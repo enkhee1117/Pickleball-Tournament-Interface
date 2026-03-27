@@ -484,7 +484,7 @@ function standings() {
     });
   }
 
-  return Object.keys(TEAMS).map(k=>({
+  return Object.keys(DEFAULT_TEAMS).map(k=>({
     key:k,
     ...s[k],
     wpct: s[k].gp>0 ? s[k].gw/s[k].gp : 0,
