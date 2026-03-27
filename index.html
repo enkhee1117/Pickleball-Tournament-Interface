@@ -328,7 +328,8 @@ function loadState() {
 // ═══════════════════════════════════════════════
 //  FIREBASE SYNC
 // ═══════════════════════════════════════════════
-let FIREBASE_URL = localStorage.getItem('mlp_firebase_url') || '';
+const HARDCODED_FIREBASE_URL = 'https://mlp-scoreboard-default-rtdb.firebaseio.com';
+let FIREBASE_URL = HARDCODED_FIREBASE_URL || localStorage.getItem('mlp_firebase_url') || '';
 let syncStatus = FIREBASE_URL ? 'pending' : 'off'; // 'off'|'pending'|'ok'|'error'
 let syncSource = null;
 let saveTimer = null;
