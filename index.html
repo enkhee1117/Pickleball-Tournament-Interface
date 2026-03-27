@@ -300,6 +300,18 @@
       background: #2a2a2a; border: none; border-radius: 12px;
       color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
     }
+    .lang-picker {
+      display: flex; gap: 8px; margin-bottom: 18px;
+    }
+    .lang-btn {
+      flex: 1; padding: 8px 4px; border-radius: 10px;
+      border: 1px solid #333; background: #252525;
+      color: #888; font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .lang-btn.lang-active {
+      background: #fff; color: #000; border-color: #fff;
+    }
 
     /* ── SYNC ── */
     .sync-bar {
@@ -1252,6 +1264,143 @@ function launchConfetti() {
   frame = requestAnimationFrame(draw);
 }
 
+// ═══════════════════════════════════════════════
+//  RULES — MULTILINGUAL
+// ═══════════════════════════════════════════════
+let rulesLang = localStorage.getItem('mlp_rules_lang') || 'en';
+
+const RULES = {
+  en: {
+    title: '📋 MLP Match Rules',
+    close: 'Got it',
+    sections: [
+      { heading: 'Match Format', rows: [
+        ['🎾', 'Each match consists of <strong>4 games</strong> played in order. First team to win <strong>3 games</strong> wins the match outright.'],
+        ['1️⃣', '<strong>Game 1 — Women\'s Doubles</strong><br>Both female players from each team.'],
+        ['2️⃣', '<strong>Game 2 — Men\'s Doubles</strong><br>Both male players from each team.'],
+        ['3️⃣', '<strong>Game 3 — Mixed Doubles 1</strong><br>One male + one female per team. Use the ⇄ Swap button to choose pairings before the game starts.'],
+        ['4️⃣', '<strong>Game 4 — Mixed Doubles 2</strong><br>Remaining male + female per team. Every player plays exactly once in mixed doubles.'],
+      ]},
+      { heading: 'Scoring', rows: [
+        ['🏓', '<strong>Rally scoring</strong> to <strong>21 points</strong>, win by 2. Every rally scores a point regardless of who served.'],
+      ]},
+      { heading: 'Dreambreaker (Tied 2–2)', rows: [
+        ['⚡', 'If the match is tied <strong>2 games each</strong>, a singles Dreambreaker decides the winner.'],
+        ['🔄', 'Each team sets a <strong>4-player rotation</strong>. Players rotate every <strong>4 rallies</strong> in that order.'],
+        ['🎯', 'Rally scoring to <strong>21, win by 2</strong> — same as a regular game.'],
+      ]},
+      { heading: 'Match Points', pts: [
+        ['3', 'Win outright — 3–1 or 4–0'],
+        ['2', 'Win the Dreambreaker — 3–2'],
+        ['1', 'Lose the Dreambreaker — 2–3'],
+        ['0', 'Lose outright — 1–3 or 0–4'],
+      ]},
+      { heading: 'Standings &amp; Advancement', rows: [
+        ['🥇', 'Teams ranked by <strong>Match Points</strong> after 3 rounds.'],
+        ['⚖️', 'Tiebreaker 1 — <strong>Game Win %</strong> (games won ÷ games played).'],
+        ['📊', 'Tiebreaker 2 — <strong>Point Differential</strong> (total points scored minus total points allowed).'],
+        ['🏆', 'Top 2 teams advance to the <strong>Championship</strong>. 3rd vs 4th play the <strong>Bronze Match</strong>.'],
+      ]},
+    ],
+  },
+  ko: {
+    title: '📋 MLP 경기 규칙',
+    close: '확인',
+    sections: [
+      { heading: '경기 형식', rows: [
+        ['🎾', '각 매치는 <strong>4게임</strong>으로 구성됩니다. 먼저 <strong>3게임</strong>을 이기는 팀이 매치를 승리합니다.'],
+        ['1️⃣', '<strong>게임 1 — 여자 복식</strong><br>각 팀의 여자 선수 2명이 출전합니다.'],
+        ['2️⃣', '<strong>게임 2 — 남자 복식</strong><br>각 팀의 남자 선수 2명이 출전합니다.'],
+        ['3️⃣', '<strong>게임 3 — 혼합 복식 1</strong><br>각 팀에서 남자 1명 + 여자 1명 출전. 게임 시작 전 ⇄ 교체 버튼으로 조합을 선택하세요.'],
+        ['4️⃣', '<strong>게임 4 — 혼합 복식 2</strong><br>나머지 남녀 각 1명 출전. 모든 선수는 혼합 복식에 정확히 한 번 출전합니다.'],
+      ]},
+      { heading: '점수 방식', rows: [
+        ['🏓', '<strong>랠리 포인트제</strong>로 <strong>21점</strong> 선취, 2점 차 승. 서브와 관계없이 모든 랠리에서 점수가 납니다.'],
+      ]},
+      { heading: '드림브레이커 (2–2 동점)', rows: [
+        ['⚡', '매치가 <strong>2게임씩</strong> 동점이 되면 단식 드림브레이커로 승자를 결정합니다.'],
+        ['🔄', '각 팀은 <strong>4명의 로테이션 순서</strong>를 정합니다. 매 <strong>4랠리</strong>마다 순서대로 교체됩니다.'],
+        ['🎯', '<strong>21점 선취, 2점 차 승</strong> — 일반 게임과 동일합니다.'],
+      ]},
+      { heading: '매치 포인트', pts: [
+        ['3', '완승 — 3–1 또는 4–0'],
+        ['2', '드림브레이커 승 — 3–2'],
+        ['1', '드림브레이커 패 — 2–3'],
+        ['0', '완패 — 1–3 또는 0–4'],
+      ]},
+      { heading: '순위 및 진출', rows: [
+        ['🥇', '3라운드 후 <strong>매치 포인트</strong>로 순위를 결정합니다.'],
+        ['⚖️', '타이브레이커 1 — <strong>게임 승률</strong> (승리 게임 수 ÷ 전체 게임 수).'],
+        ['📊', '타이브레이커 2 — <strong>점수 득실차</strong> (총 득점 − 총 실점).'],
+        ['🏆', '상위 2팀은 <strong>결승전</strong>, 3위 vs 4위는 <strong>동메달 경기</strong>에 출전합니다.'],
+      ]},
+    ],
+  },
+  zh: {
+    title: '📋 MLP 比赛规则',
+    close: '明白了',
+    sections: [
+      { heading: '比赛形式', rows: [
+        ['🎾', '每场比赛共 <strong>4局</strong>，先赢 <strong>3局</strong> 的队伍直接获胜。'],
+        ['1️⃣', '<strong>第1局 — 女子双打</strong><br>每队两名女球员出场。'],
+        ['2️⃣', '<strong>第2局 — 男子双打</strong><br>每队两名男球员出场。'],
+        ['3️⃣', '<strong>第3局 — 混合双打1</strong><br>每队各出一男一女，开赛前用 ⇄ 交换按钮选择搭档。'],
+        ['4️⃣', '<strong>第4局 — 混合双打2</strong><br>剩余男女各一名，每位球员在混双中只上场一次。'],
+      ]},
+      { heading: '计分方式', rows: [
+        ['🏓', '采用<strong>每球得分制</strong>，先得 <strong>21分</strong> 且领先 2分 者胜，无论谁发球均可得分。'],
+      ]},
+      { heading: '决胜局（2–2 平局）', rows: [
+        ['⚡', '比赛 <strong>2-2 平局</strong>时，进行单打决胜局决出胜负。'],
+        ['🔄', '每队设定 <strong>4人轮换顺序</strong>，每 <strong>4个回合</strong> 换一次人。'],
+        ['🎯', '<strong>先得21分且领先2分者胜</strong>，规则与常规局相同。'],
+      ]},
+      { heading: '积分规则', pts: [
+        ['3', '直接获胜 — 3–1 或 4–0'],
+        ['2', '赢得决胜局 — 3–2'],
+        ['1', '输掉决胜局 — 2–3'],
+        ['0', '直接失利 — 1–3 或 0–4'],
+      ]},
+      { heading: '积分榜与晋级', rows: [
+        ['🥇', '3轮后按 <strong>积分</strong> 排名。'],
+        ['⚖️', '附加赛1 — <strong>胜局率</strong>（赢得局数 ÷ 总局数）。'],
+        ['📊', '附加赛2 — <strong>净胜分</strong>（总得分 − 总失分）。'],
+        ['🏆', '前2名晋级<strong>冠军赛</strong>，第3名对第4名争夺<strong>铜牌</strong>。'],
+      ]},
+    ],
+  },
+};
+
+function rulesBodyHtml(lang) {
+  const r = RULES[lang];
+  return r.sections.map(sec => {
+    const heading = `<h3>${sec.heading}</h3>`;
+    if (sec.pts) {
+      const pts = sec.pts.map(([v,d])=>`<div class="pts-val">${v}</div><div class="pts-desc">${d}</div>`).join('');
+      return heading + `<div class="pts-grid">${pts}</div>`;
+    }
+    const rows = sec.rows.map(([icon,text])=>
+      `<div class="rule-row"><span class="rule-icon">${icon}</span><span>${text}</span></div>`
+    ).join('');
+    return heading + rows;
+  }).join('');
+}
+
+function setRulesLang(lang) {
+  rulesLang = lang;
+  localStorage.setItem('mlp_rules_lang', lang);
+  const body = document.getElementById('rules-body');
+  const title = document.getElementById('rules-title');
+  const closeBtn = document.getElementById('rules-close-btn');
+  if (body) body.innerHTML = rulesBodyHtml(lang);
+  if (title) title.textContent = RULES[lang].title;
+  if (closeBtn) closeBtn.textContent = RULES[lang].close;
+  ['en','ko','zh'].forEach(l => {
+    const btn = document.getElementById('lang-btn-'+l);
+    if (btn) btn.className = 'lang-btn' + (l===lang?' lang-active':'');
+  });
+}
+
 function showRules() {
   if (document.getElementById('rules-overlay')) return;
   const el = document.createElement('div');
@@ -1260,38 +1409,14 @@ function showRules() {
   el.innerHTML = `
     <div class="rules-sheet">
       <div class="rules-handle"></div>
-      <h2>📋 MLP Match Rules</h2>
-
-      <h3>Match Format</h3>
-      <div class="rule-row"><span class="rule-icon">🎾</span><span>Each match consists of <strong>4 games</strong> played in order. First team to win <strong>3 games</strong> wins the match outright.</span></div>
-      <div class="rule-row"><span class="rule-icon">1️⃣</span><span><strong>Game 1 — Women's Doubles</strong><br>Both female players from each team.</span></div>
-      <div class="rule-row"><span class="rule-icon">2️⃣</span><span><strong>Game 2 — Men's Doubles</strong><br>Both male players from each team.</span></div>
-      <div class="rule-row"><span class="rule-icon">3️⃣</span><span><strong>Game 3 — Mixed Doubles 1</strong><br>One male + one female per team. Use the ⇄ Swap button to choose pairings before the game starts.</span></div>
-      <div class="rule-row"><span class="rule-icon">4️⃣</span><span><strong>Game 4 — Mixed Doubles 2</strong><br>Remaining male + female per team. Every player plays exactly once in mixed doubles.</span></div>
-
-      <h3>Scoring</h3>
-      <div class="rule-row"><span class="rule-icon">🏓</span><span><strong>Rally scoring</strong> to <strong>21 points</strong>, win by 2. Every rally scores a point regardless of who served.</span></div>
-
-      <h3>Dreambreaker (Tied 2–2)</h3>
-      <div class="rule-row"><span class="rule-icon">⚡</span><span>If the match is tied <strong>2 games each</strong>, a singles Dreambreaker decides the winner.</span></div>
-      <div class="rule-row"><span class="rule-icon">🔄</span><span>Each team sets a <strong>4-player rotation</strong>. Players rotate every <strong>4 rallies</strong> in that order.</span></div>
-      <div class="rule-row"><span class="rule-icon">🎯</span><span>Rally scoring to <strong>21, win by 2</strong> — same as a regular game.</span></div>
-
-      <h3>Match Points</h3>
-      <div class="pts-grid">
-        <div class="pts-val">3</div><div class="pts-desc">Win outright — 3–1 or 4–0</div>
-        <div class="pts-val">2</div><div class="pts-desc">Win the Dreambreaker — 3–2</div>
-        <div class="pts-val">1</div><div class="pts-desc">Lose the Dreambreaker — 2–3</div>
-        <div class="pts-val">0</div><div class="pts-desc">Lose outright — 1–3 or 0–4</div>
+      <div class="lang-picker">
+        <button id="lang-btn-en" class="lang-btn${rulesLang==='en'?' lang-active':''}" onclick="setRulesLang('en')">EN</button>
+        <button id="lang-btn-ko" class="lang-btn${rulesLang==='ko'?' lang-active':''}" onclick="setRulesLang('ko')">한국어</button>
+        <button id="lang-btn-zh" class="lang-btn${rulesLang==='zh'?' lang-active':''}" onclick="setRulesLang('zh')">中文</button>
       </div>
-
-      <h3>Standings &amp; Advancement</h3>
-      <div class="rule-row"><span class="rule-icon">🥇</span><span>Teams ranked by <strong>Match Points</strong> after 3 rounds.</span></div>
-      <div class="rule-row"><span class="rule-icon">⚖️</span><span>Tiebreaker 1 — <strong>Game Win %</strong> (games won ÷ games played).</span></div>
-      <div class="rule-row"><span class="rule-icon">📊</span><span>Tiebreaker 2 — <strong>Point Differential</strong> (total points scored minus total points allowed).</span></div>
-      <div class="rule-row"><span class="rule-icon">🏆</span><span>Top 2 teams advance to the <strong>Championship</strong>. 3rd vs 4th play the <strong>Bronze Match</strong>.</span></div>
-
-      <button class="rules-close" onclick="document.getElementById('rules-overlay').remove()">Got it</button>
+      <h2 id="rules-title">${RULES[rulesLang].title}</h2>
+      <div id="rules-body">${rulesBodyHtml(rulesLang)}</div>
+      <button id="rules-close-btn" class="rules-close" onclick="document.getElementById('rules-overlay').remove()">${RULES[rulesLang].close}</button>
     </div>
   `;
   document.body.appendChild(el);
