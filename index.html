@@ -755,13 +755,13 @@ function scoreBlock(matchId, gi, s1, s2, done, winner, t1key, t2key) {
     <div class="score-row">
       <div class="score-side">
         <button class="score-tap" onclick="adj('${mid}',${gi},1,1)" style="color:${tc(t1key)}">+</button>
-        <div class="score-num-big" onclick="editScore('${mid}',${gi},1,${s1},${JSON.stringify(tc(t1key))})" style="cursor:pointer" title="Tap to edit">${s1}</div>
+        <div class="score-num-big" onclick="editScore('${mid}',${gi},1,${s1},'${tc(t1key)}')" style="cursor:pointer" title="Tap to edit">${s1}</div>
         <button class="score-tap minus" onclick="adj('${mid}',${gi},1,-1)">−</button>
       </div>
       <div class="score-sep">–</div>
       <div class="score-side right">
         <button class="score-tap minus" onclick="adj('${mid}',${gi},2,-1)">−</button>
-        <div class="score-num-big" onclick="editScore('${mid}',${gi},2,${s2},${JSON.stringify(tc(t2key))})" style="cursor:pointer" title="Tap to edit">${s2}</div>
+        <div class="score-num-big" onclick="editScore('${mid}',${gi},2,${s2},'${tc(t2key)}')" style="cursor:pointer" title="Tap to edit">${s2}</div>
         <button class="score-tap" onclick="adj('${mid}',${gi},2,1)" style="color:${tc(t2key)}">+</button>
       </div>
     </div>
