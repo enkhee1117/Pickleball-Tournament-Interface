@@ -387,9 +387,9 @@ const SCHEDULE = [
   { id:0, round:1, court:'1', t1:'red',  t2:'blue'  },
   { id:1, round:1, court:'2', t1:'green',t2:'gold'  },
   { id:2, round:2, court:'1', t1:'red',  t2:'green' },
-  { id:3, round:2, court:'2', t1:'blue', t2:'gold'  },
-  { id:4, round:3, court:'1', t1:'red',  t2:'gold'  },
-  { id:5, round:3, court:'2', t1:'blue', t2:'green' },
+  { id:3, round:2, court:'3', t1:'blue', t2:'gold'  },
+  { id:4, round:3, court:'2', t1:'red',  t2:'gold'  },
+  { id:5, round:3, court:'3', t1:'blue', t2:'green' },
 ];
 
 const GAME_LABELS = ["Women's Doubles","Men's Doubles","Mixed Doubles 1","Mixed Doubles 2","Dreambreaker"];
@@ -438,17 +438,19 @@ let FIREBASE_URL = HARDCODED_FIREBASE_URL || localStorage.getItem('mlp_firebase_
 let syncStatus = FIREBASE_URL ? 'pending' : 'off'; // 'off'|'pending'|'ok'|'error'
 let syncSource = null;
 let saveTimer = null;
+let localWrite = false;
 
 function save() {
   localStorage.setItem('mlp_v3', JSON.stringify(state));
   if (!FIREBASE_URL) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
+    localWrite = true;
     fetch(FIREBASE_URL + '/mlp_state.json', {
       method: 'PUT',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(state)
-    }).catch(()=>{ syncStatus='error'; renderSyncBar(); });
+    }).catch(()=>{ localWrite = false; syncStatus='error'; renderSyncBar(); });
   }, 150); // debounce rapid taps
 }
 
@@ -461,6 +463,12 @@ function initSync() {
     try {
       const payload = JSON.parse(e.data);
       if (payload.data) {
+        if (localWrite) {
+          // This is our own write echoed back — skip re-render to preserve input focus
+          localWrite = false;
+          syncStatus = 'ok'; renderSyncBar();
+          return;
+        }
         state = payload.data;
         // Migrate: ensure teams and courts always present
         if (!state.teams) state.teams = JSON.parse(JSON.stringify(DEFAULT_TEAMS));
