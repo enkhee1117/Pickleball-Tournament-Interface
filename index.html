@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MLP Scoreboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      background: #0d0d0d;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    .nav {
+      position: sticky; top: 0; z-index: 100;
+      background: #141414;
+      border-bottom: 1px solid #2a2a2a;
+      display: flex;
+    }
+    .nav button {
+      flex: 1; padding: 14px 4px;
+      background: none; border: none; border-bottom: 3px solid transparent;
+      color: #666; font-size: 13px; font-weight: 700; cursor: pointer;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      transition: color 0.15s;
+    }
+    .nav button.active { color: #fff; border-bottom-color: #fff; }
+
+    /* ── ROUND HEADER ── */
+    .round-header {
+      padding: 20px 16px 6px;
+      font-size: 11px; font-weight: 700; color: #555;
+      text-transform: uppercase; letter-spacing: 1.5px;
+    }
+
+    /* ── MATCH CARD ── */
+    .match-card {
+      background: #1a1a1a;
+      border-radius: 16px;
+      margin: 8px 12px;
+      overflow: hidden;
+      border: 1px solid #2a2a2a;
+    }
+    .match-top {
+      background: #1f1f1f;
+      padding: 10px 14px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .match-label { font-size: 11px; color: #555; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+    .badge {
+      font-size: 10px; font-weight: 700; padding: 3px 9px;
+      border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .badge-upcoming { background: #1e3a5f; color: #60a5fa; }
+    .badge-live { background: #5f1e1e; color: #f87171; animation: pulse 2s infinite; }
+    .badge-done { background: #1a2a1a; color: #4ade80; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+    /* ── TEAMS SCORE BAR ── */
+    .teams-bar {
+      display: grid; grid-template-columns: 1fr 48px 1fr;
+      align-items: center; padding: 16px 14px 12px; gap: 8px;
+    }
+    .team-side { }
+    .team-side.right { text-align: right; }
+    .team-name-sm { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+    .games-won { font-size: 40px; font-weight: 900; line-height: 1; }
+    .match-pts-label { font-size: 11px; color: #555; margin-top: 2px; }
+    .vs-circle {
+      text-align: center; color: #444; font-size: 13px; font-weight: 700;
+    }
+
+    /* ── GAME ROW ── */
+    .game-section {
+      border-top: 1px solid #252525;
+      padding: 12px 14px;
+    }
+    .game-section.complete { background: #161616; }
+    .game-title-row {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .game-title { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.8px; }
+    .game-done-label { font-size: 11px; font-weight: 700; }
+    .players-row {
+      display: grid; grid-template-columns: 1fr auto 1fr;
+      gap: 6px; margin-bottom: 10px;
+    }
+    .player-names { font-size: 11px; color: #777; }
+    .player-names.right { text-align: right; }
+    .vs-tiny { font-size: 10px; color: #444; text-align: center; }
+
+    /* ── SCORE CONTROLS ── */
+    .score-row {
+      display: grid; grid-template-columns: 1fr 32px 1fr;
+      align-items: center; gap: 6px;
+    }
+    .score-side {
+      display: flex; align-items: center; gap: 0;
+      background: #252525; border-radius: 12px; overflow: hidden;
+    }
+    .score-side.right { flex-direction: row-reverse; }
+    .score-tap {
+      flex: 0 0 44px; height: 52px;
+      background: none; border: none; color: #fff;
+      font-size: 26px; font-weight: 300; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.1s;
+    }
+    .score-tap:active { background: #3a3a3a; }
+    .score-tap.minus { font-size: 20px; color: #555; }
+    .score-num-big {
+      flex: 1; text-align: center;
+      font-size: 32px; font-weight: 900; line-height: 52px;
+      min-width: 0;
+    }
+    .score-sep { text-align: center; color: #444; font-size: 14px; font-weight: 600; }
+
+    /* ── DONE BUTTON ── */
+    .done-btn {
+      width: 100%; margin-top: 10px; padding: 11px;
+      background: #252525; border: none; border-radius: 10px;
+      color: #aaa; font-size: 13px; font-weight: 700; cursor: pointer;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      transition: background 0.1s;
+    }
+    .done-btn:active { background: #333; }
+
+    .undo-btn {
+      margin-top: 6px; padding: 5px 10px;
+      background: transparent; border: 1px solid #2a2a2a;
+      border-radius: 6px; color: #555; font-size: 11px; cursor: pointer;
+    }
+
+    .reset-row { padding: 8px 14px 12px; text-align: right; }
+    .reset-btn {
+      padding: 5px 12px; background: transparent;
+      border: 1px solid #2a2a2a; border-radius: 6px;
+      color: #444; font-size: 11px; cursor: pointer;
+    }
+
+    /* ── MATCH RESULT BANNER ── */
+    .result-banner {
+      padding: 12px 14px; text-align: center;
+      font-size: 14px; font-weight: 700;
+    }
+
+    /* ── STANDINGS ── */
+    .standings-page { padding-bottom: 40px; }
+    .standings-header { padding: 20px 16px 8px; }
+    .standings-header h1 { font-size: 22px; font-weight: 800; }
+    .standings-header p { color: #666; font-size: 13px; margin-top: 4px; }
+
+    .card {
+      background: #1a1a1a; border-radius: 14px;
+      margin: 8px 12px; overflow: hidden;
+      border: 1px solid #2a2a2a;
+    }
+    .card-label {
+      padding: 10px 14px 4px;
+      font-size: 10px; font-weight: 700; color: #555;
+      text-transform: uppercase; letter-spacing: 1.5px;
+    }
+
+    .standings-row {
+      display: grid;
+      grid-template-columns: 24px 1fr 42px 54px 46px 52px;
+      align-items: center;
+      padding: 12px 14px;
+      border-top: 1px solid #252525;
+      gap: 4px;
+    }
+    .standings-row.header-row {
+      padding: 8px 14px;
+      border-top: none;
+    }
+    .standings-row.header-row span {
+      font-size: 10px; color: #555; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .standings-rank { font-size: 13px; color: #555; font-weight: 700; }
+    .standings-team { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .standings-pts { font-size: 18px; font-weight: 900; text-align: center; }
+    .standings-games { font-size: 12px; text-align: center; color: #999; }
+    .standings-diff { font-size: 12px; text-align: center; color: #999; }
+    .finals-badge {
+      font-size: 10px; font-weight: 700; padding: 3px 7px;
+      border-radius: 20px; text-align: center;
+    }
+    .finals-in { background: #14532d; color: #4ade80; }
+    .bronze-in { background: #3a2000; color: #cd7f32; }
+    .finals-out { background: transparent; color: #444; }
+
+    .info-card { padding: 14px 16px; font-size: 13px; line-height: 2; color: #aaa; }
+    .info-card strong { color: #fff; }
+
+    .schedule-match { margin-bottom: 4px; }
+
+    /* ── CHAMPIONSHIP ── */
+    .champ-section { margin-top: 4px; }
+    .champ-note { color: #facc15; font-size: 12px; margin-top: 4px; }
+
+    /* ── PAGE BOTTOM PAD ── */
+    .page-pad { height: 40px; }
+
+    /* ── SYNC ── */
+    .sync-bar {
+      background: #141414; border-bottom: 1px solid #2a2a2a;
+      padding: 8px 14px; display: flex; align-items: center; justify-content: space-between;
+      font-size: 12px;
+    }
+    .sync-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; flex-shrink:0; }
+    .sync-connected .sync-dot { background: #4ade80; }
+    .sync-disconnected .sync-dot { background: #ef4444; }
+    .sync-pending .sync-dot { background: #facc15; animation: pulse 1s infinite; }
+    .sync-label { color: #888; }
+    .sync-connected .sync-label { color: #4ade80; }
+    .sync-setup-btn {
+      font-size: 11px; padding: 4px 10px; background: #2a2a2a;
+      border: none; border-radius: 6px; color: #aaa; cursor: pointer; font-weight: 600;
+    }
+
+    /* ── SETUP OVERLAY ── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999; padding: 20px;
+    }
+    .overlay-card {
+      background: #1a1a1a; border-radius: 18px; padding: 24px;
+      width: 100%; max-width: 420px; border: 1px solid #333;
+    }
+    .overlay-card h2 { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+    .overlay-card p { font-size: 13px; color: #888; line-height: 1.6; margin-bottom: 14px; }
+    .overlay-card ol { font-size: 13px; color: #aaa; line-height: 2; padding-left: 18px; margin-bottom: 16px; }
+    .overlay-card ol strong { color: #fff; }
+    .overlay-input {
+      width: 100%; padding: 12px; background: #0d0d0d; border: 1px solid #333;
+      border-radius: 10px; color: #fff; font-size: 13px; margin-bottom: 10px;
+      outline: none;
+    }
+    .overlay-input:focus { border-color: #555; }
+    .overlay-btns { display: flex; gap: 8px; }
+    .overlay-btn-primary {
+      flex: 1; padding: 12px; background: #fff; color: #000;
+      border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    .overlay-btn-skip {
+      padding: 12px 16px; background: #2a2a2a; color: #888;
+      border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ═══════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════
+const TEAMS = {
+  red:   { name: 'Team Red',   color: '#ef4444', males: ['Thai','Enrique'],    females: ['Shilan','Sandy']    },
+  blue:  { name: 'Team Blue',  color: '#60a5fa', males: ['Ed','Michael Lee'],  females: ['Manal','Joomi']     },
+  green: { name: 'Team Green', color: '#4ade80', males: ['Enke','Andrew'],     females: ['Jenny','Young']     },
+  gold:  { name: 'Team Gold',  color: '#facc15', males: ['Paul','Alix'],       females: ['Terry','Elina']     },
+};
+
+const SCHEDULE = [
+  { id:0, round:1, court:'1', t1:'red',  t2:'blue'  },
+  { id:1, round:1, court:'2', t1:'green',t2:'gold'  },
+  { id:2, round:2, court:'1', t1:'red',  t2:'green' },
+  { id:3, round:2, court:'2', t1:'blue', t2:'gold'  },
+  { id:4, round:3, court:'1', t1:'red',  t2:'gold'  },
+  { id:5, round:3, court:'2', t1:'blue', t2:'green' },
+];
+
+const GAME_LABELS = ["Women's Doubles","Men's Doubles","Mixed Doubles 1","Mixed Doubles 2","Dreambreaker"];
+
+// mixedOpt: { t1: 0|1, t2: 0|1 }
+// opt=0: Mixed1=(F0+M0, F1+M1)  opt=1: Mixed1=(F1+M0, F0+M1)  — females swap
+function gamePlayers(def, gi, mixedOpt) {
+  const t1 = TEAMS[def.t1], t2 = TEAMS[def.t2];
+  if (gi===0) return { p1: t1.females.join(' & '), p2: t2.females.join(' & ') };
+  if (gi===1) return { p1: t1.males.join(' & '),   p2: t2.males.join(' & ')   };
+  const o1 = (mixedOpt && mixedOpt.t1) || 0;
+  const o2 = (mixedOpt && mixedOpt.t2) || 0;
+  if (gi===2) return {
+    p1: `${t1.females[o1===0?0:1]} & ${t1.males[0]}`,
+    p2: `${t2.females[o2===0?0:1]} & ${t2.males[0]}`,
+  };
+  if (gi===3) return {
+    p1: `${t1.females[o1===0?1:0]} & ${t1.males[1]}`,
+    p2: `${t2.females[o2===0?1:0]} & ${t2.males[1]}`,
+  };
+  return { p1: t1.name, p2: t2.name };
+}
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+function blankGame() { return { s1:0, s2:0, done:false, winner:null }; }
+function blankMatch(id) {
+  return { id, games:[0,1,2,3].map(()=>blankGame()), db:blankGame(), needsDB:false, done:false, winner:null, mixedOpt:{t1:0,t2:0} };
+}
+
+function defaultState() {
+  return { view:'matches', matches:SCHEDULE.map(m=>blankMatch(m.id)), champMatch:null, bronzeMatch:null };
+}
+
+function loadState() {
+  try { const s=localStorage.getItem('mlp_v3'); if(s) return JSON.parse(s); } catch(e){}
+  return defaultState();
+}
+
+// ═══════════════════════════════════════════════
+//  FIREBASE SYNC
+// ═══════════════════════════════════════════════
+let FIREBASE_URL = localStorage.getItem('mlp_firebase_url') || '';
+let syncStatus = FIREBASE_URL ? 'pending' : 'off'; // 'off'|'pending'|'ok'|'error'
+let syncSource = null;
+let saveTimer = null;
+
+function save() {
+  localStorage.setItem('mlp_v3', JSON.stringify(state));
+  if (!FIREBASE_URL) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    fetch(FIREBASE_URL + '/mlp_state.json', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(state)
+    }).catch(()=>{ syncStatus='error'; renderSyncBar(); });
+  }, 150); // debounce rapid taps
+}
+
+function initSync() {
+  if (syncSource) { syncSource.close(); syncSource = null; }
+  if (!FIREBASE_URL) { syncStatus='off'; renderSyncBar(); return; }
+  syncStatus = 'pending'; renderSyncBar();
+  syncSource = new EventSource(FIREBASE_URL + '/mlp_state.json');
+  syncSource.addEventListener('put', e => {
+    try {
+      const payload = JSON.parse(e.data);
+      if (payload.data) {
+        state = payload.data;
+        localStorage.setItem('mlp_v3', JSON.stringify(state));
+        syncStatus = 'ok'; render();
+      } else if (payload.path === '/' && payload.data === null) {
+        // DB is empty — push our local state up
+        save();
+        syncStatus = 'ok'; renderSyncBar();
+      }
+    } catch(_) {}
+  });
+  syncSource.onerror = () => { syncStatus='error'; renderSyncBar(); };
+}
+
+function connectFirebase() {
+  const input = document.getElementById('fb-url-input');
+  const url = (input ? input.value : '').trim().replace(/\/$/, '');
+  if (!url.startsWith('https://')) { alert('Enter a valid Firebase database URL (starts with https://)'); return; }
+  FIREBASE_URL = url;
+  localStorage.setItem('mlp_firebase_url', FIREBASE_URL);
+  document.getElementById('sync-overlay').remove();
+  initSync();
+}
+
+function disconnectFirebase() {
+  FIREBASE_URL = ''; localStorage.removeItem('mlp_firebase_url');
+  initSync();
+}
+
+function showSetupOverlay() {
+  const existing = document.getElementById('sync-overlay');
+  if (existing) { existing.remove(); return; }
+  const el = document.createElement('div');
+  el.className = 'overlay'; el.id = 'sync-overlay';
+  el.innerHTML = `
+    <div class="overlay-card">
+      <h2>🔄 Live Sync Setup</h2>
+      <p>Connect a free Firebase Realtime Database so everyone sees scores update in real time.</p>
+      <ol>
+        <li>Go to <strong>console.firebase.google.com</strong></li>
+        <li>Create a project → <strong>Build → Realtime Database</strong></li>
+        <li>Click <strong>Create Database</strong> → choose <strong>Test mode</strong></li>
+        <li>Copy the database URL<br><span style="color:#666;font-size:11px">(looks like https://your-project-default-rtdb.firebaseio.com)</span></li>
+      </ol>
+      <input class="overlay-input" id="fb-url-input" type="url"
+        placeholder="https://your-project-default-rtdb.firebaseio.com"
+        value="${FIREBASE_URL}" />
+      <div class="overlay-btns">
+        <button class="overlay-btn-primary" onclick="connectFirebase()">Connect</button>
+        <button class="overlay-btn-skip" onclick="document.getElementById('sync-overlay').remove()">Skip</button>
+      </div>
+      ${FIREBASE_URL ? `<div style="margin-top:10px;text-align:center"><button onclick="disconnectFirebase();document.getElementById('sync-overlay').remove()" style="background:none;border:none;color:#ef4444;font-size:12px;cursor:pointer">Disconnect &amp; use local only</button></div>` : ''}
+    </div>
+  `;
+  document.body.appendChild(el);
+}
+
+function renderSyncBar() {
+  const bar = document.getElementById('sync-status-bar');
+  if (!bar) return;
+  const cls = syncStatus==='ok'?'sync-connected':syncStatus==='error'?'sync-disconnected':'sync-pending';
+  const label = syncStatus==='ok'?'Live sync on':syncStatus==='error'?'Sync error':syncStatus==='off'?'Local only':'Connecting…';
+  bar.className = 'sync-bar ' + cls;
+  bar.innerHTML = `
+    <span><span class="sync-dot"></span><span class="sync-label">${label}</span></span>
+    <button class="sync-setup-btn" onclick="showSetupOverlay()">${syncStatus==='off'?'Set up sync':'Manage sync'}</button>
+  `;
+}
+
+let state = loadState();
+
+// ═══════════════════════════════════════════════
+//  LOGIC
+// ═══════════════════════════════════════════════
+function gamesWon(match) {
+  let t1=0,t2=0;
+  match.games.forEach(g=>{ if(g.done){ g.winner==='t1'?t1++:t2++; }});
+  // Count dreambreaker as a game so score shows 3-2, not 2-2
+  if (match.db.done) { match.db.winner==='t1'?t1++:t2++; }
+  return {t1,t2};
+}
+
+function matchPoints(match) {
+  if (!match.done) return {t1:0,t2:0};
+  if (match.needsDB) {
+    return match.winner==='t1' ? {t1:2,t2:1} : {t1:1,t2:2};
+  }
+  return match.winner==='t1' ? {t1:3,t2:0} : {t1:0,t2:3};
+}
+
+function standings() {
+  const s = {};
+  Object.keys(TEAMS).forEach(k=>{s[k]={mp:0,gw:0,gp:0,pf:0,pa:0};});
+
+  SCHEDULE.forEach((def,i)=>{
+    const m = state.matches[i];
+    if (!m.done) return;
+    const pts = matchPoints(m);
+    s[def.t1].mp += pts.t1;
+    s[def.t2].mp += pts.t2;
+    m.games.forEach(g=>{
+      if (!g.done) return;
+      s[def.t1].gw += g.winner==='t1'?1:0;
+      s[def.t2].gw += g.winner==='t2'?1:0;
+      s[def.t1].gp++; s[def.t2].gp++;
+      s[def.t1].pf+=g.s1; s[def.t1].pa+=g.s2;
+      s[def.t2].pf+=g.s2; s[def.t2].pa+=g.s1;
+    });
+    if (m.db.done) {
+      s[def.t1].pf+=m.db.s1; s[def.t1].pa+=m.db.s2;
+      s[def.t2].pf+=m.db.s2; s[def.t2].pa+=m.db.s1;
+    }
+  });
+
+  // Championship match
+  if (state.champMatch && state.champMatch.done) {
+    const cm = state.champMatch;
+    const def = {t1: cm.t1key, t2: cm.t2key};
+    const pts = matchPoints(cm);
+    s[def.t1].mp += pts.t1; s[def.t2].mp += pts.t2;
+    cm.games.forEach(g=>{
+      if (!g.done) return;
+      s[def.t1].gw += g.winner==='t1'?1:0;
+      s[def.t2].gw += g.winner==='t2'?1:0;
+      s[def.t1].gp++; s[def.t2].gp++;
+      s[def.t1].pf+=g.s1; s[def.t1].pa+=g.s2;
+      s[def.t2].pf+=g.s2; s[def.t2].pa+=g.s1;
+    });
+  }
+
+  return Object.keys(TEAMS).map(k=>({
+    key:k,
+    ...s[k],
+    wpct: s[k].gp>0 ? s[k].gw/s[k].gp : 0,
+    diff: s[k].pf - s[k].pa,
+  })).sort((a,b)=> b.mp-a.mp || b.wpct-a.wpct || b.diff-a.diff);
+}
+
+function rrComplete() {
+  return state.matches.every(m=>m.done);
+}
+
+function getTop2() {
+  const st = standings();
+  return [st[0].key, st[1].key];
+}
+
+function getBottom2() {
+  const st = standings();
+  return [st[2].key, st[3].key];
+}
+
+// ═══════════════════════════════════════════════
+//  ACTIONS
+// ═══════════════════════════════════════════════
+function getMatch(matchId) {
+  if (matchId==='champ') return state.champMatch;
+  if (matchId==='bronze') return state.bronzeMatch;
+  return state.matches[matchId];
+}
+
+function adj(matchId, gi, team, delta) {
+  const m = getMatch(matchId);
+  const isDB = gi===4;
+  const game = isDB ? m.db : m.games[gi];
+  if (game.done) return;
+  if (team===1) game.s1 = Math.max(0, game.s1+delta);
+  else          game.s2 = Math.max(0, game.s2+delta);
+  save(); render();
+}
+
+function markDone(matchId, gi) {
+  const m = getMatch(matchId);
+  const isDB = gi===4;
+  const game = isDB ? m.db : m.games[gi];
+  if (game.done) return;
+  if (game.s1===game.s2) { alert("Scores are tied — can't complete game."); return; }
+  game.done = true;
+  game.winner = game.s1>game.s2 ? 't1' : 't2';
+
+  if (!isDB) {
+    const allDone = m.games.every(g=>g.done);
+    if (allDone) {
+      const gw = gamesWon(m);
+      if (gw.t1===gw.t2) {
+        m.needsDB = true;
+      } else {
+        m.done = true;
+        m.winner = gw.t1>gw.t2 ? 't1' : 't2';
+      }
+    }
+  } else {
+    m.done = true;
+    m.winner = game.winner;
+  }
+
+  // Auto-create championship + bronze if RR just completed
+  if (matchId!=='champ' && matchId!=='bronze' && rrComplete()) {
+    if (!state.champMatch) {
+      const [k1,k2] = getTop2();
+      state.champMatch = { ...blankMatch('champ'), t1key:k1, t2key:k2 };
+    }
+    if (!state.bronzeMatch) {
+      const [k3,k4] = getBottom2();
+      state.bronzeMatch = { ...blankMatch('bronze'), t1key:k3, t2key:k4 };
+    }
+  }
+  save(); render();
+}
+
+function undoGame(matchId, gi) {
+  const m = getMatch(matchId);
+  const isDB = gi===4;
+  const game = isDB ? m.db : m.games[gi];
+  game.done = false; game.winner = null;
+  m.done = false; m.winner = null;
+  if (isDB) m.needsDB = true;
+  else m.needsDB = false;
+  save(); render();
+}
+
+function resetMatch(matchId) {
+  if (!confirm('Reset this match?')) return;
+  if (matchId==='champ') state.champMatch = null;
+  else if (matchId==='bronze') state.bronzeMatch = null;
+  else state.matches[matchId] = blankMatch(matchId);
+  save(); render();
+}
+
+function toggleMixed(matchId, team) {
+  const m = getMatch(matchId);
+  if (!m.mixedOpt) m.mixedOpt = {t1:0,t2:0};
+  m.mixedOpt[team] = m.mixedOpt[team]===0 ? 1 : 0;
+  save(); render();
+}
+
+function setView(v) { state.view=v; save(); render(); }
+
+// ═══════════════════════════════════════════════
+//  RENDER HELPERS
+// ═══════════════════════════════════════════════
+function tc(key) { return TEAMS[key].color; }
+
+function scoreBlock(matchId, gi, s1, s2, done, winner, t1key, t2key) {
+  const mid = matchId;
+  if (done) {
+    // Static display when done
+    const w1 = winner==='t1';
+    return `
+      <div class="score-row">
+        <div class="score-side" style="justify-content:center">
+          <div class="score-num-big" style="color:${w1?tc(t1key):'#fff'}">${s1}</div>
+        </div>
+        <div class="score-sep">–</div>
+        <div class="score-side right" style="justify-content:center">
+          <div class="score-num-big" style="color:${!w1?tc(t2key):'#fff'}">${s2}</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:4px">
+        <button class="undo-btn" onclick="undoGame('${mid}',${gi})">Undo</button>
+      </div>
+    `;
+  }
+  return `
+    <div class="score-row">
+      <div class="score-side">
+        <button class="score-tap" onclick="adj('${mid}',${gi},1,1)" style="color:${tc(t1key)}">+</button>
+        <div class="score-num-big">${s1}</div>
+        <button class="score-tap minus" onclick="adj('${mid}',${gi},1,-1)">−</button>
+      </div>
+      <div class="score-sep">–</div>
+      <div class="score-side right">
+        <button class="score-tap minus" onclick="adj('${mid}',${gi},2,-1)">−</button>
+        <div class="score-num-big">${s2}</div>
+        <button class="score-tap" onclick="adj('${mid}',${gi},2,1)" style="color:${tc(t2key)}">+</button>
+      </div>
+    </div>
+    <button class="done-btn" onclick="markDone('${mid}',${gi})">Mark Game Done ✓</button>
+  `;
+}
+
+function renderMixedSwapRow(def, m, matchId) {
+  const opt = m.mixedOpt || {t1:0,t2:0};
+  const t1 = TEAMS[def.t1], t2 = TEAMS[def.t2];
+  // Show current pairing summary for each team
+  const p1a = `${t1.females[opt.t1===0?0:1]} & ${t1.males[0]}`;
+  const p1b = `${t1.females[opt.t1===0?1:0]} & ${t1.males[1]}`;
+  const p2a = `${t2.females[opt.t2===0?0:1]} & ${t2.males[0]}`;
+  const p2b = `${t2.females[opt.t2===0?1:0]} & ${t2.males[1]}`;
+  const mixedLocked = m.games[2].done || m.games[3].done;
+  const lockNote = mixedLocked ? '<span style="color:#555;font-size:10px">locked after game starts</span>' : '';
+  return `
+    <div style="border-top:1px solid #252525;padding:10px 14px;background:#131313">
+      <div style="font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Mixed Doubles Pairings</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:#1e1e1e;border-radius:10px;padding:8px 10px">
+          <div style="font-size:11px;font-weight:700;color:${tc(def.t1)};margin-bottom:4px">${t1.name}</div>
+          <div style="font-size:11px;color:#888;margin-bottom:2px">MD1: ${p1a}</div>
+          <div style="font-size:11px;color:#888;margin-bottom:6px">MD2: ${p1b}</div>
+          ${!mixedLocked?`<button onclick="toggleMixed('${matchId}','t1')" style="width:100%;padding:5px;background:#2a2a2a;border:none;border-radius:7px;color:#ccc;font-size:11px;font-weight:700;cursor:pointer">⇄ Swap</button>`:'<div style="font-size:10px;color:#444;text-align:center">locked</div>'}
+        </div>
+        <div style="background:#1e1e1e;border-radius:10px;padding:8px 10px">
+          <div style="font-size:11px;font-weight:700;color:${tc(def.t2)};margin-bottom:4px">${t2.name}</div>
+          <div style="font-size:11px;color:#888;margin-bottom:2px">MD1: ${p2a}</div>
+          <div style="font-size:11px;color:#888;margin-bottom:6px">MD2: ${p2b}</div>
+          ${!mixedLocked?`<button onclick="toggleMixed('${matchId}','t2')" style="width:100%;padding:5px;background:#2a2a2a;border:none;border-radius:7px;color:#ccc;font-size:11px;font-weight:700;cursor:pointer">⇄ Swap</button>`:'<div style="font-size:10px;color:#444;text-align:center">locked</div>'}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderGameSection(def, m, gi, matchId) {
+  const isDB = gi===4;
+  const game = isDB ? m.db : m.games[gi];
+  const label = GAME_LABELS[gi];
+  const players = gamePlayers(def, gi, m.mixedOpt);
+  const t1 = def.t1, t2 = def.t2;
+
+  let doneLabelHtml = '';
+  if (game.done) {
+    const winKey = game.winner==='t1'?t1:t2;
+    doneLabelHtml = `<span class="game-done-label" style="color:${tc(winKey)}">${TEAMS[winKey].name} wins</span>`;
+  }
+
+  // Insert swap row just before Mixed Doubles 1
+  const swapRow = (gi===2) ? renderMixedSwapRow(def, m, matchId) : '';
+
+  return `
+    ${swapRow}
+    <div class="game-section${game.done?' complete':''}">
+      <div class="game-title-row">
+        <span class="game-title">${label}</span>
+        ${doneLabelHtml}
+      </div>
+      <div class="players-row">
+        <div class="player-names" style="color:${tc(t1)}">${players.p1}</div>
+        <div class="vs-tiny">vs</div>
+        <div class="player-names right" style="color:${tc(t2)}">${players.p2}</div>
+      </div>
+      ${scoreBlock(matchId, gi, game.s1, game.s2, game.done, game.winner, t1, t2)}
+    </div>
+  `;
+}
+
+function renderMatchCard(def, m, matchId) {
+  const t1 = TEAMS[def.t1], t2 = TEAMS[def.t2];
+  const gw = gamesWon(m);
+  const pts = matchPoints(m);
+
+  // Badge
+  let badge, badgeClass;
+  if (m.done) { badge='Final'; badgeClass='badge-done'; }
+  else if (m.games.some(g=>g.s1>0||g.s2>0||g.done)||m.db.s1>0||m.db.s2>0) { badge='Live'; badgeClass='badge-live'; }
+  else { badge='Upcoming'; badgeClass='badge-upcoming'; }
+
+  // Games to render
+  let gamesHtml = '';
+  for (let gi=0;gi<4;gi++) {
+    gamesHtml += renderGameSection(def, m, gi, matchId);
+  }
+  if (m.needsDB) {
+    gamesHtml += renderGameSection(def, m, 4, matchId);
+  }
+
+  // Result banner
+  let resultHtml = '';
+  if (m.done) {
+    const winKey = m.winner==='t1'?def.t1:def.t2;
+    const extra = m.needsDB ? ' via Dreambreaker' : '';
+    resultHtml = `<div class="result-banner" style="background:#0f2a0f;color:${tc(winKey)}">${TEAMS[winKey].name} wins the match${extra}!</div>`;
+  }
+
+  return `
+    <div class="match-card">
+      <div class="match-top">
+        <span class="match-label">${def.round==='Champ'?'Championship':'Round '+def.round} · Court ${def.court}</span>
+        <span class="badge ${badgeClass}">${badge}</span>
+      </div>
+      <div class="teams-bar">
+        <div class="team-side">
+          <div class="team-name-sm" style="color:${tc(def.t1)}">${t1.name}</div>
+          <div class="games-won">${gw.t1}</div>
+          ${m.done?`<div class="match-pts-label">${pts.t1} match pts</div>`:''}
+        </div>
+        <div class="vs-circle">VS</div>
+        <div class="team-side right">
+          <div class="team-name-sm" style="color:${tc(def.t2)}">${t2.name}</div>
+          <div class="games-won">${gw.t2}</div>
+          ${m.done?`<div class="match-pts-label">${pts.t2} match pts</div>`:''}
+        </div>
+      </div>
+      ${gamesHtml}
+      ${resultHtml}
+      <div class="reset-row">
+        <button class="reset-btn" onclick="resetMatch(${matchId})">↺ Reset Match</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderChampCard() {
+  if (!state.champMatch) return '';
+  const cm = state.champMatch;
+  const def = { t1: cm.t1key, t2: cm.t2key, round:'Champ', court:'3' };
+  const gw = gamesWon(cm);
+  const pts = matchPoints(cm);
+  const t1 = TEAMS[cm.t1key], t2 = TEAMS[cm.t2key];
+
+  let badge, badgeClass;
+  if (cm.done) { badge='Final'; badgeClass='badge-done'; }
+  else if (cm.games.some(g=>g.s1>0||g.s2>0||g.done)) { badge='Live'; badgeClass='badge-live'; }
+  else { badge='Upcoming'; badgeClass='badge-upcoming'; }
+
+  let gamesHtml = '';
+  for (let gi=0;gi<4;gi++) gamesHtml += renderGameSection(def, cm, gi, 'champ');
+  if (cm.needsDB) gamesHtml += renderGameSection(def, cm, 4, 'champ');
+
+  let resultHtml = '';
+  if (cm.done) {
+    const winKey = cm.winner==='t1'?cm.t1key:cm.t2key;
+    const extra = cm.needsDB?' via Dreambreaker':'';
+    resultHtml = `<div class="result-banner" style="background:#2a2000;color:#facc15">🏆 ${TEAMS[winKey].name} are the Champions${extra}!</div>`;
+  }
+
+  return `
+    <div class="round-header" style="color:#facc15">🏆 Championship</div>
+    <div class="match-card" style="border-color:#3a3000">
+      <div class="match-top" style="background:#1f1c00">
+        <span class="match-label" style="color:#7a6800">Championship Final</span>
+        <span class="badge ${badgeClass}">${badge}</span>
+      </div>
+      <div class="teams-bar">
+        <div class="team-side">
+          <div class="team-name-sm" style="color:${tc(cm.t1key)}">${t1.name}</div>
+          <div class="games-won">${gw.t1}</div>
+          ${cm.done?`<div class="match-pts-label">${pts.t1} match pts</div>`:''}
+        </div>
+        <div class="vs-circle">VS</div>
+        <div class="team-side right">
+          <div class="team-name-sm" style="color:${tc(cm.t2key)}">${t2.name}</div>
+          <div class="games-won">${gw.t2}</div>
+          ${cm.done?`<div class="match-pts-label">${pts.t2} match pts</div>`:''}
+        </div>
+      </div>
+      ${gamesHtml}
+      ${resultHtml}
+      <div class="reset-row">
+        <button class="reset-btn" onclick="resetMatch('champ')">↺ Reset Championship</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderBronzeCard() {
+  if (!state.bronzeMatch) return '';
+  const bm = state.bronzeMatch;
+  const def = { t1: bm.t1key, t2: bm.t2key, round:'Bronze', court:'2' };
+  const gw = gamesWon(bm);
+  const pts = matchPoints(bm);
+  const t1 = TEAMS[bm.t1key], t2 = TEAMS[bm.t2key];
+
+  let badge, badgeClass;
+  if (bm.done) { badge='Final'; badgeClass='badge-done'; }
+  else if (bm.games.some(g=>g.s1>0||g.s2>0||g.done)) { badge='Live'; badgeClass='badge-live'; }
+  else { badge='Upcoming'; badgeClass='badge-upcoming'; }
+
+  let gamesHtml = '';
+  for (let gi=0;gi<4;gi++) gamesHtml += renderGameSection(def, bm, gi, 'bronze');
+  if (bm.needsDB) gamesHtml += renderGameSection(def, bm, 4, 'bronze');
+
+  let resultHtml = '';
+  if (bm.done) {
+    const winKey = bm.winner==='t1'?bm.t1key:bm.t2key;
+    const extra = bm.needsDB?' via Dreambreaker':'';
+    resultHtml = `<div class="result-banner" style="background:#1a1200;color:#cd7f32">🥉 ${TEAMS[winKey].name} win Bronze${extra}!</div>`;
+  }
+
+  return `
+    <div class="round-header" style="color:#cd7f32">🥉 Bronze Match · 3rd Place</div>
+    <div class="match-card" style="border-color:#3a2800">
+      <div class="match-top" style="background:#1a1400">
+        <span class="match-label" style="color:#7a5a00">3rd Place · Court 2</span>
+        <span class="badge ${badgeClass}">${badge}</span>
+      </div>
+      <div class="teams-bar">
+        <div class="team-side">
+          <div class="team-name-sm" style="color:${tc(bm.t1key)}">${t1.name}</div>
+          <div class="games-won">${gw.t1}</div>
+          ${bm.done?`<div class="match-pts-label">${pts.t1} match pts</div>`:''}
+        </div>
+        <div class="vs-circle">VS</div>
+        <div class="team-side right">
+          <div class="team-name-sm" style="color:${tc(bm.t2key)}">${t2.name}</div>
+          <div class="games-won">${gw.t2}</div>
+          ${bm.done?`<div class="match-pts-label">${pts.t2} match pts</div>`:''}
+        </div>
+      </div>
+      ${gamesHtml}
+      ${resultHtml}
+      <div class="reset-row">
+        <button class="reset-btn" onclick="resetMatch('bronze')">↺ Reset Bronze Match</button>
+      </div>
+    </div>
+  `;
+}
+
+function startChamp() {
+  const [k1,k2] = getTop2();
+  state.champMatch = { ...blankMatch('champ'), t1key:k1, t2key:k2 };
+  save(); render();
+}
+
+function startBronze() {
+  const [k3,k4] = getBottom2();
+  state.bronzeMatch = { ...blankMatch('bronze'), t1key:k3, t2key:k4 };
+  save(); render();
+}
+
+function renderMatchesView() {
+  let html = '<div>';
+  const rounds = [1,2,3];
+  rounds.forEach(r=>{
+    html += `<div class="round-header">Round ${r}</div>`;
+    SCHEDULE.filter(d=>d.round===r).forEach(def=>{
+      html += renderMatchCard(def, state.matches[def.id], def.id);
+    });
+  });
+
+  if (rrComplete()) {
+    // Bronze match
+    if (state.bronzeMatch) {
+      html += renderBronzeCard();
+    } else {
+      const [k3,k4] = getBottom2();
+      html += `
+        <div class="round-header" style="color:#cd7f32">🥉 Bronze Match · 3rd Place</div>
+        <div class="match-card" style="border-color:#3a2800">
+          <div style="padding:20px;text-align:center">
+            <div style="color:#cd7f32;font-size:15px;font-weight:700;margin-bottom:8px">3rd Place Match · Court 2</div>
+            <div style="font-size:13px;color:#888">
+              <span style="color:${tc(k3)};font-weight:700">${TEAMS[k3].name}</span>
+              &nbsp;vs&nbsp;
+              <span style="color:${tc(k4)};font-weight:700">${TEAMS[k4].name}</span>
+            </div>
+            <button onclick="startBronze()" style="margin-top:14px;padding:12px 24px;background:#cd7f32;color:#000;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">
+              Start Bronze Match →
+            </button>
+          </div>
+        </div>
+      `;
+    }
+    // Championship
+    if (state.champMatch) {
+      html += renderChampCard();
+    } else {
+      const [k1,k2] = getTop2();
+      html += `
+        <div class="round-header" style="color:#facc15">🏆 Championship · Court 3</div>
+        <div class="match-card" style="border-color:#3a3000">
+          <div style="padding:20px;text-align:center">
+            <div style="color:#facc15;font-size:15px;font-weight:700;margin-bottom:8px">Finalists · Court 3</div>
+            <div style="font-size:13px;color:#888">
+              <span style="color:${tc(k1)};font-weight:700">${TEAMS[k1].name}</span>
+              &nbsp;vs&nbsp;
+              <span style="color:${tc(k2)};font-weight:700">${TEAMS[k2].name}</span>
+            </div>
+            <button onclick="startChamp()" style="margin-top:14px;padding:12px 24px;background:#facc15;color:#000;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">
+              Start Championship →
+            </button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  html += '<div class="page-pad"></div></div>';
+  return html;
+}
+
+function renderStandings() {
+  const st = standings();
+  const rrDone = rrComplete();
+
+  let rows = '';
+  st.forEach((row,i)=>{
+    const team = TEAMS[row.key];
+    const isTop2 = i<2;
+    rows += `
+      <div class="standings-row">
+        <div class="standings-rank">${i+1}</div>
+        <div class="standings-team">
+          <span class="dot" style="background:${team.color}"></span>
+          ${team.name.replace('Team ','')}
+        </div>
+        <div class="standings-pts" style="color:${team.color}">${row.mp}</div>
+        <div class="standings-games">${row.gw}/${row.gp}</div>
+        <div class="standings-diff">${row.diff>0?'+':''}${row.diff}</div>
+        <div class="finals-badge ${isTop2&&rrDone?'finals-in':i===2&&rrDone?'bronze-in':'finals-out'}">${isTop2&&rrDone?'Finals':i===2&&rrDone?'Bronze':'—'}</div>
+      </div>
+    `;
+  });
+
+  const schedHtml = `
+    <div class="info-card">
+      <div class="schedule-match"><strong>Round 1:</strong> <span style="color:${tc('red')}">Red</span> vs <span style="color:${tc('blue')}">Blue</span> &nbsp;·&nbsp; <span style="color:${tc('green')}">Green</span> vs <span style="color:${tc('gold')}">Gold</span></div>
+      <div class="schedule-match"><strong>Round 2:</strong> <span style="color:${tc('red')}">Red</span> vs <span style="color:${tc('green')}">Green</span> &nbsp;·&nbsp; <span style="color:${tc('blue')}">Blue</span> vs <span style="color:${tc('gold')}">Gold</span></div>
+      <div class="schedule-match"><strong>Round 3:</strong> <span style="color:${tc('red')}">Red</span> vs <span style="color:${tc('gold')}">Gold</span> &nbsp;·&nbsp; <span style="color:${tc('blue')}">Blue</span> vs <span style="color:${tc('green')}">Green</span></div>
+      <div class="schedule-match champ-note"><strong>Championship:</strong> Top 2 teams</div>
+    </div>
+  `;
+
+  return `
+    <div class="standings-page">
+      <div class="standings-header">
+        <h1>Standings</h1>
+        <p>Top 2 advance to Championship after Round 3</p>
+      </div>
+      <div class="card">
+        <div class="standings-row header-row">
+          <span></span><span>Team</span><span style="text-align:center">Pts</span>
+          <span style="text-align:center">W/G</span>
+          <span style="text-align:center">+/−</span>
+          <span>Status</span>
+        </div>
+        ${rows}
+      </div>
+
+      <div class="card-label" style="margin:16px 12px 0">Points System</div>
+      <div class="card">
+        <div class="info-card">
+          <div>🏆 <strong>3 pts</strong> — Win outright (3-1 or 4-0)</div>
+          <div>✅ <strong>2 pts</strong> — Win Dreambreaker (3-2)</div>
+          <div>💪 <strong>1 pt</strong> &nbsp;— Lose Dreambreaker (2-3)</div>
+          <div>❌ <strong>0 pts</strong> — Lose outright (1-3 or 0-4)</div>
+        </div>
+      </div>
+
+      <div class="card-label" style="margin:16px 12px 0">Schedule</div>
+      <div class="card">${schedHtml}</div>
+
+      <div class="card-label" style="margin:16px 12px 0">Teams</div>
+      <div class="card">
+        <div class="info-card" style="line-height:1.8">
+          ${Object.entries(TEAMS).map(([k,t])=>`
+            <div style="margin-bottom:8px">
+              <span style="color:${t.color};font-weight:700">${t.name}</span><br>
+              <span style="color:#888;font-size:12px">♂ ${t.males.join(', ')} &nbsp;·&nbsp; ♀ ${t.females.join(', ')}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="page-pad"></div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════
+function render() {
+  const nav = `
+    <nav class="nav">
+      <button onclick="setView('matches')" class="${state.view==='matches'?'active':''}">Matches</button>
+      <button onclick="setView('standings')" class="${state.view==='standings'?'active':''}">Standings</button>
+    </nav>
+    <div class="sync-bar sync-pending" id="sync-status-bar"></div>
+  `;
+  const body = state.view==='matches' ? renderMatchesView() : renderStandings();
+  document.getElementById('app').innerHTML = nav + body;
+  renderSyncBar();
+}
+
+render();
+initSync();
+</script>
+</body>
+</html>
