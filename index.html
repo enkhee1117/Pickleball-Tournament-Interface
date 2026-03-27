@@ -214,6 +214,35 @@
     /* ── PAGE BOTTOM PAD ── */
     .page-pad { height: 40px; }
 
+    /* ── ACTIVE MATCH ── */
+    .match-card.match-live {
+      border-color: rgba(255,255,255,0.35);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .match-card.match-live .match-top { background: #282828; }
+
+    /* ── SCORE EDIT SHEET ── */
+    .score-edit-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 400; display: flex; align-items: flex-end; justify-content: center;
+    }
+    .score-edit-sheet {
+      background: #1e1e1e; border-radius: 22px 22px 0 0;
+      width: 100%; max-width: 400px; padding: 20px 24px 44px;
+      border-top: 1px solid #333;
+    }
+    .score-edit-handle { width: 36px; height: 4px; background: #444; border-radius: 2px; margin: 0 auto 18px; }
+    .score-edit-label { font-size: 12px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 1px; text-align: center; margin-bottom: 10px; }
+    .score-edit-input {
+      width: 100%; text-align: center; font-size: 52px; font-weight: 900;
+      background: #141414; border: 2px solid #333; border-radius: 14px;
+      color: #fff; padding: 10px; outline: none; margin-bottom: 14px;
+    }
+    .score-edit-input:focus { border-color: #555; }
+    .score-edit-btns { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+    .score-edit-cancel { padding: 14px; background: #2a2a2a; border: none; border-radius: 12px; color: #888; font-size: 15px; font-weight: 700; cursor: pointer; }
+    .score-edit-confirm { padding: 14px; background: #fff; border: none; border-radius: 12px; color: #000; font-size: 15px; font-weight: 700; cursor: pointer; }
+
     /* ── RULES BUTTON ── */
     .rules-fab {
       position: fixed; bottom: 24px; right: 20px; z-index: 200;
@@ -601,11 +630,13 @@ function markDone(matchId, gi) {
       } else {
         m.done = true;
         m.winner = gw.t1>gw.t2 ? 't1' : 't2';
+        launchConfetti();
       }
     }
   } else {
     m.done = true;
     m.winner = game.winner;
+    launchConfetti();
   }
 
   // Auto-create championship + bronze if RR just completed
@@ -724,13 +755,13 @@ function scoreBlock(matchId, gi, s1, s2, done, winner, t1key, t2key) {
     <div class="score-row">
       <div class="score-side">
         <button class="score-tap" onclick="adj('${mid}',${gi},1,1)" style="color:${tc(t1key)}">+</button>
-        <div class="score-num-big">${s1}</div>
+        <div class="score-num-big" onclick="editScore('${mid}',${gi},1,${s1},${JSON.stringify(tc(t1key))})" style="cursor:pointer" title="Tap to edit">${s1}</div>
         <button class="score-tap minus" onclick="adj('${mid}',${gi},1,-1)">−</button>
       </div>
       <div class="score-sep">–</div>
       <div class="score-side right">
         <button class="score-tap minus" onclick="adj('${mid}',${gi},2,-1)">−</button>
-        <div class="score-num-big">${s2}</div>
+        <div class="score-num-big" onclick="editScore('${mid}',${gi},2,${s2},${JSON.stringify(tc(t2key))})" style="cursor:pointer" title="Tap to edit">${s2}</div>
         <button class="score-tap" onclick="adj('${mid}',${gi},2,1)" style="color:${tc(t2key)}">+</button>
       </div>
     </div>
@@ -830,8 +861,9 @@ function renderMatchCard(def, m, matchId) {
     resultHtml = `<div class="result-banner" style="background:#0f2a0f;color:${tc(winKey)}">${T(winKey).name} wins the match${extra}!</div>`;
   }
 
+  const isLive = badgeClass === 'badge-live';
   return `
-    <div class="match-card">
+    <div class="match-card${isLive?' match-live':''}" ${isLive?'id="active-match"':''}>
       <div class="match-top">
         <span class="match-label">${def.round==='Champ'?'Championship':'Round '+def.round} · Court ${def.court}</span>
         <span class="badge ${badgeClass}">${badge}</span>
@@ -1129,6 +1161,95 @@ function render() {
   const body = state.view==='matches' ? renderMatchesView() : renderStandings();
   document.getElementById('app').innerHTML = nav + body;
   renderSyncBar();
+  // Scroll to active match
+  setTimeout(()=>{
+    const el = document.getElementById('active-match');
+    if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 80);
+}
+
+// ═══════════════════════════════════════════════
+//  SCORE DIRECT EDIT
+// ═══════════════════════════════════════════════
+function editScore(matchId, gi, team, current, color) {
+  if (document.getElementById('score-edit-overlay')) return;
+  const el = document.createElement('div');
+  el.className = 'score-edit-overlay'; el.id = 'score-edit-overlay';
+  el.onclick = e => { if (e.target===el) el.remove(); };
+  const m2 = getMatch(matchId);
+  const _k1 = m2.t1key || SCHEDULE[matchId]?.t1;
+  const _k2 = m2.t2key || SCHEDULE[matchId]?.t2;
+  const teamLabel = team===1 ? T(_k1).name : T(_k2).name;
+  el.innerHTML = `
+    <div class="score-edit-sheet">
+      <div class="score-edit-handle"></div>
+      <div class="score-edit-label" style="color:${color}">${teamLabel} — ${gi===4?'Dreambreaker':['Women\'s','Men\'s','Mixed 1','Mixed 2'][gi]}</div>
+      <input class="score-edit-input" id="score-edit-input" type="number" min="0" max="99"
+        value="${current}" inputmode="numeric" style="border-color:${color}" />
+      <div class="score-edit-btns">
+        <button class="score-edit-cancel" onclick="document.getElementById('score-edit-overlay').remove()">Cancel</button>
+        <button class="score-edit-confirm" onclick="confirmScoreEdit('${matchId}',${gi},${team})" style="background:${color};color:#000">Set Score</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(el);
+  const input = document.getElementById('score-edit-input');
+  input.focus(); input.select();
+  input.onkeydown = e => { if (e.key==='Enter') confirmScoreEdit(matchId, gi, team); };
+}
+
+function confirmScoreEdit(matchId, gi, team) {
+  const val = parseInt(document.getElementById('score-edit-input')?.value);
+  if (isNaN(val) || val < 0) return;
+  const m = getMatch(matchId);
+  const game = gi===4 ? m.db : m.games[gi];
+  if (game.done) return;
+  if (team===1) game.s1 = val; else game.s2 = val;
+  document.getElementById('score-edit-overlay')?.remove();
+  save(); render();
+}
+
+// ═══════════════════════════════════════════════
+//  CONFETTI
+// ═══════════════════════════════════════════════
+function launchConfetti() {
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;width:100vw;height:100vh';
+  document.body.appendChild(canvas);
+  const W = canvas.width  = window.innerWidth;
+  const H = canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  const colors = ['#ef4444','#60a5fa','#4ade80','#facc15','#fff','#f472b6','#fb923c'];
+  const pieces = Array.from({length:120}, ()=>({
+    x: Math.random()*W, y: Math.random()*H - H,
+    r: Math.random()*6+3,
+    color: colors[Math.floor(Math.random()*colors.length)],
+    vx: (Math.random()-0.5)*4,
+    vy: Math.random()*4+2,
+    spin: (Math.random()-0.5)*0.2,
+    angle: Math.random()*Math.PI*2,
+    shape: Math.random()>0.5 ? 'rect' : 'circle',
+    w: Math.random()*10+5, h: Math.random()*5+3,
+  }));
+  let frame, start = performance.now();
+  function draw(ts) {
+    ctx.clearRect(0,0,W,H);
+    const elapsed = ts - start;
+    const fade = Math.max(0, 1 - (elapsed-2500)/1000);
+    ctx.globalAlpha = fade;
+    pieces.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy; p.angle+=p.spin;
+      if (p.y>H+10) { p.y=-10; p.x=Math.random()*W; }
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.angle);
+      ctx.fillStyle = p.color;
+      if (p.shape==='rect') ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+      else { ctx.beginPath(); ctx.arc(0,0,p.r,0,Math.PI*2); ctx.fill(); }
+      ctx.restore();
+    });
+    if (elapsed < 3500) frame = requestAnimationFrame(draw);
+    else canvas.remove();
+  }
+  frame = requestAnimationFrame(draw);
 }
 
 function showRules() {
