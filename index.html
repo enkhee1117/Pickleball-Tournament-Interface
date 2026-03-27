@@ -422,7 +422,7 @@ function blankMatch(id) {
 }
 
 function defaultState() {
-  return { view:'matches', matches:SCHEDULE.map(m=>blankMatch(m.id)), champMatch:null, bronzeMatch:null, teams: JSON.parse(JSON.stringify(DEFAULT_TEAMS)), courts:['Court 1','Court 2','Court 3'] };
+  return { matches:SCHEDULE.map(m=>blankMatch(m.id)), champMatch:null, bronzeMatch:null, teams: JSON.parse(JSON.stringify(DEFAULT_TEAMS)), courts:['Court 1','Court 2','Court 3'] };
 }
 
 function loadState() {
@@ -439,6 +439,7 @@ let syncStatus = FIREBASE_URL ? 'pending' : 'off'; // 'off'|'pending'|'ok'|'erro
 let syncSource = null;
 let saveTimer = null;
 let localWrite = false;
+let currentView = localStorage.getItem('mlp_view') || 'matches';
 
 function save() {
   localStorage.setItem('mlp_v3', JSON.stringify(state));
@@ -705,7 +706,7 @@ function toggleMixed(matchId, team) {
   save(); render();
 }
 
-function setView(v) { state.view=v; save(); render(); }
+function setView(v) { currentView=v; localStorage.setItem('mlp_view',v); render(); }
 
 // ═══════════════════════════════════════════════
 //  COURT MANAGEMENT
@@ -1234,12 +1235,12 @@ function renderStandings() {
 function render() {
   const nav = `
     <nav class="nav">
-      <button onclick="setView('matches')" class="${state.view==='matches'?'active':''}">Matches</button>
-      <button onclick="setView('standings')" class="${state.view==='standings'?'active':''}">Standings</button>
+      <button onclick="setView('matches')" class="${currentView==='matches'?'active':''}">Matches</button>
+      <button onclick="setView('standings')" class="${currentView==='standings'?'active':''}">Standings</button>
     </nav>
     <div class="sync-bar sync-pending" id="sync-status-bar"></div>
   `;
-  const body = state.view==='matches' ? renderMatchesView() : renderStandings();
+  const body = currentView==='matches' ? renderMatchesView() : renderStandings();
   document.getElementById('app').innerHTML = nav + body;
   renderSyncBar();
   // Scroll to active match
