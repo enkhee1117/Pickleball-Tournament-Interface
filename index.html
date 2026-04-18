@@ -2077,6 +2077,53 @@ function rrMyCard() {
   `;
 }
 
+// ─── First-time welcome ───
+function showWelcome() {
+  if (document.getElementById('welcome-overlay')) return;
+  const players = (rrState && rrState.players) || [];
+  if (!players.length) return;
+  const cards = players.map((p, i) => {
+    const nm = rrPlayerName(i);
+    const d = rrPlayerDUPR(i);
+    return `<button onclick="pickWelcomeIdentity(${i})" style="background:#1a2a3f;border:1px solid #3a5f8a;color:#fff;padding:14px 10px;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <span>${nm}</span>
+      ${d !== null ? `<span style="font-size:11px;color:#9ab6dd;font-weight:600">DUPR ${d.toFixed(2)}</span>` : ''}
+    </button>`;
+  }).join('');
+  const el = document.createElement('div');
+  el.id = 'welcome-overlay';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  el.innerHTML = `
+    <div style="background:#141414;border-radius:18px;width:100%;max-width:460px;padding:24px 20px 20px;border:1px solid #2a2a2a;box-shadow:0 8px 32px rgba(0,0,0,0.6)">
+      <div style="text-align:center;margin-bottom:18px">
+        <div style="font-size:44px;margin-bottom:6px">\ud83c\udfbe</div>
+        <div style="color:#fff;font-size:20px;font-weight:800;letter-spacing:0.3px">Welcome to Terry\u2019s Women\u2019s Tourney!</div>
+        <div style="color:#9ab6dd;font-size:13px;font-weight:600;margin-top:6px">Congrats on joining \u2014 let\u2019s get you set up.</div>
+      </div>
+      <div style="color:#888;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;margin:14px 0 10px">Who are you?</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">${cards}</div>
+      <div style="text-align:center;margin-top:16px">
+        <button onclick="dismissWelcome()" style="background:transparent;border:none;color:#666;font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline">Skip for now</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(el);
+}
+function pickWelcomeIdentity(idx) {
+  myIdentity = parseInt(idx);
+  localStorage.setItem('rr_identity', String(myIdentity));
+  localStorage.setItem('welcomed', '1');
+  const el = document.getElementById('welcome-overlay');
+  if (el) el.remove();
+  toast('Welcome, ' + rrPlayerName(myIdentity) + '!');
+  render();
+}
+function dismissWelcome() {
+  localStorage.setItem('welcomed', '1');
+  const el = document.getElementById('welcome-overlay');
+  if (el) el.remove();
+}
+
 // ─── Settings sheet ───
 function showSettings() {
   hideSettings();
@@ -3084,6 +3131,7 @@ try {
   render();
   initSync();
   rrInitSync();
+  if (localStorage.getItem('welcomed') !== '1') showWelcome();
 } catch (err) {
   document.getElementById('app').innerHTML = `<div style="padding:20px;color:#f87171;font-family:monospace;font-size:12px;line-height:1.6">
     <strong style="color:#fff;font-size:14px">Startup error</strong><br><br>
