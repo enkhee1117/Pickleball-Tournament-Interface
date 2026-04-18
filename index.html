@@ -451,6 +451,12 @@
       display: flex; justify-content: space-between; align-items: center;
     }
     .rr-round-title { font-size: 13px; font-weight: 800; color: #fff; text-transform: uppercase; letter-spacing: 0.6px; }
+    .rr-court-pill {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 3px 9px; border-radius: 7px;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.4px;
+      border: 1px solid; white-space: nowrap;
+    }
 
     .rr-game-card {
       padding: 12px 14px;
@@ -2132,6 +2138,21 @@ function rrPlayerDUPR(i) {
   if (!p || typeof p === 'string') return null;
   return (typeof p.dupr === 'number') ? p.dupr : null;
 }
+const RR_COURT_PALETTE = [
+  { bg:'#0f2540', border:'#3a5f8a', fg:'#a5b8f0' },
+  { bg:'#3f1d2e', border:'#8a3a5f', fg:'#f0a5b8' },
+  { bg:'#3f2e0f', border:'#8a6c3a', fg:'#f0c5a5' },
+  { bg:'#1f3f1d', border:'#4a8a3a', fg:'#a5f0b8' },
+  { bg:'#2e1d3f', border:'#6c3a8a', fg:'#c5a5f0' },
+];
+function rrCourtColor(n) {
+  const idx = Math.max(0, (Number(n) || 1) - 1) % RR_COURT_PALETTE.length;
+  return RR_COURT_PALETTE[idx];
+}
+function rrCourtPillHtml(n) {
+  const c = rrCourtColor(n);
+  return `<span class="rr-court-pill" style="background:${c.bg};border-color:${c.border};color:${c.fg}">Court ${n||1}</span>`;
+}
 
 function blankRRGame(i) {
   return { i, court: 1, team1: [], team2: [], s1: 0, s2: 0, done: false, winner: null };
@@ -2314,7 +2335,9 @@ function rrMyCard() {
   const next = rrMyNextGame();
   const standing = rrMyStanding();
   const nextHtml = next
-    ? `<div class="my-card-title">Next: Game ${next.idx+1} · Court ${next.g.court||1}</div>
+    ? `<div class="my-card-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+         <span>Next: Game ${next.idx+1}</span>${rrCourtPillHtml(next.g.court)}
+       </div>
        <div class="my-card-sub">Partner: <strong style="color:#fff">${rrPlayerName(next.partner)}</strong><br/>
        vs ${rrPlayerName(next.opponents[0])} &amp; ${rrPlayerName(next.opponents[1])}</div>`
     : `<div class="my-card-title">No upcoming games</div>
@@ -2327,11 +2350,21 @@ function rrMyCard() {
     : '';
   return `
     <div class="my-card">
-      <div class="my-card-label">Signed in as ${name}</div>
+      <div class="my-card-label" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span>Signed in as ${name}</span>
+        <button onclick="changeIdentity()" style="background:none;border:none;color:#a5b8f0;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;text-decoration:underline;cursor:pointer;padding:0">Not you?</button>
+      </div>
       ${nextHtml}
       ${standingHtml}
     </div>
   `;
+}
+function changeIdentity() {
+  myIdentity = null;
+  localStorage.removeItem('rr_identity');
+  localStorage.removeItem('welcomed');
+  render();
+  showWelcome();
 }
 
 // ─── First-time welcome ───
@@ -2475,6 +2508,14 @@ function showSettings() {
           ${archiveList}
         `}
       ` : ''}
+
+      <div class="settings-section-label">Rules Language</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${[['en','EN'],['ko','한국어'],['zh','中文'],['mn','Монгол'],['fa','فارسی']].map(([code,label]) => {
+          const active = (rulesLang === code) ? 'background:#fff;color:#000;border-color:#fff' : 'background:#1a1a1a;color:#ddd;border-color:#2a2a2a';
+          return `<button onclick="setRulesLang('${code}'); showSettings()" style="flex:1;min-width:60px;padding:8px 6px;border:1px solid;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;${active}">${label}</button>`;
+        }).join('')}
+      </div>
 
       <div class="settings-section-label">Sync</div>
       ${sync}
@@ -2814,10 +2855,18 @@ function rrMarkDone(gameKey) {
   const g = rrGetGame(gameKey);
   if (!g) return;
   if (g.s1 === g.s2) { alert("Scores tied — can't complete."); return; }
+  const hi = Math.max(g.s1, g.s2);
+  const margin = Math.abs(g.s1 - g.s2);
+  if (hi < 11 || margin < 2) {
+    if (!confirm(`Unusual score ${g.s1}–${g.s2} (rules: 11, win by 2). Submit anyway?`)) return;
+  }
   g.done = true;
   g.winner = g.s1 > g.s2 ? 't1' : 't2';
-  launchConfetti();
-  // Auto-advance semis → gold/bronze
+  // Confetti for playoffs or the signed-in player's own win only.
+  const isPlayoff = gameKey === 'semi1' || gameKey === 'semi2' || gameKey === 'gold' || gameKey === 'bronze';
+  const winTeam = g.winner === 't1' ? g.team1 : g.team2;
+  const myWin = typeof myIdentity === 'number' && winTeam && winTeam.indexOf(myIdentity) !== -1;
+  if (isPlayoff || myWin) launchConfetti();
   if (gameKey === 'semi1' || gameKey === 'semi2') rrMaybeAdvanceSemis();
   rrSave(); render();
 }
@@ -3020,7 +3069,10 @@ function rrGameCard(g, gameKey, title) {
   return `
     <div class="rr-round-card" ${!g.done && (g.s1>0||g.s2>0)?'id="active-match"':''}>
       <div class="rr-round-top">
-        <span class="rr-round-title">${title} · Court ${g.court||1}</span>
+        <span style="display:flex;align-items:center;gap:8px;min-width:0">
+          ${rrCourtPillHtml(g.court)}
+          <span class="rr-round-title">${title}</span>
+        </span>
         <span class="badge ${badgeClass}">${badge}</span>
       </div>
       <div class="rr-game-card${g.done?' complete':''}">
@@ -3240,11 +3292,12 @@ function rrRenderStandings() {
       <div class="card">
         <div class="rr-standings-row header-row">
           <span></span><span>Player</span>
-          <span style="text-align:center">PF</span>
+          <span style="text-align:center;color:#facc15">PF ↓</span>
           <span style="text-align:center">+/−</span>
           <span style="text-align:center">W/G</span>
           <span style="text-align:center">PA</span>
         </div>
+        <div style="padding:4px 14px 6px;font-size:10px;color:#666;letter-spacing:0.4px;text-align:right">Sort: PF → +/− → W</div>
         ${rows}
       </div>
       <div class="card-label" style="margin:16px 12px 0">Scoring</div>
