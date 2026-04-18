@@ -934,7 +934,7 @@ function undoGame(matchId, gi) {
 }
 
 function resetAll() {
-  if (prompt('Enter password to reset everything:') !== 'terry') return;
+  if (!confirm('Reset ALL games? This clears every score.')) return;
   state.matches = SCHEDULE.map(m=>blankMatch(m.id));
   state.champMatch = null;
   state.bronzeMatch = null;
@@ -942,7 +942,7 @@ function resetAll() {
 }
 
 function resetMatch(matchId) {
-  if (prompt('Enter password to reset:') !== 'terry') return;
+  if (!confirm('Reset this match? All scores for it will be cleared.')) return;
   if (matchId==='champ') state.champMatch = null;
   else if (matchId==='bronze') state.bronzeMatch = null;
   else state.matches[matchId] = blankMatch(matchId);
@@ -1059,6 +1059,7 @@ function scoreBlock(matchId, gi, s1, s2, done, winner, t1key, t2key) {
       <div class="score-side">
         <button class="score-tap" onclick="adj('${mid}',${gi},1,1)" style="color:${tc(t1key)}">+</button>
         <input class="score-num-big" type="number" min="0" value="${s1}"
+          data-focus-key="mlp-${mid}-${gi}-1"
           onchange="setScoreInline('${mid}',${gi},1,this.value)"
           onfocus="this.select()" inputmode="numeric" pattern="[0-9]*"
           style="color:${tc(t1key)}"/>
@@ -1068,6 +1069,7 @@ function scoreBlock(matchId, gi, s1, s2, done, winner, t1key, t2key) {
       <div class="score-side right">
         <button class="score-tap minus" onclick="adj('${mid}',${gi},2,-1)">−</button>
         <input class="score-num-big" type="number" min="0" value="${s2}"
+          data-focus-key="mlp-${mid}-${gi}-2"
           onchange="setScoreInline('${mid}',${gi},2,this.value)"
           onfocus="this.select()" inputmode="numeric" pattern="[0-9]*"
           style="color:${tc(t2key)}"/>
@@ -1430,12 +1432,7 @@ function renderStandings() {
         <p>Top 2 advance to Championship after Round 3</p>
       </div>
 
-      <div class="card-label" style="margin:0 12px">Tournament Style</div>
-      <div class="card">
-        <div style="padding:10px 12px">${styleBar()}</div>
-      </div>
-
-      <div class="card" style="margin-top:16px">
+      <div class="card" style="margin-top:4px">
         <div class="standings-row header-row">
           <span></span><span>Team</span><span style="text-align:center">Pts</span>
           <span style="text-align:center">W/G</span>
@@ -1501,8 +1498,23 @@ function renderStandings() {
 // ═══════════════════════════════════════════════
 function setTournamentMode(mode) {
   if (mode === 'ppa') { alert('PPA style coming soon!'); return; }
+  if (mode === tournamentMode) return;
+  // Safety: confirm before switching if the current mode has data.
+  // Nothing is deleted — the other mode has its own stored state.
+  let hasData = false;
+  if (tournamentMode === 'mlp') {
+    const matches = (state && state.matches) || [];
+    hasData = matches.some(m => ((m && m.games) || []).some(g => g.s1>0 || g.s2>0 || g.done));
+  } else if (tournamentMode === 'rr') {
+    hasData = !!(rrState && rrState.games && rrState.games.length > 0);
+  }
+  if (hasData) {
+    const labels = { mlp:'MLP', rr:'Round Robin', ppa:'PPA' };
+    if (!confirm(`Switch to ${labels[mode]}? Your ${labels[tournamentMode]} data stays saved — you can switch back anytime from Settings.`)) return;
+  }
   tournamentMode = mode;
   localStorage.setItem('tournament_mode', mode);
+  hideSettings();
   render();
 }
 
@@ -1516,6 +1528,35 @@ function styleBar() {
   `;
 }
 
+// Swap #app innerHTML while preserving scroll position and input focus/caret.
+// Focused elements are identified by a stable data-focus-key set by renderers.
+function swapApp(html) {
+  const prevScroll = window.scrollY;
+  const active = document.activeElement;
+  let focusKey = null, selStart = null, selEnd = null;
+  if (active && active.dataset && active.dataset.focusKey) {
+    focusKey = active.dataset.focusKey;
+    if (typeof active.selectionStart === 'number') {
+      selStart = active.selectionStart; selEnd = active.selectionEnd;
+    }
+  }
+  const app = document.getElementById('app');
+  if (app) app.innerHTML = html;
+  renderSyncBar();
+  if (focusKey) {
+    const next = document.querySelector(`[data-focus-key="${focusKey}"]`);
+    if (next) {
+      try {
+        next.focus();
+        if (selStart !== null && typeof next.setSelectionRange === 'function') {
+          next.setSelectionRange(selStart, selEnd);
+        }
+      } catch(_) {}
+    }
+  }
+  window.scrollTo(0, prevScroll);
+}
+
 function render() {
   if (tournamentMode === 'rr') { renderRR(); return; }
 
@@ -1527,10 +1568,7 @@ function render() {
     <div class="sync-bar sync-pending" id="sync-status-bar"></div>
   `;
   const body = currentView==='matches' ? renderMatchesView() : renderStandings();
-  const prevScroll = window.scrollY;
-  document.getElementById('app').innerHTML = nav + body;
-  renderSyncBar();
-  window.scrollTo(0, prevScroll);
+  swapApp(nav + body);
 }
 
 // ═══════════════════════════════════════════════
@@ -1871,11 +1909,12 @@ if (isNaN(myIdentity)) myIdentity = null;
 let viewMode = localStorage.getItem('view_mode') || 'organizer'; // 'organizer' | 'player'
 
 function setIdentity(idx) {
-  if (idx === null || idx === '' || idx === undefined) {
-    myIdentity = null; localStorage.removeItem('rr_identity');
-  } else {
-    myIdentity = parseInt(idx); localStorage.setItem('rr_identity', String(myIdentity));
-  }
+  const raw = (idx === '' || idx === null || idx === undefined) ? null : parseInt(idx);
+  myIdentity = (raw === null || isNaN(raw)) ? null : raw;
+  if (myIdentity === null) localStorage.removeItem('rr_identity');
+  else localStorage.setItem('rr_identity', String(myIdentity));
+  // Refresh sheet if open so the selector reflects the new value.
+  if (document.getElementById('settings-overlay')) showSettings();
   render();
 }
 function setViewMode(mode) {
@@ -1917,7 +1956,233 @@ function startNewTournament() {
   rrState = defaultRRState();
   const name = prompt('Name this tournament (optional):', 'Round Robin — ' + new Date().toLocaleDateString());
   if (name) rrState.name = name;
-  rrSave(); render();
+  rrSetView('setup');
+  rrSave(); hideSettings(); render();
+}
+
+function deleteArchivedTournament(id) {
+  if (!confirm('Delete this archived tournament permanently?')) return;
+  rrArchive = rrArchive.filter(t => t.id !== id);
+  saveArchive();
+  showSettings();
+}
+
+// ─── Personalized helpers ───
+function rrMyNextGame() {
+  if (myIdentity === null || !rrState.games) return null;
+  for (let i = 0; i < rrState.games.length; i++) {
+    const g = rrState.games[i];
+    if (g.done) continue;
+    const t1 = g.team1 || [], t2 = g.team2 || [];
+    if (t1.includes(myIdentity)) {
+      const partner = t1.find(x => x !== myIdentity);
+      return { idx:i, g, partner, opponents:t2, onMyTeam:1 };
+    }
+    if (t2.includes(myIdentity)) {
+      const partner = t2.find(x => x !== myIdentity);
+      return { idx:i, g, partner, opponents:t1, onMyTeam:2 };
+    }
+  }
+  return null;
+}
+
+function rrMyStanding() {
+  if (myIdentity === null) return null;
+  const st = rrStandings();
+  const i = st.findIndex(r => r.idx === myIdentity);
+  if (i < 0) return null;
+  return { rank: i+1, total: st.length, row: st[i] };
+}
+
+function rrMyCard() {
+  if (myIdentity === null) return '';
+  const name = rrPlayerName(myIdentity);
+  const next = rrMyNextGame();
+  const standing = rrMyStanding();
+  const nextHtml = next
+    ? `<div class="my-card-title">Next: Game ${next.idx+1} · Court ${next.g.court||1}</div>
+       <div class="my-card-sub">Partner: <strong style="color:#fff">${rrPlayerName(next.partner)}</strong><br/>
+       vs ${rrPlayerName(next.opponents[0])} &amp; ${rrPlayerName(next.opponents[1])}</div>`
+    : `<div class="my-card-title">No upcoming games</div>
+       <div class="my-card-sub">All your games are done.</div>`;
+  const standingHtml = standing
+    ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center">
+         <span style="color:#c5d5ff;font-size:12px">Your standing</span>
+         <span style="color:#fff;font-weight:800;font-size:14px">#${standing.rank} of ${standing.total} · ${standing.row.gw}W-${standing.row.gl}L</span>
+       </div>`
+    : '';
+  return `
+    <div class="my-card">
+      <div class="my-card-label">Signed in as ${name}</div>
+      ${nextHtml}
+      ${standingHtml}
+    </div>
+  `;
+}
+
+// ─── Settings sheet ───
+function showSettings() {
+  hideSettings();
+  const totalArchive = rrArchive.length;
+  const playerOptions = rrState.players.map((p, i) => {
+    const nm = rrPlayerName(i);
+    const sel = (myIdentity === i) ? ' selected' : '';
+    return `<option value="${i}"${sel}>${nm}</option>`;
+  }).join('');
+  const modeLabels = { mlp:'MLP', rr:'Round Robin', ppa:'PPA · Soon' };
+  const modeButtons = ['mlp','rr','ppa'].map(m => {
+    const active = (tournamentMode === m) ? 'background:#fff;color:#000' : 'background:#1a1a1a;color:#ddd';
+    const disabled = (m === 'ppa') ? 'opacity:0.5' : '';
+    return `<button onclick="setTournamentMode('${m}')" style="flex:1;padding:10px 6px;border:1px solid #2a2a2a;border-radius:8px;font-size:13px;font-weight:700;${active};${disabled}">${modeLabels[m]}</button>`;
+  }).join('');
+  const viewLabels = { organizer:'Organizer', player:'Player' };
+  const viewButtons = ['organizer','player'].map(m => {
+    const active = (viewMode === m) ? 'background:#fff;color:#000' : 'background:#1a1a1a;color:#ddd';
+    return `<button onclick="setViewMode('${m}')" style="flex:1;padding:10px 6px;border:1px solid #2a2a2a;border-radius:8px;font-size:13px;font-weight:700;${active}">${viewLabels[m]}</button>`;
+  }).join('');
+  const archiveList = rrArchive.length === 0
+    ? `<div style="padding:10px 14px;color:#666;font-size:12px">No archived tournaments yet.</div>`
+    : rrArchive.map(t => {
+        const d = new Date(t.archivedAt || t.createdAt || Date.now());
+        const when = d.toLocaleDateString() + ' · ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        return `
+          <div class="settings-row">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;color:#eee;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(t.name||'Round Robin').replace(/</g,'&lt;')}</div>
+              <div style="font-size:11px;color:#777;margin-top:2px">${when} · ${(t.players||[]).length} players</div>
+            </div>
+            <button onclick="viewArchived('${t.id}')" style="background:#2a2a2a;border:none;color:#eee;padding:6px 10px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;margin-right:6px">View</button>
+            <button onclick="deleteArchivedTournament('${t.id}')" style="background:none;border:none;color:#ef4444;font-size:18px;cursor:pointer">×</button>
+          </div>`;
+      }).join('');
+
+  const sync = FIREBASE_URL
+    ? `<div class="settings-row" onclick="showSetupOverlay()">
+         <div><div style="color:#eee;font-weight:700">Live Sync</div><div style="font-size:11px;color:#777;margin-top:2px">Connected</div></div>
+         <span class="hint" style="color:#4ade80">ON</span>
+       </div>`
+    : `<div class="settings-row" onclick="showSetupOverlay()">
+         <div><div style="color:#eee;font-weight:700">Live Sync</div><div style="font-size:11px;color:#777;margin-top:2px">Share scores live with Firebase</div></div>
+         <span class="hint">OFF</span>
+       </div>`;
+
+  const el = document.createElement('div');
+  el.className = 'settings-overlay';
+  el.id = 'settings-overlay';
+  el.onclick = (e) => { if (e.target === el) hideSettings(); };
+  el.innerHTML = `
+    <div class="settings-sheet" onclick="event.stopPropagation()">
+      <div class="settings-handle"></div>
+
+      <div class="settings-section-label">Tournament Style</div>
+      <div style="display:flex;gap:6px">${modeButtons}</div>
+
+      <div class="settings-section-label">View Mode</div>
+      <div style="display:flex;gap:6px">${viewButtons}</div>
+      <div style="font-size:11px;color:#666;margin-top:6px;padding:0 2px">
+        ${viewMode==='player' ? 'Player view hides setup, DUPR, and edit controls.' : 'Organizer view shows everything.'}
+      </div>
+
+      ${tournamentMode === 'rr' ? `
+        <div class="settings-section-label">Sign In As</div>
+        <div class="settings-row" style="cursor:default">
+          <div style="color:#eee;font-weight:700">I am…</div>
+          <select class="select-input" onchange="setIdentity(this.value)">
+            <option value="">— none —</option>
+            ${playerOptions}
+          </select>
+        </div>
+
+        <div class="settings-section-label">Tournament</div>
+        <div class="settings-row" style="cursor:default">
+          <div style="color:#eee;font-weight:700;flex-shrink:0;margin-right:10px">Name</div>
+          <input class="select-input" style="flex:1;min-width:0" value="${(rrState.name||'').replace(/"/g,'&quot;')}" onchange="rrUpdateName(this.value); showSettings()"/>
+        </div>
+        <div class="settings-row" onclick="startNewTournament()">
+          <div><div style="color:#eee;font-weight:700">Start New Tournament</div><div style="font-size:11px;color:#777;margin-top:2px">Archives current, then resets</div></div>
+          <span class="chev">›</span>
+        </div>
+
+        <div class="settings-section-label">Archive · ${totalArchive}</div>
+        ${archiveList}
+      ` : ''}
+
+      <div class="settings-section-label">Sync</div>
+      ${sync}
+
+      <div class="settings-section-label">Reset</div>
+      ${tournamentMode === 'rr'
+        ? `<div class="settings-row settings-danger" onclick="rrResetAll();hideSettings()">
+            <div><div style="color:#f87171;font-weight:700">Reset Round Robin</div><div style="font-size:11px;color:#a06060;margin-top:2px">Clears all scores &amp; generated games</div></div>
+            <span class="chev">›</span>
+          </div>`
+        : `<div class="settings-row settings-danger" onclick="resetAll();hideSettings()">
+            <div><div style="color:#f87171;font-weight:700">Reset MLP Tournament</div><div style="font-size:11px;color:#a06060;margin-top:2px">Clears all scores</div></div>
+            <span class="chev">›</span>
+          </div>`}
+
+      <div style="text-align:center;margin-top:20px">
+        <button onclick="hideSettings()" style="background:#222;border:none;color:#aaa;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(el);
+}
+
+function hideSettings() {
+  const el = document.getElementById('settings-overlay');
+  if (el) el.remove();
+}
+
+// ─── Archive viewer (read-only snapshot) ───
+let viewingArchivedId = null;
+function viewArchived(id) {
+  viewingArchivedId = id;
+  const t = rrArchive.find(x => x.id === id);
+  if (!t) return;
+  hideSettings();
+  const el = document.createElement('div');
+  el.className = 'settings-overlay'; el.id = 'archive-overlay';
+  el.onclick = (e) => { if (e.target === el) { el.remove(); viewingArchivedId = null; } };
+
+  // Compute standings from archived snapshot
+  const prevState = rrState;
+  rrState = t;
+  const st = rrStandings();
+  rrState = prevState;
+
+  const rows = st.map((r, i) => `
+    <div class="rr-standings-row">
+      <div class="rr-rank-badge ${i===0?'gold':i===1?'silver':i===2?'bronze':'top8'}">${i+1}</div>
+      <div class="rr-player-name">${(r.name||'').replace(/</g,'&lt;')}</div>
+      <div class="rr-stat primary">${r.gw}</div>
+      <div class="rr-stat">${r.gw}/${r.gp}</div>
+      <div class="rr-stat">${r.diff>0?'+':''}${r.diff}</div>
+      <div class="rr-stat">${r.pf}</div>
+    </div>`).join('');
+
+  const when = new Date(t.archivedAt || t.createdAt || Date.now()).toLocaleString();
+  el.innerHTML = `
+    <div class="settings-sheet" onclick="event.stopPropagation()">
+      <div class="settings-handle"></div>
+      <div style="text-align:center;padding:0 0 10px">
+        <div style="font-size:18px;font-weight:800;color:#fff">${(t.name||'Round Robin').replace(/</g,'&lt;')}</div>
+        <div style="font-size:12px;color:#777;margin-top:2px">${when} · ${(t.players||[]).length} players · ${(t.games||[]).filter(g=>g.done).length} games played</div>
+      </div>
+      <div class="rr-standings-row header-row">
+        <span></span><span>Player</span>
+        <span style="text-align:center">W</span>
+        <span style="text-align:center">W/G</span>
+        <span style="text-align:center">+/−</span>
+        <span style="text-align:center">PF</span>
+      </div>
+      ${rows}
+      <div style="text-align:center;margin-top:16px">
+        <button onclick="document.getElementById('archive-overlay').remove();showSettings()" style="background:#222;border:none;color:#aaa;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">Back</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(el);
 }
 
 function rrSave() {
@@ -1954,6 +2219,16 @@ function rrInitSync() {
       }
     } catch(_) {}
   });
+  // One-shot archive fetch so archives show up on any device.
+  fetch(FIREBASE_URL + '/rr_archive.json')
+    .then(r => r.json())
+    .then(data => {
+      if (Array.isArray(data) && data.length) {
+        rrArchive = data;
+        localStorage.setItem('rr_archive', JSON.stringify(rrArchive));
+      }
+    })
+    .catch(()=>{});
 }
 
 function rrSetView(v) { rrView = v; localStorage.setItem('rr_view', v); render(); }
@@ -2142,7 +2417,7 @@ function rrSetScoreInline(gameKey, team, val) {
 }
 
 function rrResetGame(gameKey) {
-  if (prompt('Enter password to reset:') !== 'terry') return;
+  if (!confirm('Reset this game? Its score will be cleared.')) return;
   const g = rrGetGame(gameKey);
   if (!g) return;
   g.s1 = 0; g.s2 = 0; g.done = false; g.winner = null;
@@ -2201,7 +2476,7 @@ function rrDraftPick(rank, partnerIdx) {
 }
 
 function rrUndoDraft() {
-  if (prompt('Enter password to redo draft:') !== 'terry') return;
+  if (!confirm('Redo draft? Picks and playoff matches will be reset.')) return;
   rrState.draft = { picks: {} };
   rrState.semi1 = null; rrState.semi2 = null; rrState.gold = null; rrState.bronze = null;
   rrSave(); render();
@@ -2246,42 +2521,62 @@ function rrGameCard(g, gameKey, title) {
 
   const w1 = g.done && g.winner==='t1';
   const w2 = g.done && g.winner==='t2';
+  const readOnly = viewMode === 'player';
 
-  const scoreHtml = g.done ? `
-    <div class="score-row">
-      <div class="score-side" style="justify-content:center">
-        <div class="score-num-big" style="color:${w1?'#60a5fa':'#fff'}">${g.s1}</div>
+  let scoreHtml;
+  if (g.done) {
+    scoreHtml = `
+      <div class="score-row">
+        <div class="score-side" style="justify-content:center">
+          <div class="score-num-big" style="color:${w1?'#60a5fa':'#fff'}">${g.s1}</div>
+        </div>
+        <div class="score-sep">–</div>
+        <div class="score-side right" style="justify-content:center">
+          <div class="score-num-big" style="color:${w2?'#f472b6':'#fff'}">${g.s2}</div>
+        </div>
       </div>
-      <div class="score-sep">–</div>
-      <div class="score-side right" style="justify-content:center">
-        <div class="score-num-big" style="color:${w2?'#f472b6':'#fff'}">${g.s2}</div>
+      ${readOnly ? '' : `<div style="text-align:center;margin-top:4px">
+        <button class="undo-btn" onclick="rrUndoGame('${gameKey}')">Undo</button>
+      </div>`}
+    `;
+  } else if (readOnly) {
+    scoreHtml = `
+      <div class="score-row">
+        <div class="score-side" style="justify-content:center">
+          <div class="score-num-big" style="color:#60a5fa">${g.s1}</div>
+        </div>
+        <div class="score-sep">–</div>
+        <div class="score-side right" style="justify-content:center">
+          <div class="score-num-big" style="color:#f472b6">${g.s2}</div>
+        </div>
       </div>
-    </div>
-    <div style="text-align:center;margin-top:4px">
-      <button class="undo-btn" onclick="rrUndoGame('${gameKey}')">Undo</button>
-    </div>
-  ` : `
-    <div class="score-row">
-      <div class="score-side">
-        <button class="score-tap" onclick="rrAdj('${gameKey}',1,1)" style="color:#60a5fa">+</button>
-        <input class="score-num-big" type="number" min="0" value="${g.s1}"
-          onchange="rrSetScoreInline('${gameKey}',1,this.value)"
-          onfocus="this.select()" inputmode="numeric" pattern="[0-9]*"
-          style="color:#60a5fa"/>
-        <button class="score-tap minus" onclick="rrAdj('${gameKey}',1,-1)">−</button>
+    `;
+  } else {
+    scoreHtml = `
+      <div class="score-row">
+        <div class="score-side">
+          <button class="score-tap" onclick="rrAdj('${gameKey}',1,1)" style="color:#60a5fa">+</button>
+          <input class="score-num-big" type="number" min="0" value="${g.s1}"
+            data-focus-key="rr-${gameKey}-1"
+            onchange="rrSetScoreInline('${gameKey}',1,this.value)"
+            onfocus="this.select()" inputmode="numeric" pattern="[0-9]*"
+            style="color:#60a5fa"/>
+          <button class="score-tap minus" onclick="rrAdj('${gameKey}',1,-1)">−</button>
+        </div>
+        <div class="score-sep">–</div>
+        <div class="score-side right">
+          <button class="score-tap minus" onclick="rrAdj('${gameKey}',2,-1)">−</button>
+          <input class="score-num-big" type="number" min="0" value="${g.s2}"
+            data-focus-key="rr-${gameKey}-2"
+            onchange="rrSetScoreInline('${gameKey}',2,this.value)"
+            onfocus="this.select()" inputmode="numeric" pattern="[0-9]*"
+            style="color:#f472b6"/>
+          <button class="score-tap" onclick="rrAdj('${gameKey}',2,1)" style="color:#f472b6">+</button>
+        </div>
       </div>
-      <div class="score-sep">–</div>
-      <div class="score-side right">
-        <button class="score-tap minus" onclick="rrAdj('${gameKey}',2,-1)">−</button>
-        <input class="score-num-big" type="number" min="0" value="${g.s2}"
-          onchange="rrSetScoreInline('${gameKey}',2,this.value)"
-          onfocus="this.select()" inputmode="numeric" pattern="[0-9]*"
-          style="color:#f472b6"/>
-        <button class="score-tap" onclick="rrAdj('${gameKey}',2,1)" style="color:#f472b6">+</button>
-      </div>
-    </div>
-    <button class="done-btn" onclick="rrMarkDone('${gameKey}')">Mark Game Done ✓</button>
-  `;
+      <button class="done-btn" onclick="rrMarkDone('${gameKey}')">Mark Game Done ✓</button>
+    `;
+  }
 
   const t1Names = g.team1.map(i => rrPlayerName(i)).join(' & ');
   const t2Names = g.team2.map(i => rrPlayerName(i)).join(' & ');
@@ -2323,8 +2618,10 @@ function rrRenderSetup() {
       <div class="rr-player-row" style="grid-template-columns:26px 1fr 70px 32px">
         <div class="rr-player-num">${i+1}.</div>
         <input class="rr-player-input" value="${(name||'').replace(/"/g,'&quot;')}"
+          data-focus-key="rr-pname-${i}"
           oninput="rrUpdatePlayer(${i}, this.value)" placeholder="Player ${i+1}"/>
         <input class="rr-player-input" type="number" step="0.01" min="0"
+          data-focus-key="rr-pdupr-${i}"
           value="${dupr!=null?dupr:''}" placeholder="DUPR"
           onchange="rrUpdatePlayerDUPR(${i}, this.value)"/>
         ${canRemove
@@ -2343,9 +2640,6 @@ function rrRenderSetup() {
         <h1>Round Robin Setup</h1>
         <p>${rrState.players.length} players · ${rrState.gamesPerPlayer} games each · ${totalGames} total games</p>
       </div>
-
-      <div class="rr-subsection-label">Tournament Style</div>
-      <div style="padding:0 12px">${styleBar()}</div>
 
       <div class="rr-subsection-label">Players · ${rrState.players.length}</div>
       <div style="padding: 0 12px">
@@ -2382,7 +2676,7 @@ function rrRenderSetup() {
 
       ${hasGames ? `
         <div style="padding: 4px 16px 0; color:#888; font-size:12px; text-align:center">
-          ${started ? '⚠️ Regenerating will reset all scores (password required).' : 'Games ready. Tap Games tab to start.'}
+          ${started ? '⚠️ Regenerating will reset all scores.' : 'Games ready. Tap Games tab to start.'}
         </div>
       ` : ''}
 
@@ -2427,9 +2721,10 @@ function rrRenderGames() {
         <p>${rrState.games.filter(g=>g.done).length} / ${rrState.games.length} games complete</p>
       </div>
       ${gamesHtml}
-      <div style="padding:16px 12px;text-align:center">
-        <button class="rr-generate-btn warn" style="max-width:260px;display:inline-block" onclick="rrResetAll()">↺ Reset Entire Tournament</button>
-      </div>
+      ${viewMode === 'player' ? '' : `
+        <div style="padding:16px 12px;text-align:center">
+          <button class="rr-generate-btn warn" style="max-width:260px;display:inline-block" onclick="rrResetAll()">↺ Reset Entire Tournament</button>
+        </div>`}
       <div class="page-pad"></div>
     </div>
   `;
@@ -2621,9 +2916,13 @@ function rrRenderPlayoffs() {
 
 function renderRR() {
   const rrDone = rrRRComplete();
+  const isPlayer = viewMode === 'player';
+  if (isPlayer && rrView === 'setup') rrView = 'games';
+  const setupBtn = isPlayer ? '' :
+    `<button onclick="rrSetView('setup')" class="${rrView==='setup'?'active':''}">Setup</button>`;
   const nav = `
     <nav class="nav">
-      <button onclick="rrSetView('setup')"     class="${rrView==='setup'?'active':''}">Setup</button>
+      ${setupBtn}
       <button onclick="rrSetView('games')"     class="${rrView==='games'?'active':''}">Games</button>
       <button onclick="rrSetView('standings')" class="${rrView==='standings'?'active':''}">Standings</button>
       <button onclick="rrSetView('playoffs')"  class="${rrView==='playoffs'?'active':''}" style="${rrDone?'':'opacity:0.6'}">Playoffs</button>
@@ -2632,15 +2931,12 @@ function renderRR() {
   `;
   let body;
   if (rrView === 'setup') body = rrRenderSetup();
-  else if (rrView === 'games') body = rrRenderGames();
-  else if (rrView === 'standings') body = rrRenderStandings();
+  else if (rrView === 'games') body = rrMyCard() + rrRenderGames();
+  else if (rrView === 'standings') body = rrMyCard() + rrRenderStandings();
   else if (rrView === 'playoffs') body = rrRenderPlayoffs();
   else body = rrRenderSetup();
 
-  const prevScroll = window.scrollY;
-  document.getElementById('app').innerHTML = nav + body;
-  renderSyncBar();
-  window.scrollTo(0, prevScroll);
+  swapApp(nav + body);
 }
 
 window.addEventListener('error', (e) => {
@@ -2671,6 +2967,12 @@ const fab = document.createElement('button');
 fab.className = 'rules-fab'; fab.title = 'Rules'; fab.textContent = '?';
 fab.onclick = showRules;
 document.body.appendChild(fab);
+
+// Inject the settings gear FAB (sits to the left of the rules FAB)
+const gearFab = document.createElement('button');
+gearFab.className = 'settings-fab'; gearFab.title = 'Settings'; gearFab.textContent = '⚙';
+gearFab.onclick = showSettings;
+document.body.appendChild(gearFab);
 </script>
 </body>
 </html>
