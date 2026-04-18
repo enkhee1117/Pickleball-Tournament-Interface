@@ -2854,19 +2854,26 @@ function rrRenderGames() {
     `;
   }
   // Group by round (skipping done games unless rrShowDone is on)
-  const totalDone = rrState.games.filter(g => g.done).length;
-  const total = rrState.games.length;
+  const mineOnly = viewMode === 'player' && typeof myIdentity === 'number';
+  const inMyGame = (g) => {
+    const all = (g.team1 || []).concat(g.team2 || []);
+    return all.indexOf(myIdentity) !== -1;
+  };
+  const pool = mineOnly ? rrState.games.filter(inMyGame) : rrState.games;
+  const totalDone = pool.filter(g => g.done).length;
+  const total = pool.length;
   const rounds = {};
-  rrState.games.forEach((g, i) => {
+  pool.forEach((g) => {
     if (g.done && !rrShowDone) return;
     const r = g.round || 1;
+    const i = rrState.games.indexOf(g);
     if (!rounds[r]) rounds[r] = [];
     rounds[r].push({ g, i });
   });
   const hasVisible = Object.keys(rounds).length > 0;
   const gamesHtml = hasVisible ? Object.keys(rounds).sort((a,b)=>a-b).map(r => {
     const rGames = rounds[r];
-    const allRGames = rrState.games.filter(g => (g.round||1) === Number(r));
+    const allRGames = pool.filter(g => (g.round||1) === Number(r));
     const done = allRGames.filter(g => g.done).length;
     const inner = rGames.map(x => rrGameCard(x.g, String(x.i), `Game ${x.i+1}`)).join('');
     return `
@@ -2876,7 +2883,7 @@ function rrRenderGames() {
   }).join('') : `
     <div style="padding:40px 20px;text-align:center;color:#666">
       <div style="font-size:40px;margin-bottom:10px">🎉</div>
-      <div style="font-weight:700;color:#eee;font-size:15px;margin-bottom:4px">All games complete</div>
+      <div style="font-weight:700;color:#eee;font-size:15px;margin-bottom:4px">${mineOnly ? 'All your games complete' : 'All games complete'}</div>
       <div style="font-size:12px">Toggle below to see finished games.</div>
     </div>
   `;
@@ -2891,11 +2898,14 @@ function rrRenderGames() {
     </div>
   `;
 
+  const subhead = mineOnly
+    ? `Your games only \u00b7 ${rrShowDone ? 'all' : 'upcoming &amp; live'}`
+    : (rrShowDone ? 'All games' : 'Upcoming &amp; live games only');
   return `
     <div class="rr-page">
       <div class="rr-header">
         <h1>Round Robin</h1>
-        <p>${rrShowDone ? 'All games' : 'Upcoming &amp; live games only'}</p>
+        <p>${subhead}</p>
       </div>
       ${filterPill}
       ${gamesHtml}
