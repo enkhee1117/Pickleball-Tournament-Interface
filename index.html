@@ -1931,6 +1931,7 @@ function loadRRState() {
 
 let rrState = loadRRState();
 let rrView = localStorage.getItem('rr_view') || 'setup';
+let rrShowDone = localStorage.getItem('rr_show_done') === '1';
 
 // ─── Identity & view mode (device-scoped) ───
 let myIdentity = (function() {
@@ -2270,6 +2271,7 @@ function rrInitSync() {
 }
 
 function rrSetView(v) { rrView = v; localStorage.setItem('rr_view', v); render(); }
+function rrToggleShowDone() { rrShowDone = !rrShowDone; localStorage.setItem('rr_show_done', rrShowDone ? '1' : '0'); render(); }
 
 // ─── Game Generation: balanced random pairing ───
 function rrShuffle(arr) {
@@ -2782,29 +2784,51 @@ function rrRenderGames() {
       </div>
     `;
   }
-  // Group by round
+  // Group by round (skipping done games unless rrShowDone is on)
+  const totalDone = rrState.games.filter(g => g.done).length;
+  const total = rrState.games.length;
   const rounds = {};
   rrState.games.forEach((g, i) => {
+    if (g.done && !rrShowDone) return;
     const r = g.round || 1;
     if (!rounds[r]) rounds[r] = [];
     rounds[r].push({ g, i });
   });
-  const gamesHtml = Object.keys(rounds).sort((a,b)=>a-b).map(r => {
+  const hasVisible = Object.keys(rounds).length > 0;
+  const gamesHtml = hasVisible ? Object.keys(rounds).sort((a,b)=>a-b).map(r => {
     const rGames = rounds[r];
-    const done = rGames.filter(x => x.g.done).length;
+    const allRGames = rrState.games.filter(g => (g.round||1) === Number(r));
+    const done = allRGames.filter(g => g.done).length;
     const inner = rGames.map(x => rrGameCard(x.g, String(x.i), `Game ${x.i+1}`)).join('');
     return `
-      <div class="round-header">Round ${r} · ${done}/${rGames.length} done</div>
+      <div class="round-header">Round ${r} · ${done}/${allRGames.length} done</div>
       ${inner}
     `;
-  }).join('');
+  }).join('') : `
+    <div style="padding:40px 20px;text-align:center;color:#666">
+      <div style="font-size:40px;margin-bottom:10px">🎉</div>
+      <div style="font-weight:700;color:#eee;font-size:15px;margin-bottom:4px">All games complete</div>
+      <div style="font-size:12px">Toggle below to see finished games.</div>
+    </div>
+  `;
+
+  const filterPill = `
+    <div style="padding:8px 12px 4px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <span style="color:#888;font-size:12px">${totalDone} / ${total} games complete</span>
+      <button onclick="rrToggleShowDone()"
+        style="background:${rrShowDone?'#1a2a3f':'#1a1a1a'};border:1px solid ${rrShowDone?'#3a5f8a':'#333'};color:${rrShowDone?'#60a5fa':'#888'};padding:6px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer">
+        ${rrShowDone ? '✓ Showing finished' : 'Show finished'}
+      </button>
+    </div>
+  `;
 
   return `
     <div class="rr-page">
       <div class="rr-header">
         <h1>Round Robin</h1>
-        <p>${rrState.games.filter(g=>g.done).length} / ${rrState.games.length} games complete</p>
+        <p>${rrShowDone ? 'All games' : 'Upcoming &amp; live games only'}</p>
       </div>
+      ${filterPill}
       ${gamesHtml}
       ${viewMode === 'player' ? '' : `
         <div style="padding:16px 12px;text-align:center">
