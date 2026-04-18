@@ -1709,8 +1709,24 @@ function rrTotalGames() {
   return Math.ceil(P * gpp / 4);
 }
 
+function rrMigrateState(s) {
+  if (!s || typeof s !== 'object') return defaultRRState();
+  const d = defaultRRState();
+  if (!Array.isArray(s.players) || s.players.length < 4) s.players = d.players;
+  if (typeof s.gamesPerPlayer !== 'number' || s.gamesPerPlayer < 1) s.gamesPerPlayer = d.gamesPerPlayer;
+  if (typeof s.numCourts !== 'number' || s.numCourts < 1) s.numCourts = d.numCourts;
+  if (!Array.isArray(s.games)) s.games = [];
+  if (!s.draft || typeof s.draft !== 'object') s.draft = { picks: {} };
+  if (!s.draft.picks || typeof s.draft.picks !== 'object') s.draft.picks = {};
+  if (s.semi1 === undefined) s.semi1 = null;
+  if (s.semi2 === undefined) s.semi2 = null;
+  if (s.gold === undefined) s.gold = null;
+  if (s.bronze === undefined) s.bronze = null;
+  return s;
+}
+
 function loadRRState() {
-  try { const s = localStorage.getItem('rr_v1'); if (s) return JSON.parse(s); } catch(e){}
+  try { const s = localStorage.getItem('rr_v1'); if (s) return rrMigrateState(JSON.parse(s)); } catch(e){}
   return defaultRRState();
 }
 
@@ -1743,7 +1759,7 @@ function rrInitSync() {
       const payload = JSON.parse(e.data);
       if (payload.data) {
         if (rrLocalWrite) { rrLocalWrite = false; return; }
-        rrState = payload.data;
+        rrState = rrMigrateState(payload.data);
         localStorage.setItem('rr_v1', JSON.stringify(rrState));
         if (tournamentMode === 'rr') render();
       } else if (payload.path === '/' && payload.data === null) {
