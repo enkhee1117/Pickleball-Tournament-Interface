@@ -1966,7 +1966,7 @@ function setViewMode(mode) {
     const entered = prompt('Enter organizer password:');
     if (entered === null) return;
     if (entered !== ORGANIZER_PASSWORD) {
-      toast('Wrong password');
+      toast('Don\u2019t you dare \ud83d\ude1c');
       return;
     }
     localStorage.setItem('organizer_authed', '1');
