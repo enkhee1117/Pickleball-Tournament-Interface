@@ -359,6 +359,157 @@
       padding: 12px 16px; background: #2a2a2a; color: #888;
       border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer;
     }
+
+    /* ── TOURNAMENT STYLE PICKER ── */
+    .style-bar {
+      position: sticky; top: 0; z-index: 110;
+      background: #0a0a0a; border-bottom: 1px solid #1f1f1f;
+      display: flex; padding: 8px 10px; gap: 6px;
+    }
+    .style-btn {
+      flex: 1; padding: 9px 6px;
+      background: #151515; border: 1px solid #262626; border-radius: 10px;
+      color: #888; font-size: 11px; font-weight: 700; cursor: pointer;
+      text-transform: uppercase; letter-spacing: 0.6px;
+      transition: all 0.15s;
+    }
+    .style-btn.active { background: #fff; color: #000; border-color: #fff; }
+    .style-btn.disabled { color: #444; cursor: not-allowed; }
+
+    /* ── ROUND ROBIN STYLES ── */
+    .rr-page { padding-bottom: 40px; }
+    .rr-header { padding: 18px 16px 4px; }
+    .rr-header h1 { font-size: 22px; font-weight: 800; }
+    .rr-header p { color: #666; font-size: 13px; margin-top: 4px; }
+    .rr-subsection-label {
+      padding: 16px 16px 6px;
+      font-size: 11px; font-weight: 700; color: #555;
+      text-transform: uppercase; letter-spacing: 1.5px;
+    }
+
+    .rr-player-input {
+      width: 100%; padding: 10px 12px;
+      background: #1a1a1a; border: 1px solid #2a2a2a;
+      border-radius: 9px; color: #fff; font-size: 13px;
+      outline: none; transition: border-color 0.15s;
+    }
+    .rr-player-input:focus { border-color: #555; }
+    .rr-player-row {
+      display: grid; grid-template-columns: 26px 1fr;
+      gap: 8px; align-items: center; margin-bottom: 6px;
+    }
+    .rr-player-num {
+      font-size: 11px; color: #555; font-weight: 700; text-align: right;
+    }
+
+    .rr-config-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; padding: 0 4px;
+    }
+    .rr-config-item {
+      background: #1a1a1a; border: 1px solid #2a2a2a;
+      border-radius: 10px; padding: 10px 12px;
+    }
+    .rr-config-label {
+      font-size: 10px; color: #666; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px;
+    }
+    .rr-config-input {
+      width: 100%; background: transparent; border: none;
+      color: #fff; font-size: 18px; font-weight: 800;
+      outline: none; padding: 0;
+    }
+
+    .rr-round-card {
+      background: #1a1a1a; border-radius: 14px;
+      margin: 8px 12px; overflow: hidden; border: 1px solid #2a2a2a;
+    }
+    .rr-round-top {
+      background: #1f1f1f; padding: 10px 14px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .rr-round-title { font-size: 13px; font-weight: 800; color: #fff; text-transform: uppercase; letter-spacing: 0.6px; }
+
+    .rr-game-card {
+      padding: 12px 14px;
+      border-top: 1px solid #252525;
+    }
+    .rr-game-card.complete { background: #161616; }
+    .rr-game-label-row {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .rr-game-label { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.8px; }
+    .rr-team-row {
+      display: grid; grid-template-columns: 1fr auto 1fr;
+      gap: 8px; align-items: center; margin-bottom: 10px;
+    }
+    .rr-team-names {
+      font-size: 12px; color: #ccc; font-weight: 700; line-height: 1.4;
+    }
+    .rr-team-names.right { text-align: right; }
+    .rr-team-names.t1 { color: #60a5fa; }
+    .rr-team-names.t2 { color: #f472b6; }
+    .rr-vs { font-size: 10px; color: #444; text-align: center; }
+
+    .rr-player-pill {
+      display: inline-block; padding: 2px 6px;
+      background: #252525; border-radius: 6px;
+      font-size: 11px; color: #ccc; margin: 1px;
+    }
+
+    .rr-generate-btn {
+      width: calc(100% - 24px); margin: 10px 12px;
+      padding: 14px; background: #fff; color: #000;
+      border: none; border-radius: 12px;
+      font-size: 14px; font-weight: 800; cursor: pointer;
+      text-transform: uppercase; letter-spacing: 0.8px;
+    }
+    .rr-generate-btn:active { transform: scale(0.98); }
+    .rr-generate-btn.secondary { background: #2a2a2a; color: #ccc; }
+    .rr-generate-btn.warn { background: #2a1a1a; color: #f87171; border: 1px solid #5a1a1a; }
+
+    .rr-standings-row {
+      display: grid;
+      grid-template-columns: 28px 1fr 44px 54px 48px 48px;
+      align-items: center;
+      padding: 12px 14px;
+      border-top: 1px solid #252525;
+      gap: 4px;
+    }
+    .rr-standings-row.header-row { padding: 8px 14px; border-top: none; }
+    .rr-standings-row.header-row span {
+      font-size: 10px; color: #555; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .rr-rank-badge {
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; background: #252525; color: #888;
+    }
+    .rr-rank-badge.gold { background: #facc15; color: #000; }
+    .rr-rank-badge.silver { background: #c0c0c0; color: #000; }
+    .rr-rank-badge.bronze { background: #cd7f32; color: #000; }
+    .rr-rank-badge.top8 { background: #1e3a5f; color: #60a5fa; }
+    .rr-player-name { font-size: 13px; font-weight: 700; color: #fff; }
+    .rr-stat { font-size: 13px; text-align: center; color: #999; }
+    .rr-stat.primary { font-size: 16px; font-weight: 800; color: #fff; }
+
+    .rr-bracket-card {
+      background: #1a1a1a; border-radius: 14px;
+      margin: 8px 12px; overflow: hidden; border: 1px solid #2a2a2a;
+    }
+    .rr-bracket-top {
+      padding: 10px 14px; background: #1f1f1f;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .rr-bracket-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; }
+
+    .rr-coming-soon {
+      padding: 60px 20px; text-align: center;
+      color: #555; font-size: 14px; line-height: 1.8;
+    }
+    .rr-coming-soon h2 { color: #888; font-size: 20px; margin-bottom: 8px; }
   </style>
 </head>
 <body>
@@ -440,6 +591,7 @@ let syncSource = null;
 let saveTimer = null;
 let localWrite = false;
 let currentView = localStorage.getItem('mlp_view') || 'matches';
+let tournamentMode = localStorage.getItem('tournament_mode') || 'mlp';
 
 function save() {
   localStorage.setItem('mlp_v3', JSON.stringify(state));
@@ -1245,8 +1397,28 @@ function renderStandings() {
 // ═══════════════════════════════════════════════
 //  RENDER
 // ═══════════════════════════════════════════════
+function setTournamentMode(mode) {
+  if (mode === 'ppa') { alert('PPA style coming soon!'); return; }
+  tournamentMode = mode;
+  localStorage.setItem('tournament_mode', mode);
+  render();
+}
+
+function styleBar() {
+  return `
+    <div class="style-bar">
+      <button class="style-btn ${tournamentMode==='mlp'?'active':''}" onclick="setTournamentMode('mlp')">MLP</button>
+      <button class="style-btn ${tournamentMode==='rr'?'active':''}" onclick="setTournamentMode('rr')">Round Robin</button>
+      <button class="style-btn ${tournamentMode==='ppa'?'active':''} disabled" onclick="setTournamentMode('ppa')">PPA · Soon</button>
+    </div>
+  `;
+}
+
 function render() {
+  if (tournamentMode === 'rr') { renderRR(); return; }
+
   const nav = `
+    ${styleBar()}
     <nav class="nav">
       <button onclick="setView('matches')" class="${currentView==='matches'?'active':''}">Matches</button>
       <button onclick="setView('standings')" class="${currentView==='standings'?'active':''}">Standings</button>
@@ -1505,8 +1677,698 @@ function showRules() {
   document.body.appendChild(el);
 }
 
+// ═══════════════════════════════════════════════
+// ══                ROUND ROBIN                ══
+// ═══════════════════════════════════════════════
+
+const RR_DEFAULT_PLAYERS = [
+  'Player 1','Player 2','Player 3','Player 4',
+  'Player 5','Player 6','Player 7','Player 8',
+  'Player 9','Player 10','Player 11','Player 12',
+];
+
+function blankRRGame(i) {
+  return { i, court: 1, team1: [], team2: [], s1: 0, s2: 0, done: false, winner: null };
+}
+
+function defaultRRState() {
+  return {
+    players: RR_DEFAULT_PLAYERS.slice(),
+    gamesPerPlayer: 6,
+    numCourts: 3,
+    games: [],
+    draft: { picks: {} }, // { 0: partnerIdx, 1: partnerIdx, 2: partnerIdx, 3: partnerIdx } by rank
+    semi1: null, semi2: null, gold: null, bronze: null,
+  };
+}
+
+function rrTotalGames() {
+  const P = rrState.players.length;
+  const gpp = rrState.gamesPerPlayer || 6;
+  // Each game uses 4 player-slots, total player-slots = P * gpp, total games = P*gpp/4
+  return Math.ceil(P * gpp / 4);
+}
+
+function loadRRState() {
+  try { const s = localStorage.getItem('rr_v1'); if (s) return JSON.parse(s); } catch(e){}
+  return defaultRRState();
+}
+
+let rrState = loadRRState();
+let rrView = localStorage.getItem('rr_view') || 'setup';
+
+function rrSave() {
+  localStorage.setItem('rr_v1', JSON.stringify(rrState));
+  if (!FIREBASE_URL) return;
+  clearTimeout(rrSaveTimer);
+  rrSaveTimer = setTimeout(() => {
+    rrLocalWrite = true;
+    fetch(FIREBASE_URL + '/rr_state.json', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(rrState)
+    }).catch(()=>{ rrLocalWrite = false; });
+  }, 150);
+}
+let rrSaveTimer = null;
+let rrLocalWrite = false;
+let rrSyncSource = null;
+
+function rrInitSync() {
+  if (rrSyncSource) { rrSyncSource.close(); rrSyncSource = null; }
+  if (!FIREBASE_URL) return;
+  rrSyncSource = new EventSource(FIREBASE_URL + '/rr_state.json');
+  rrSyncSource.addEventListener('put', e => {
+    try {
+      const payload = JSON.parse(e.data);
+      if (payload.data) {
+        if (rrLocalWrite) { rrLocalWrite = false; return; }
+        rrState = payload.data;
+        localStorage.setItem('rr_v1', JSON.stringify(rrState));
+        if (tournamentMode === 'rr') render();
+      } else if (payload.path === '/' && payload.data === null) {
+        rrSave();
+      }
+    } catch(_) {}
+  });
+}
+
+function rrSetView(v) { rrView = v; localStorage.setItem('rr_view', v); render(); }
+
+// ─── Game Generation: balanced random pairing ───
+function rrShuffle(arr) {
+  const a = arr.slice();
+  for (let i=a.length-1;i>0;i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+// Generate N games. Schedule is arranged into rounds: each round, as many concurrent games
+// as courts allow, with every player in at most one game per round — this guarantees
+// no duplicate players within a single game. We then try many random rounds and pick the
+// schedule with fewest repeat partners/opponents.
+function rrGenerateGames(players, numGames, numCourts) {
+  const P = players.length;
+  const perRound = Math.min(numCourts, Math.floor(P / 4));
+  if (perRound < 1) return [];
+  const totalRounds = Math.ceil(numGames / perRound);
+
+  function attempt() {
+    const games = [];
+    for (let r = 0; r < totalRounds; r++) {
+      const shuffled = rrShuffle([...Array(P).keys()]);
+      for (let g = 0; g < perRound; g++) {
+        if (games.length >= numGames) break;
+        const four = shuffled.slice(g * 4, g * 4 + 4);
+        if (four.length < 4) break;
+        games.push({
+          i: games.length,
+          round: r + 1,
+          court: g + 1,
+          team1: [four[0], four[1]],
+          team2: [four[2], four[3]],
+          s1: 0, s2: 0, done: false, winner: null,
+        });
+      }
+    }
+    return games;
+  }
+
+  function score(games) {
+    const pairCount = {};
+    const oppCount = {};
+    let s = 0;
+    for (const g of games) {
+      const pk1 = g.team1.slice().sort((a, b) => a - b).join('_');
+      const pk2 = g.team2.slice().sort((a, b) => a - b).join('_');
+      pairCount[pk1] = (pairCount[pk1] || 0) + 1;
+      pairCount[pk2] = (pairCount[pk2] || 0) + 1;
+      for (const a of g.team1) for (const b of g.team2) {
+        const ok = a < b ? a + '_' + b : b + '_' + a;
+        oppCount[ok] = (oppCount[ok] || 0) + 1;
+      }
+    }
+    for (const k in pairCount) if (pairCount[k] > 1) s += (pairCount[k] - 1) * 10;
+    for (const k in oppCount) if (oppCount[k] > 1) s += (oppCount[k] - 1) * 2;
+    return s;
+  }
+
+  let best = null, bestScore = Infinity;
+  for (let iter = 0; iter < 500; iter++) {
+    const games = attempt();
+    const sc = score(games);
+    if (sc < bestScore) { bestScore = sc; best = games; if (sc === 0) break; }
+  }
+  return best || [];
+}
+
+// ─── Actions ───
+function rrUpdatePlayer(idx, name) {
+  rrState.players[idx] = name;
+  rrSave();
+}
+function rrUpdateConfig(key, val) {
+  const n = parseInt(val);
+  if (!isNaN(n) && n > 0) { rrState[key] = n; rrSave(); render(); }
+}
+function rrGenerateAll() {
+  if (rrState.games.some(g => g.done || g.s1>0 || g.s2>0)) {
+    if (!confirm('This will overwrite all current games and scores. Continue?')) return;
+    if (prompt('Enter password to regenerate:') !== 'terry') return;
+  }
+  const total = rrTotalGames();
+  rrState.games = rrGenerateGames(rrState.players, total, rrState.numCourts);
+  rrState.draft = { picks: {} };
+  rrState.semi1 = null; rrState.semi2 = null; rrState.gold = null; rrState.bronze = null;
+  rrSave(); rrSetView('games');
+}
+
+function rrAdj(gameKey, team, delta) {
+  const g = rrGetGame(gameKey);
+  if (!g || g.done) return;
+  if (team===1) g.s1 = Math.max(0, g.s1 + delta);
+  else g.s2 = Math.max(0, g.s2 + delta);
+  rrSave(); render();
+}
+
+function rrGetGame(key) {
+  if (key === 'semi1') return rrState.semi1;
+  if (key === 'semi2') return rrState.semi2;
+  if (key === 'gold') return rrState.gold;
+  if (key === 'bronze') return rrState.bronze;
+  return rrState.games[parseInt(key)];
+}
+
+function rrMarkDone(gameKey) {
+  const g = rrGetGame(gameKey);
+  if (!g) return;
+  if (g.s1 === g.s2) { alert("Scores tied — can't complete."); return; }
+  g.done = true;
+  g.winner = g.s1 > g.s2 ? 't1' : 't2';
+  launchConfetti();
+  // Auto-advance semis → gold/bronze
+  if (gameKey === 'semi1' || gameKey === 'semi2') rrMaybeAdvanceSemis();
+  rrSave(); render();
+}
+
+function rrUndoGame(gameKey) {
+  const g = rrGetGame(gameKey);
+  if (!g) return;
+  g.done = false; g.winner = null;
+  // If undoing a semi, clear gold/bronze
+  if (gameKey === 'semi1' || gameKey === 'semi2') {
+    rrState.gold = null; rrState.bronze = null;
+  }
+  rrSave(); render();
+}
+
+function rrEditScore(gameKey, team) {
+  const g = rrGetGame(gameKey);
+  if (!g || g.done) return;
+  const cur = team===1 ? g.s1 : g.s2;
+  const v = prompt('Enter score:', cur);
+  if (v===null) return;
+  const n = parseInt(v);
+  if (isNaN(n) || n<0) return;
+  if (team===1) g.s1 = n; else g.s2 = n;
+  rrSave(); render();
+}
+
+function rrResetGame(gameKey) {
+  if (prompt('Enter password to reset:') !== 'terry') return;
+  const g = rrGetGame(gameKey);
+  if (!g) return;
+  g.s1 = 0; g.s2 = 0; g.done = false; g.winner = null;
+  if (gameKey === 'semi1' || gameKey === 'semi2') {
+    rrState.gold = null; rrState.bronze = null;
+  }
+  rrSave(); render();
+}
+
+function rrResetAll() {
+  if (prompt('Enter password to reset everything:') !== 'terry') return;
+  rrState = defaultRRState();
+  rrSave(); render();
+}
+
+// ─── Standings ───
+function rrStandings() {
+  const stats = rrState.players.map((name, idx) => ({
+    idx, name, pf: 0, pa: 0, gp: 0, gw: 0
+  }));
+  rrState.games.forEach(g => {
+    if (!g.done) return;
+    g.team1.forEach(p => {
+      if (stats[p]) { stats[p].pf += g.s1; stats[p].pa += g.s2; stats[p].gp++; if (g.winner==='t1') stats[p].gw++; }
+    });
+    g.team2.forEach(p => {
+      if (stats[p]) { stats[p].pf += g.s2; stats[p].pa += g.s1; stats[p].gp++; if (g.winner==='t2') stats[p].gw++; }
+    });
+  });
+  return stats.map(s => ({ ...s, diff: s.pf - s.pa }))
+    .sort((a,b) => b.gw - a.gw || b.diff - a.diff || b.pf - a.pf);
+}
+
+function rrRRComplete() {
+  return rrState.games.length > 0 && rrState.games.every(g => g.done);
+}
+
+// ─── Draft Pick & Playoffs ───
+function rrDraftComplete() {
+  return [0,1,2,3].every(r => rrState.draft && rrState.draft.picks && rrState.draft.picks[r] != null);
+}
+
+function rrDraftPick(rank, partnerIdx) {
+  if (!rrState.draft) rrState.draft = { picks: {} };
+  rrState.draft.picks[rank] = partnerIdx;
+  // Auto-fill the 4th if only one remaining
+  const st = rrStandings();
+  const top4Picked = [0,1,2,3].map(r => rrState.draft.picks[r]).filter(v => v != null);
+  const bottom4 = [4,5,6,7].map(r => st[r] ? st[r].idx : null).filter(v => v != null);
+  const remaining = bottom4.filter(i => !top4Picked.includes(i));
+  if (remaining.length === 1) {
+    for (let r=0;r<4;r++) if (rrState.draft.picks[r] == null) rrState.draft.picks[r] = remaining[0];
+  }
+  if (rrDraftComplete()) rrBuildSemis();
+  rrSave(); render();
+}
+
+function rrUndoDraft() {
+  if (prompt('Enter password to redo draft:') !== 'terry') return;
+  rrState.draft = { picks: {} };
+  rrState.semi1 = null; rrState.semi2 = null; rrState.gold = null; rrState.bronze = null;
+  rrSave(); render();
+}
+
+function rrBuildSemis() {
+  const st = rrStandings();
+  const picks = rrState.draft.picks;
+  // Teams: rank 0 team = [rank0.idx, picks[0]], etc.
+  const teamA = [st[0].idx, picks[0]]; // 1st + pick
+  const teamB = [st[1].idx, picks[1]]; // 2nd + pick
+  const teamC = [st[2].idx, picks[2]]; // 3rd + pick
+  const teamD = [st[3].idx, picks[3]]; // 4th + pick
+  // Standard bracket: 1 vs 4, 2 vs 3
+  rrState.semi1 = { court: 1, team1: teamA, team2: teamD, s1: 0, s2: 0, done: false, winner: null, label: 'Semi 1 · 1 vs 4' };
+  rrState.semi2 = { court: 2, team1: teamB, team2: teamC, s1: 0, s2: 0, done: false, winner: null, label: 'Semi 2 · 2 vs 3' };
+}
+
+function rrMaybeAdvanceSemis() {
+  const s1 = rrState.semi1, s2 = rrState.semi2;
+  if (s1 && s1.done && s2 && s2.done) {
+    const s1W = s1.winner === 't1' ? s1.team1 : s1.team2;
+    const s1L = s1.winner === 't1' ? s1.team2 : s1.team1;
+    const s2W = s2.winner === 't1' ? s2.team1 : s2.team2;
+    const s2L = s2.winner === 't1' ? s2.team2 : s2.team1;
+    if (!rrState.gold) rrState.gold = { court: 1, team1: s1W, team2: s2W, s1: 0, s2: 0, done: false, winner: null, label: 'Gold Medal' };
+    if (!rrState.bronze) rrState.bronze = { court: 2, team1: s1L, team2: s2L, s1: 0, s2: 0, done: false, winner: null, label: 'Bronze Medal' };
+  }
+}
+
+// ─── Render ───
+function rrNames(arr) {
+  if (!arr || !arr.length) return '';
+  return arr.map(i => `<span class="rr-player-pill">${rrState.players[i] || '?'}</span>`).join('');
+}
+
+function rrGameCard(g, gameKey, title) {
+  let badge, badgeClass;
+  if (g.done) { badge='Final'; badgeClass='badge-done'; }
+  else if (g.s1>0 || g.s2>0) { badge='Live'; badgeClass='badge-live'; }
+  else { badge='Upcoming'; badgeClass='badge-upcoming'; }
+
+  const w1 = g.done && g.winner==='t1';
+  const w2 = g.done && g.winner==='t2';
+
+  const scoreHtml = g.done ? `
+    <div class="score-row">
+      <div class="score-side" style="justify-content:center">
+        <div class="score-num-big" style="color:${w1?'#60a5fa':'#fff'}">${g.s1}</div>
+      </div>
+      <div class="score-sep">–</div>
+      <div class="score-side right" style="justify-content:center">
+        <div class="score-num-big" style="color:${w2?'#f472b6':'#fff'}">${g.s2}</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:4px">
+      <button class="undo-btn" onclick="rrUndoGame('${gameKey}')">Undo</button>
+    </div>
+  ` : `
+    <div class="score-row">
+      <div class="score-side">
+        <button class="score-tap" onclick="rrAdj('${gameKey}',1,1)" style="color:#60a5fa">+</button>
+        <div class="score-num-big" onclick="rrEditScore('${gameKey}',1)" style="cursor:pointer">${g.s1}</div>
+        <button class="score-tap minus" onclick="rrAdj('${gameKey}',1,-1)">−</button>
+      </div>
+      <div class="score-sep">–</div>
+      <div class="score-side right">
+        <button class="score-tap minus" onclick="rrAdj('${gameKey}',2,-1)">−</button>
+        <div class="score-num-big" onclick="rrEditScore('${gameKey}',2)" style="cursor:pointer">${g.s2}</div>
+        <button class="score-tap" onclick="rrAdj('${gameKey}',2,1)" style="color:#f472b6">+</button>
+      </div>
+    </div>
+    <button class="done-btn" onclick="rrMarkDone('${gameKey}')">Mark Game Done ✓</button>
+  `;
+
+  const t1Names = g.team1.map(i => rrState.players[i] || '?').join(' & ');
+  const t2Names = g.team2.map(i => rrState.players[i] || '?').join(' & ');
+
+  let resultHtml = '';
+  if (g.done) {
+    const winNames = g.winner==='t1' ? t1Names : t2Names;
+    resultHtml = `<div class="result-banner" style="background:#0f2a0f;color:#4ade80">${winNames} win!</div>`;
+  }
+
+  return `
+    <div class="rr-round-card" ${!g.done && (g.s1>0||g.s2>0)?'id="active-match"':''}>
+      <div class="rr-round-top">
+        <span class="rr-round-title">${title} · Court ${g.court||1}</span>
+        <span class="badge ${badgeClass}">${badge}</span>
+      </div>
+      <div class="rr-game-card${g.done?' complete':''}">
+        <div class="rr-team-row">
+          <div class="rr-team-names t1">${t1Names}</div>
+          <div class="rr-vs">vs</div>
+          <div class="rr-team-names t2 right">${t2Names}</div>
+        </div>
+        ${scoreHtml}
+      </div>
+      ${resultHtml}
+      <div class="reset-row">
+        <button class="reset-btn" onclick="rrResetGame('${gameKey}')">↺ Reset</button>
+      </div>
+    </div>
+  `;
+}
+
+function rrRenderSetup() {
+  const playerRows = rrState.players.map((name, i) => `
+    <div class="rr-player-row">
+      <div class="rr-player-num">${i+1}.</div>
+      <input class="rr-player-input" value="${(name||'').replace(/"/g,'&quot;')}"
+        oninput="rrUpdatePlayer(${i}, this.value)" placeholder="Player ${i+1}"/>
+    </div>
+  `).join('');
+
+  const hasGames = rrState.games.length > 0;
+  const started = rrState.games.some(g => g.done || g.s1>0 || g.s2>0);
+
+  const totalGames = rrTotalGames();
+  return `
+    <div class="rr-page">
+      <div class="rr-header">
+        <h1>Round Robin Setup</h1>
+        <p>${rrState.players.length} players · ${rrState.gamesPerPlayer} games each · ${totalGames} total games</p>
+      </div>
+
+      <div class="rr-subsection-label">Players</div>
+      <div style="padding: 0 12px">${playerRows}</div>
+
+      <div class="rr-subsection-label">Configuration</div>
+      <div style="padding: 0 12px">
+        <div class="rr-config-grid">
+          <div class="rr-config-item">
+            <div class="rr-config-label">Games / Player</div>
+            <input class="rr-config-input" type="number" min="1" max="20"
+              value="${rrState.gamesPerPlayer}" onchange="rrUpdateConfig('gamesPerPlayer', this.value)"/>
+          </div>
+          <div class="rr-config-item">
+            <div class="rr-config-label">Courts</div>
+            <input class="rr-config-input" type="number" min="1" max="6"
+              value="${rrState.numCourts}" onchange="rrUpdateConfig('numCourts', this.value)"/>
+          </div>
+        </div>
+        <div style="color:#666;font-size:12px;margin:10px 4px;line-height:1.5">
+          ${rrState.players.length} players × ${rrState.gamesPerPlayer} games each ÷ 4 players per game
+          = <strong style="color:#ccc">${totalGames}</strong> total games
+          (${Math.ceil(totalGames / rrState.numCourts)} rounds of ${rrState.numCourts}-court play).
+        </div>
+      </div>
+
+      <button class="rr-generate-btn" onclick="rrGenerateAll()">
+        ${hasGames ? '🎲 Regenerate All Games' : '🎲 Generate Random Games'}
+      </button>
+
+      ${hasGames ? `
+        <div style="padding: 4px 16px 0; color:#888; font-size:12px; text-align:center">
+          ${started ? '⚠️ Regenerating will reset all scores (password required).' : 'Games ready. Tap Games tab to start.'}
+        </div>
+      ` : ''}
+
+      <div class="page-pad"></div>
+    </div>
+  `;
+}
+
+function rrRenderGames() {
+  if (!rrState.games.length) {
+    return `
+      <div class="rr-page">
+        <div class="rr-coming-soon">
+          <h2>No games yet</h2>
+          <p>Go to Setup → tap <strong>Generate Random Games</strong> to begin.</p>
+          <button class="rr-generate-btn" style="max-width:260px;margin:20px auto;display:block" onclick="rrSetView('setup')">Go to Setup</button>
+        </div>
+      </div>
+    `;
+  }
+  // Group by round
+  const rounds = {};
+  rrState.games.forEach((g, i) => {
+    const r = g.round || 1;
+    if (!rounds[r]) rounds[r] = [];
+    rounds[r].push({ g, i });
+  });
+  const gamesHtml = Object.keys(rounds).sort((a,b)=>a-b).map(r => {
+    const rGames = rounds[r];
+    const done = rGames.filter(x => x.g.done).length;
+    const inner = rGames.map(x => rrGameCard(x.g, String(x.i), `Game ${x.i+1}`)).join('');
+    return `
+      <div class="round-header">Round ${r} · ${done}/${rGames.length} done</div>
+      ${inner}
+    `;
+  }).join('');
+
+  return `
+    <div class="rr-page">
+      <div class="rr-header">
+        <h1>Round Robin</h1>
+        <p>${rrState.games.filter(g=>g.done).length} / ${rrState.games.length} games complete</p>
+      </div>
+      ${gamesHtml}
+      <div style="padding:16px 12px;text-align:center">
+        <button class="rr-generate-btn warn" style="max-width:260px;display:inline-block" onclick="rrResetAll()">↺ Reset Entire Tournament</button>
+      </div>
+      <div class="page-pad"></div>
+    </div>
+  `;
+}
+
+function rrRenderStandings() {
+  const st = rrStandings();
+  if (!st.length) return '<div class="rr-coming-soon">No players yet.</div>';
+
+  const rrDone = rrRRComplete();
+  const rows = st.map((row, i) => {
+    let badgeCls = 'top8';
+    if (i === 0) badgeCls = 'gold';
+    else if (i === 1) badgeCls = 'silver';
+    else if (i === 2) badgeCls = 'bronze';
+    else if (i >= 8) badgeCls = '';
+    return `
+      <div class="rr-standings-row">
+        <div class="rr-rank-badge ${badgeCls}">${i+1}</div>
+        <div class="rr-player-name">${row.name || 'Player '+(row.idx+1)}</div>
+        <div class="rr-stat primary">${row.gw}</div>
+        <div class="rr-stat">${row.gw}/${row.gp}</div>
+        <div class="rr-stat">${row.diff>0?'+':''}${row.diff}</div>
+        <div class="rr-stat">${row.pf}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="rr-page">
+      <div class="rr-header">
+        <h1>Individual Standings</h1>
+        <p>${rrDone ? 'Round robin complete · Top 4 move to draft' : 'Ranked by wins, then point differential'}</p>
+      </div>
+      <div class="card">
+        <div class="rr-standings-row header-row">
+          <span></span><span>Player</span>
+          <span style="text-align:center">W</span>
+          <span style="text-align:center">W/G</span>
+          <span style="text-align:center">+/−</span>
+          <span style="text-align:center">PF</span>
+        </div>
+        ${rows}
+      </div>
+      <div class="card-label" style="margin:16px 12px 0">Scoring</div>
+      <div class="card">
+        <div class="info-card">
+          <div>🏆 <strong>W</strong> — Games won</div>
+          <div>📊 <strong>+/−</strong> — Point differential (for − against)</div>
+          <div>🎯 <strong>PF</strong> — Total points scored</div>
+          <div style="margin-top:6px;color:#facc15">Top 4 choose partners from ranks 5-8 for semis.</div>
+        </div>
+      </div>
+      <div class="page-pad"></div>
+    </div>
+  `;
+}
+
+function rrRenderPlayoffs() {
+  if (!rrRRComplete()) {
+    return `
+      <div class="rr-page">
+        <div class="rr-coming-soon">
+          <h2>Playoffs locked</h2>
+          <p>Complete all ${rrState.games.length || 6} round-robin games to unlock draft &amp; playoffs.</p>
+          <p style="margin-top:8px;color:#666">${rrState.games.filter(g=>g.done).length} / ${rrState.games.length || 6} done</p>
+        </div>
+      </div>
+    `;
+  }
+
+  const st = rrStandings();
+  const top4 = st.slice(0, 4);
+  const bottom4 = st.slice(4, 8);
+  const picks = (rrState.draft && rrState.draft.picks) || {};
+
+  // Draft UI
+  let draftHtml = '';
+  if (!rrDraftComplete()) {
+    // Find next drafter
+    let nextRank = [0,1,2,3].find(r => picks[r] == null);
+    const pickedIdxs = [0,1,2,3].map(r => picks[r]).filter(v => v != null);
+    const available = bottom4.filter(p => !pickedIdxs.includes(p.idx));
+
+    const currentTeams = [0,1,2,3].map(r => {
+      const top = top4[r];
+      if (picks[r] != null) {
+        const partner = st.find(s => s.idx === picks[r]);
+        return `<div style="padding:10px 14px;border-top:1px solid #252525">
+          <div style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Team ${String.fromCharCode(65+r)}</div>
+          <div style="font-size:13px;color:#fff;font-weight:700">${top.name} <span style="color:#666">(${r+1})</span> + ${partner.name} <span style="color:#666">(${st.indexOf(partner)+1})</span></div>
+        </div>`;
+      }
+      const isNext = r === nextRank;
+      return `<div style="padding:10px 14px;border-top:1px solid #252525;${isNext?'background:#1e2a3f':''}">
+        <div style="font-size:10px;color:${isNext?'#60a5fa':'#666'};font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Team ${String.fromCharCode(65+r)} ${isNext?'· On the clock':''}</div>
+        <div style="font-size:13px;color:#fff;font-weight:700">${top.name} <span style="color:#666">(${r+1})</span> + <span style="color:#666">?</span></div>
+      </div>`;
+    }).join('');
+
+    const pickerHtml = available.length === 0 ? '' : `
+      <div class="card" style="margin-top:16px">
+        <div class="card-label" style="padding:12px 14px 4px">
+          ${top4[nextRank].name} (rank ${nextRank+1}) · Pick your partner
+        </div>
+        <div style="padding:0 12px 12px">
+          ${available.map(p => {
+            const rank = st.indexOf(p) + 1;
+            return `<button onclick="rrDraftPick(${nextRank}, ${p.idx})"
+              style="display:block;width:100%;margin-bottom:8px;padding:14px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;text-align:left">
+              <span style="color:#60a5fa">Rank ${rank}</span> · ${p.name}
+              <span style="float:right;color:#666;font-size:12px">${p.gw}W · ${p.diff>0?'+':''}${p.diff}</span>
+            </button>`;
+          }).join('')}
+        </div>
+      </div>
+    `;
+
+    draftHtml = `
+      <div class="card-label" style="margin:16px 12px 0">Team Draft</div>
+      <div class="card">
+        <div class="info-card" style="padding:12px 14px">
+          Top 4 players pick partners from ranks 5-8, in order.
+        </div>
+        ${currentTeams}
+      </div>
+      ${pickerHtml}
+    `;
+  }
+
+  // Bracket UI (visible once draft complete)
+  let bracketHtml = '';
+  if (rrDraftComplete()) {
+    const semi1Html = rrState.semi1 ? rrGameCard(rrState.semi1, 'semi1', '🥈 ' + rrState.semi1.label) : '';
+    const semi2Html = rrState.semi2 ? rrGameCard(rrState.semi2, 'semi2', '🥈 ' + rrState.semi2.label) : '';
+    const goldHtml = rrState.gold ? rrGameCard(rrState.gold, 'gold', '🏆 ' + rrState.gold.label) :
+      `<div class="rr-bracket-card">
+         <div class="rr-bracket-top" style="background:#1f1c00">
+           <span class="rr-bracket-label" style="color:#facc15">🏆 Gold Medal</span>
+           <span class="badge badge-upcoming">Locked</span>
+         </div>
+         <div style="padding:16px;text-align:center;color:#666;font-size:13px">Complete both semis to unlock</div>
+       </div>`;
+    const bronzeHtml = rrState.bronze ? rrGameCard(rrState.bronze, 'bronze', '🥉 ' + rrState.bronze.label) :
+      `<div class="rr-bracket-card">
+         <div class="rr-bracket-top" style="background:#1a1400">
+           <span class="rr-bracket-label" style="color:#cd7f32">🥉 Bronze Medal</span>
+           <span class="badge badge-upcoming">Locked</span>
+         </div>
+         <div style="padding:16px;text-align:center;color:#666;font-size:13px">Complete both semis to unlock</div>
+       </div>`;
+
+    bracketHtml = `
+      <div class="rr-subsection-label">Semifinals</div>
+      ${semi1Html}
+      ${semi2Html}
+      <div class="rr-subsection-label">Medal Matches</div>
+      ${goldHtml}
+      ${bronzeHtml}
+      <div style="padding:12px 12px 0;text-align:center">
+        <button class="reset-btn" style="font-size:11px" onclick="rrUndoDraft()">↺ Redo Draft</button>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="rr-page">
+      <div class="rr-header">
+        <h1>Playoffs</h1>
+        <p>${rrDraftComplete() ? 'Bracket locked in' : 'Draft your partner'}</p>
+      </div>
+      ${draftHtml}
+      ${bracketHtml}
+      <div class="page-pad"></div>
+    </div>
+  `;
+}
+
+function renderRR() {
+  const rrDone = rrRRComplete();
+  const nav = `
+    ${styleBar()}
+    <nav class="nav">
+      <button onclick="rrSetView('setup')"     class="${rrView==='setup'?'active':''}">Setup</button>
+      <button onclick="rrSetView('games')"     class="${rrView==='games'?'active':''}">Games</button>
+      <button onclick="rrSetView('standings')" class="${rrView==='standings'?'active':''}">Standings</button>
+      <button onclick="rrSetView('playoffs')"  class="${rrView==='playoffs'?'active':''}" style="${rrDone?'':'opacity:0.6'}">Playoffs</button>
+    </nav>
+    <div class="sync-bar sync-pending" id="sync-status-bar"></div>
+  `;
+  let body;
+  if (rrView === 'setup') body = rrRenderSetup();
+  else if (rrView === 'games') body = rrRenderGames();
+  else if (rrView === 'standings') body = rrRenderStandings();
+  else if (rrView === 'playoffs') body = rrRenderPlayoffs();
+  else body = rrRenderSetup();
+
+  document.getElementById('app').innerHTML = nav + body;
+  renderSyncBar();
+  setTimeout(() => {
+    const el = document.getElementById('active-match');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 80);
+}
+
 render();
 initSync();
+rrInitSync();
 
 // Inject the floating rules button once
 const fab = document.createElement('button');
