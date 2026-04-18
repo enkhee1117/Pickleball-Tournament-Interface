@@ -15,7 +15,7 @@
 
     /* ── NAV ── */
     .nav {
-      position: sticky; top: 45px; z-index: 100;
+      position: sticky; top: 0; z-index: 100;
       background: #141414;
       border-bottom: 1px solid #2a2a2a;
       display: flex;
@@ -117,6 +117,18 @@
       font-size: 32px; font-weight: 900; line-height: 52px;
       min-width: 0;
     }
+    /* When the big score is an editable input */
+    input.score-num-big {
+      background: transparent; border: none; outline: none;
+      color: #fff; padding: 0; margin: 0;
+      -moz-appearance: textfield; appearance: textfield;
+      font-family: inherit; width: 100%; height: 52px;
+    }
+    input.score-num-big::-webkit-outer-spin-button,
+    input.score-num-big::-webkit-inner-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+    input.score-num-big:focus { background: rgba(255,255,255,0.04); }
     .score-sep { text-align: center; color: #444; font-size: 14px; font-weight: 600; }
 
     /* ── DONE BUTTON ── */
@@ -362,9 +374,7 @@
 
     /* ── TOURNAMENT STYLE PICKER ── */
     .style-bar {
-      position: sticky; top: 0; z-index: 110;
-      background: #0a0a0a; border-bottom: 1px solid #1f1f1f;
-      display: flex; padding: 8px 10px; gap: 6px;
+      display: flex; padding: 0; gap: 6px;
     }
     .style-btn {
       flex: 1; padding: 9px 6px;
@@ -782,6 +792,17 @@ function getMatch(matchId) {
   return state.matches[matchId];
 }
 
+function setScoreInline(matchId, gi, team, val) {
+  const n = parseInt(val);
+  if (isNaN(n) || n < 0) return;
+  const m = getMatch(matchId);
+  if (!m) return;
+  const game = gi===4 ? m.db : m.games[gi];
+  if (!game || game.done) return;
+  if (team===1) game.s1 = n; else game.s2 = n;
+  save(); render();
+}
+
 function adj(matchId, gi, team, delta) {
   const m = getMatch(matchId);
   const isDB = gi===4;
@@ -968,13 +989,19 @@ function scoreBlock(matchId, gi, s1, s2, done, winner, t1key, t2key) {
     <div class="score-row">
       <div class="score-side">
         <button class="score-tap" onclick="adj('${mid}',${gi},1,1)" style="color:${tc(t1key)}">+</button>
-        <div class="score-num-big" onclick="editScore('${mid}',${gi},1,${s1},'${tc(t1key)}')" style="cursor:pointer" title="Tap to edit">${s1}</div>
+        <input class="score-num-big" type="number" min="0" value="${s1}"
+          onchange="setScoreInline('${mid}',${gi},1,this.value)"
+          onfocus="this.select()" inputmode="numeric" pattern="[0-9]*"
+          style="color:${tc(t1key)}"/>
         <button class="score-tap minus" onclick="adj('${mid}',${gi},1,-1)">−</button>
       </div>
       <div class="score-sep">–</div>
       <div class="score-side right">
         <button class="score-tap minus" onclick="adj('${mid}',${gi},2,-1)">−</button>
-        <div class="score-num-big" onclick="editScore('${mid}',${gi},2,${s2},'${tc(t2key)}')" style="cursor:pointer" title="Tap to edit">${s2}</div>
+        <input class="score-num-big" type="number" min="0" value="${s2}"
+          onchange="setScoreInline('${mid}',${gi},2,this.value)"
+          onfocus="this.select()" inputmode="numeric" pattern="[0-9]*"
+          style="color:${tc(t2key)}"/>
         <button class="score-tap" onclick="adj('${mid}',${gi},2,1)" style="color:${tc(t2key)}">+</button>
       </div>
     </div>
@@ -1333,7 +1360,13 @@ function renderStandings() {
         <h1>Standings</h1>
         <p>Top 2 advance to Championship after Round 3</p>
       </div>
+
+      <div class="card-label" style="margin:0 12px">Tournament Style</div>
       <div class="card">
+        <div style="padding:10px 12px">${styleBar()}</div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
         <div class="standings-row header-row">
           <span></span><span>Team</span><span style="text-align:center">Pts</span>
           <span style="text-align:center">W/G</span>
@@ -1418,7 +1451,6 @@ function render() {
   if (tournamentMode === 'rr') { renderRR(); return; }
 
   const nav = `
-    ${styleBar()}
     <nav class="nav">
       <button onclick="setView('matches')" class="${currentView==='matches'?'active':''}">Matches</button>
       <button onclick="setView('standings')" class="${currentView==='standings'?'active':''}">Standings</button>
@@ -1925,14 +1957,11 @@ function rrUndoGame(gameKey) {
   rrSave(); render();
 }
 
-function rrEditScore(gameKey, team) {
+function rrSetScoreInline(gameKey, team, val) {
+  const n = parseInt(val);
+  if (isNaN(n) || n < 0) return;
   const g = rrGetGame(gameKey);
   if (!g || g.done) return;
-  const cur = team===1 ? g.s1 : g.s2;
-  const v = prompt('Enter score:', cur);
-  if (v===null) return;
-  const n = parseInt(v);
-  if (isNaN(n) || n<0) return;
   if (team===1) g.s1 = n; else g.s2 = n;
   rrSave(); render();
 }
@@ -2060,13 +2089,19 @@ function rrGameCard(g, gameKey, title) {
     <div class="score-row">
       <div class="score-side">
         <button class="score-tap" onclick="rrAdj('${gameKey}',1,1)" style="color:#60a5fa">+</button>
-        <div class="score-num-big" onclick="rrEditScore('${gameKey}',1)" style="cursor:pointer">${g.s1}</div>
+        <input class="score-num-big" type="number" min="0" value="${g.s1}"
+          onchange="rrSetScoreInline('${gameKey}',1,this.value)"
+          onfocus="this.select()" inputmode="numeric" pattern="[0-9]*"
+          style="color:#60a5fa"/>
         <button class="score-tap minus" onclick="rrAdj('${gameKey}',1,-1)">−</button>
       </div>
       <div class="score-sep">–</div>
       <div class="score-side right">
         <button class="score-tap minus" onclick="rrAdj('${gameKey}',2,-1)">−</button>
-        <div class="score-num-big" onclick="rrEditScore('${gameKey}',2)" style="cursor:pointer">${g.s2}</div>
+        <input class="score-num-big" type="number" min="0" value="${g.s2}"
+          onchange="rrSetScoreInline('${gameKey}',2,this.value)"
+          onfocus="this.select()" inputmode="numeric" pattern="[0-9]*"
+          style="color:#f472b6"/>
         <button class="score-tap" onclick="rrAdj('${gameKey}',2,1)" style="color:#f472b6">+</button>
       </div>
     </div>
@@ -2127,6 +2162,9 @@ function rrRenderSetup() {
         <h1>Round Robin Setup</h1>
         <p>${rrState.players.length} players · ${rrState.gamesPerPlayer} games each · ${totalGames} total games</p>
       </div>
+
+      <div class="rr-subsection-label">Tournament Style</div>
+      <div style="padding:0 12px">${styleBar()}</div>
 
       <div class="rr-subsection-label">Players · ${rrState.players.length}</div>
       <div style="padding: 0 12px">
@@ -2403,7 +2441,6 @@ function rrRenderPlayoffs() {
 function renderRR() {
   const rrDone = rrRRComplete();
   const nav = `
-    ${styleBar()}
     <nav class="nav">
       <button onclick="rrSetView('setup')"     class="${rrView==='setup'?'active':''}">Setup</button>
       <button onclick="rrSetView('games')"     class="${rrView==='games'?'active':''}">Games</button>
