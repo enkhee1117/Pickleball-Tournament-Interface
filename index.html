@@ -1939,7 +1939,15 @@ let myIdentity = (function() {
   return (v === null || v === '') ? null : parseInt(v);
 })();
 if (isNaN(myIdentity)) myIdentity = null;
-let viewMode = localStorage.getItem('view_mode') || 'organizer'; // 'organizer' | 'player'
+let viewMode = (function() {
+  const stored = localStorage.getItem('view_mode');
+  // Organizer is password-gated. Devices without the authed flag must re-enter.
+  if (stored === 'organizer' && localStorage.getItem('organizer_authed') !== '1') {
+    localStorage.setItem('view_mode', 'player');
+    return 'player';
+  }
+  return stored === 'organizer' ? 'organizer' : 'player';
+})(); // 'organizer' | 'player'
 
 function setIdentity(idx) {
   const raw = (idx === '' || idx === null || idx === undefined) ? null : parseInt(idx);
@@ -1951,8 +1959,20 @@ function setIdentity(idx) {
   toast(myIdentity === null ? 'Signed out' : 'Signed in as ' + rrPlayerName(myIdentity));
   render();
 }
+const ORGANIZER_PASSWORD = 'TerryBoomer';
 function setViewMode(mode) {
-  viewMode = mode === 'player' ? 'player' : 'organizer';
+  const next = mode === 'player' ? 'player' : 'organizer';
+  if (next === 'organizer' && viewMode !== 'organizer') {
+    const entered = prompt('Enter organizer password:');
+    if (entered === null) return;
+    if (entered !== ORGANIZER_PASSWORD) {
+      toast('Wrong password');
+      return;
+    }
+    localStorage.setItem('organizer_authed', '1');
+  }
+  if (next === 'player') localStorage.removeItem('organizer_authed');
+  viewMode = next;
   localStorage.setItem('view_mode', viewMode);
   // In player view, force Games tab as landing (Setup is hidden).
   if (viewMode === 'player' && rrView === 'setup') rrView = 'games';
