@@ -2146,16 +2146,18 @@ function showSettings() {
       <div class="settings-section-label">Sync</div>
       ${sync}
 
-      <div class="settings-section-label">Reset</div>
-      ${tournamentMode === 'rr'
-        ? `<div class="settings-row settings-danger" onclick="rrResetAll();hideSettings()">
-            <div><div style="color:#f87171;font-weight:700">Reset Round Robin</div><div style="font-size:11px;color:#a06060;margin-top:2px">Clears all scores &amp; generated games</div></div>
-            <span class="chev">›</span>
-          </div>`
-        : `<div class="settings-row settings-danger" onclick="resetAll();hideSettings()">
-            <div><div style="color:#f87171;font-weight:700">Reset MLP Tournament</div><div style="font-size:11px;color:#a06060;margin-top:2px">Clears all scores</div></div>
-            <span class="chev">›</span>
-          </div>`}
+      ${viewMode === 'player' ? '' : `
+        <div class="settings-section-label">Reset</div>
+        ${tournamentMode === 'rr'
+          ? `<div class="settings-row settings-danger" onclick="rrResetAll();hideSettings()">
+              <div><div style="color:#f87171;font-weight:700">Reset Round Robin</div><div style="font-size:11px;color:#a06060;margin-top:2px">Clears all scores &amp; generated games</div></div>
+              <span class="chev">›</span>
+            </div>`
+          : `<div class="settings-row settings-danger" onclick="resetAll();hideSettings()">
+              <div><div style="color:#f87171;font-weight:700">Reset MLP Tournament</div><div style="font-size:11px;color:#a06060;margin-top:2px">Clears all scores</div></div>
+              <span class="chev">›</span>
+            </div>`}
+      `}
 
       <div style="text-align:center;margin-top:20px">
         <button onclick="hideSettings()" style="background:#222;border:none;color:#aaa;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">Close</button>
