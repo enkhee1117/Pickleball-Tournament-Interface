@@ -2768,6 +2768,18 @@ function rrGenerateAll() {
   rrState.games = rrGenerateGames(rrState.players, total, rrState.numCourts);
   rrState.draft = { picks: {} };
   rrState.semi1 = null; rrState.semi2 = null; rrState.gold = null; rrState.bronze = null;
+  // Verify every player got exactly gamesPerPlayer games; warn organizer if not.
+  const target = rrState.gamesPerPlayer;
+  const counts = new Array(rrState.players.length).fill(0);
+  rrState.games.forEach(g => {
+    (g.team1 || []).forEach(i => { if (i >= 0 && i < counts.length) counts[i]++; });
+    (g.team2 || []).forEach(i => { if (i >= 0 && i < counts.length) counts[i]++; });
+  });
+  const offenders = counts.map((c, i) => ({ i, c })).filter(x => x.c !== target);
+  if (offenders.length) {
+    const detail = offenders.map(x => `${rrPlayerNameRaw(x.i)}:${x.c}`).join(', ');
+    toast(`Uneven schedule — expected ${target}/player. ${detail}`, 3500);
+  }
   rrSave(); rrSetView('games');
 }
 
