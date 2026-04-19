@@ -2510,6 +2510,14 @@ function showSettings() {
         `}
       ` : ''}
 
+      ${tournamentMode === 'ppa' ? `
+        <div class="settings-section-label">Tournament</div>
+        <div class="settings-row" style="cursor:default">
+          <div style="color:#eee;font-weight:700;flex-shrink:0;margin-right:10px">Name</div>
+          <input class="select-input" style="flex:1;min-width:0" value="${escapeHtml(ppaState.name||'')}" onchange="ppaUpdateName(this.value); showSettings()"/>
+        </div>
+      ` : ''}
+
       <div class="settings-section-label">Rules Language</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${[['en','EN'],['ko','한국어'],['zh','中文'],['mn','Монгол'],['fa','فارسی']].map(([code,label]) => {
@@ -3507,7 +3515,7 @@ function ppaSave() {
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(ppaState)
     }).catch(()=>{ ppaLocalWrite = false; });
-  }, 300);
+  }, 150);
 }
 function ppaInitSync() {
   if (ppaSyncSource) { ppaSyncSource.close(); ppaSyncSource = null; }
@@ -3661,7 +3669,7 @@ function ppaGenerateAll() {
   ppaSetView('games');
 }
 function ppaStandings() {
-  const poolCount = Math.max(1, ppaState.pools || 1);
+  const poolCount = Math.max(1, Math.min(ppaState.pools || 1, ppaState.teams.length));
   const rows = ppaState.teams.map((_, idx) => ({
     idx, name: ppaTeamShort(idx), pool: idx % poolCount,
     pf: 0, pa: 0, gp: 0, gw: 0,
@@ -3782,7 +3790,7 @@ function ppaRenderSetup() {
   const hasGames = ppaState.games.length > 0;
   const started = ppaState.games.some(g => g.done || g.s1>0 || g.s2>0);
   const n = ppaState.teams.length;
-  const poolCount = Math.max(1, ppaState.pools || 1);
+  const poolCount = Math.max(1, Math.min(ppaState.pools || 1, ppaState.teams.length));
   let totalGames = 0;
   {
     const assn = ppaAssignPools();
@@ -3843,7 +3851,7 @@ function ppaRenderGames() {
   }
   const totalDone = ppaState.games.filter(g => g.done).length;
   const total = ppaState.games.length;
-  const poolCount = Math.max(1, ppaState.pools || 1);
+  const poolCount = Math.max(1, Math.min(ppaState.pools || 1, ppaState.teams.length));
   const byPool = {};
   ppaState.games.forEach(g => {
     if (g.done && !rrShowDone) return;
@@ -3909,7 +3917,7 @@ function ppaRenderGames() {
 
 function ppaRenderStandings() {
   const byPool = ppaStandings();
-  const poolCount = Math.max(1, ppaState.pools || 1);
+  const poolCount = Math.max(1, Math.min(ppaState.pools || 1, ppaState.teams.length));
   const poolKeys = Object.keys(byPool).sort((a,b)=>a-b);
   const tables = poolKeys.map(p => {
     const rows = byPool[p].map((row, i) => {
