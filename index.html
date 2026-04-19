@@ -3034,11 +3034,25 @@ function rrGenerateAll() {
   rrSave(); rrSetView('games');
 }
 
+// Pickleball clamp: cap at 11 unless the other team is at 10+ (deuce), then other+2.
+function clampPickleScore(raw, other, cap) {
+  cap = cap || 11;
+  const max = other < (cap - 1) ? cap : other + 2;
+  return Math.max(0, Math.min(max, raw));
+}
+
 function rrAdj(gameKey, team, delta) {
   const g = rrGetGame(gameKey);
   if (!g || g.done) return;
-  if (team===1) g.s1 = Math.max(0, g.s1 + delta);
-  else g.s2 = Math.max(0, g.s2 + delta);
+  if (team === 1) {
+    const clamped = clampPickleScore(g.s1 + delta, g.s2);
+    if (delta > 0 && clamped === g.s1) { toast('Win by 2 \u2014 max ' + clamped + '.', 1200); return; }
+    g.s1 = clamped;
+  } else {
+    const clamped = clampPickleScore(g.s2 + delta, g.s1);
+    if (delta > 0 && clamped === g.s2) { toast('Win by 2 \u2014 max ' + clamped + '.', 1200); return; }
+    g.s2 = clamped;
+  }
   rrSave(); render();
 }
 
@@ -3088,7 +3102,8 @@ function rrSetScoreInline(gameKey, team, val) {
   if (isNaN(n) || n < 0) return;
   const g = rrGetGame(gameKey);
   if (!g || g.done) return;
-  if (team===1) g.s1 = n; else g.s2 = n;
+  if (team === 1) g.s1 = clampPickleScore(n, g.s2);
+  else g.s2 = clampPickleScore(n, g.s1);
   rrSave(); render();
 }
 
@@ -3834,14 +3849,22 @@ function ppaGetGame(key) {
 }
 function ppaAdj(key, team, delta) {
   const g = ppaGetGame(key); if (!g || g.done) return;
-  if (team === 1) g.s1 = Math.max(0, g.s1 + delta);
-  else g.s2 = Math.max(0, g.s2 + delta);
+  if (team === 1) {
+    const clamped = clampPickleScore(g.s1 + delta, g.s2);
+    if (delta > 0 && clamped === g.s1) { toast('Win by 2 \u2014 max ' + clamped + '.', 1200); return; }
+    g.s1 = clamped;
+  } else {
+    const clamped = clampPickleScore(g.s2 + delta, g.s1);
+    if (delta > 0 && clamped === g.s2) { toast('Win by 2 \u2014 max ' + clamped + '.', 1200); return; }
+    g.s2 = clamped;
+  }
   ppaSave(); render();
 }
 function ppaSetScoreInline(key, team, value) {
   const g = ppaGetGame(key); if (!g || g.done) return;
   const n = Math.max(0, parseInt(value) || 0);
-  if (team === 1) g.s1 = n; else g.s2 = n;
+  if (team === 1) g.s1 = clampPickleScore(n, g.s2);
+  else g.s2 = clampPickleScore(n, g.s1);
   ppaSave(); render();
 }
 function ppaMarkDone(key) {
