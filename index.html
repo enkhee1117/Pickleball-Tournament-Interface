@@ -2400,8 +2400,18 @@ function rrMyStanding() {
   return { rank: i+1, total: st.length, row: st[i] };
 }
 
+function rrSignInPrompt() {
+  if (myIdentity !== null || viewMode !== 'player' || !rrState.games.length) return '';
+  return `
+    <div class="my-card" style="background:linear-gradient(135deg,#2a1f0a 0%,#3d2810 100%);border-color:#6a4a1a;cursor:pointer" onclick="showWelcome()">
+      <div class="my-card-label" style="color:#f0a070">\ud83d\udc4b Who are you?</div>
+      <div class="my-card-title">Tap to pick your name</div>
+      <div class="my-card-sub">Sign in so your next game, partner, and standing show up here.</div>
+    </div>
+  `;
+}
 function rrMyCard() {
-  if (myIdentity === null) return '';
+  if (myIdentity === null) return rrSignInPrompt();
   const name = rrPlayerName(myIdentity);
   const next = rrMyNextGame();
   const standing = rrMyStanding();
