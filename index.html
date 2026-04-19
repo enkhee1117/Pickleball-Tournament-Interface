@@ -587,6 +587,12 @@
     }
     .my-card-title { font-size: 17px; font-weight: 800; color: #fff; margin-bottom: 4px; }
     .my-card-sub { font-size: 12px; color: #c5d5ff; line-height: 1.5; }
+    .my-card-hero {
+      padding: 16px 18px 18px;
+      background: linear-gradient(135deg, #1e4a7a 0%, #3d2580 100%);
+      border-color: #5a8fba;
+      box-shadow: 0 4px 18px rgba(90, 143, 186, 0.2);
+    }
 
     .view-mode-pill {
       display: inline-block; padding: 3px 8px;
@@ -1614,9 +1620,26 @@ function swapApp(html) {
   window.scrollTo(0, prevScroll);
 }
 
+// ─── Wake lock: keep screen on during live games ───
+let wakeLock = null;
+async function updateWakeLock() {
+  const wantLock = tournamentMode === 'rr' && rrView === 'games';
+  try {
+    if (wantLock && !wakeLock && 'wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!wantLock && wakeLock) {
+      const w = wakeLock; wakeLock = null;
+      await w.release();
+    }
+  } catch (_) { wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) updateWakeLock(); });
+
 function render() {
-  if (tournamentMode === 'rr') { renderRR(); return; }
-  if (tournamentMode === 'ppa') { renderPPA(); return; }
+  if (tournamentMode === 'rr') { renderRR(); updateWakeLock(); return; }
+  if (tournamentMode === 'ppa') { renderPPA(); updateWakeLock(); return; }
+  updateWakeLock();
 
   const nav = `
     <nav class="nav">
@@ -2375,22 +2398,35 @@ function rrMyCard() {
   const name = rrPlayerName(myIdentity);
   const next = rrMyNextGame();
   const standing = rrMyStanding();
+  const isHero = viewMode === 'player' && rrView === 'games' && !!next;
   const nextHtml = next
-    ? `<div class="my-card-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-         <span>Next: Game ${next.idx+1}</span>${rrCourtPillHtml(next.g.court)}
-       </div>
-       <div class="my-card-sub">Partner: <strong style="color:#fff">${rrPlayerName(next.partner)}</strong><br/>
-       vs ${rrPlayerName(next.opponents[0])} &amp; ${rrPlayerName(next.opponents[1])}</div>`
+    ? (isHero
+        ? `<div style="display:flex;align-items:center;gap:14px;margin-top:4px">
+             <div style="flex:0 0 auto;background:rgba(0,0,0,0.35);border-radius:12px;padding:10px 14px;text-align:center;min-width:72px">
+               <div style="color:#a5b8f0;font-size:10px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase">Court</div>
+               <div style="color:#fff;font-size:32px;font-weight:900;line-height:1">${next.g.court}</div>
+             </div>
+             <div style="flex:1;min-width:0">
+               <div style="color:#fff;font-size:22px;font-weight:900;margin-bottom:2px">Game ${next.idx+1}</div>
+               <div style="color:#c5d5ff;font-size:13px;line-height:1.45">with <strong style="color:#fff">${rrPlayerName(next.partner)}</strong><br/>vs ${rrPlayerName(next.opponents[0])} &amp; ${rrPlayerName(next.opponents[1])}</div>
+             </div>
+           </div>
+           <button onclick="rrJumpToMyGame('${next.g.court}','rr-card-${next.idx}')" style="margin-top:12px;width:100%;padding:12px;background:#3a5f8a;border:1px solid #5a8fba;color:#fff;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;letter-spacing:0.3px">Go to my game \u2193</button>`
+        : `<div class="my-card-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+             <span>Next: Game ${next.idx+1}</span>${rrCourtPillHtml(next.g.court)}
+           </div>
+           <div class="my-card-sub">Partner: <strong style="color:#fff">${rrPlayerName(next.partner)}</strong><br/>
+           vs ${rrPlayerName(next.opponents[0])} &amp; ${rrPlayerName(next.opponents[1])}</div>`)
     : `<div class="my-card-title">No upcoming games</div>
        <div class="my-card-sub">All your games are done.</div>`;
   const standingHtml = standing
     ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center">
          <span style="color:#c5d5ff;font-size:12px">Your standing</span>
-         <span style="color:#fff;font-weight:800;font-size:14px">#${standing.rank} of ${standing.total} · ${standing.row.gp>0?standing.row.ppg.toFixed(1):'—'} PF/G · ${standing.row.gw}/${standing.row.gp}W</span>
+         <span style="color:#fff;font-weight:800;font-size:14px">#${standing.rank} of ${standing.total} \u00b7 ${standing.row.gp>0?standing.row.ppg.toFixed(1):'\u2014'} PF/G \u00b7 ${standing.row.gw}/${standing.row.gp}W</span>
        </div>`
     : '';
   return `
-    <div class="my-card">
+    <div class="my-card${isHero?' my-card-hero':''}">
       <div class="my-card-label" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
         <span>Signed in as ${name}</span>
         <button onclick="changeIdentity()" style="background:none;border:none;color:#a5b8f0;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;text-decoration:underline;cursor:pointer;padding:0">Not you?</button>
@@ -2399,6 +2435,14 @@ function rrMyCard() {
       ${standingHtml}
     </div>
   `;
+}
+function rrJumpToMyGame(_court, elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.style.transition = 'box-shadow 0.3s';
+  el.style.boxShadow = '0 0 0 3px #60a5fa';
+  setTimeout(() => { el.style.boxShadow = ''; }, 1500);
 }
 function changeIdentity() {
   myIdentity = null;
@@ -2679,6 +2723,25 @@ let rrSaveTimer = null;
 let rrLocalWrite = false;
 let rrSyncSource = null;
 
+function rrDiffNewlyDone(prev, next) {
+  const msgs = [];
+  if (!prev || !next) return msgs;
+  const prevGames = prev.games || [], nextGames = next.games || [];
+  for (let i = 0; i < nextGames.length; i++) {
+    const pg = prevGames[i], ng = nextGames[i];
+    if (ng && ng.done && !(pg && pg.done)) {
+      msgs.push(`\u2713 Game ${i+1} final: ${ng.s1}\u2013${ng.s2}`);
+    }
+  }
+  ['semi1','semi2','gold','bronze'].forEach(k => {
+    const pg = prev[k], ng = next[k];
+    if (ng && ng.done && !(pg && pg.done)) {
+      msgs.push(`\u2713 ${ng.label || k} final: ${ng.s1}\u2013${ng.s2}`);
+    }
+  });
+  return msgs;
+}
+
 function rrInitSync() {
   if (rrSyncSource) { rrSyncSource.close(); rrSyncSource = null; }
   if (!FIREBASE_URL) return;
@@ -2688,10 +2751,14 @@ function rrInitSync() {
       const payload = JSON.parse(e.data);
       if (payload.data) {
         if (rrLocalWrite) { rrLocalWrite = false; return; }
-        rrState = rrMigrateState(payload.data);
+        const prev = rrState;
+        const next = rrMigrateState(payload.data);
+        const newlyDone = rrDiffNewlyDone(prev, next);
+        rrState = next;
         localStorage.setItem('rr_v1', JSON.stringify(rrState));
         if (tournamentMode === 'rr') render();
         refreshWelcome();
+        newlyDone.forEach(msg => toast(msg, 2200));
       } else if (payload.path === '/' && payload.data === null) {
         rrSave();
       }
@@ -2997,6 +3064,8 @@ function rrMarkDone(gameKey) {
   const myWin = typeof myIdentity === 'number' && winTeam && winTeam.indexOf(myIdentity) !== -1;
   if (isPlayoff || myWin) launchConfetti();
   if (gameKey === 'semi1' || gameKey === 'semi2') rrMaybeAdvanceSemis();
+  const label = isPlayoff ? (g.label || 'Playoff') : `Game ${parseInt(gameKey)+1}`;
+  toast(`\u2713 ${label} saved: ${g.s1}\u2013${g.s2}`, 1800);
   rrSave(); render();
 }
 
@@ -3205,7 +3274,7 @@ function rrGameCard(g, gameKey, title) {
   }
 
   return `
-    <div class="rr-round-card" ${!g.done && (g.s1>0||g.s2>0)?'id="active-match"':''}>
+    <div class="rr-round-card" id="rr-card-${gameKey}" data-active="${!g.done && (g.s1>0||g.s2>0)?'1':'0'}">
       <div class="rr-round-top">
         <span style="display:flex;align-items:center;gap:8px;min-width:0">
           ${rrCourtPillHtml(g.court)}
