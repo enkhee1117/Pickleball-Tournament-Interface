@@ -3583,7 +3583,14 @@ function ppaUpdateTeam(idx, field, value) {
 }
 function ppaUpdateConfig(key, value) {
   const n = Math.max(1, parseInt(value) || 1);
-  if (key === 'pools') ppaState.pools = Math.min(4, n);
+  if (key === 'pools') {
+    const next = Math.min(4, n);
+    if (next !== ppaState.pools && (ppaState.semi1 || ppaState.semi2 || ppaState.gold || ppaState.bronze)) {
+      ppaState.semi1 = null; ppaState.semi2 = null;
+      ppaState.gold = null; ppaState.bronze = null;
+    }
+    ppaState.pools = next;
+  }
   else if (key === 'numCourts') ppaState.numCourts = n;
   ppaSave(); render();
 }
