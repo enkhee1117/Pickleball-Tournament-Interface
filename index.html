@@ -2347,7 +2347,7 @@ function rrMyCard() {
   const standingHtml = standing
     ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center">
          <span style="color:#c5d5ff;font-size:12px">Your standing</span>
-         <span style="color:#fff;font-weight:800;font-size:14px">#${standing.rank} of ${standing.total} · ${standing.row.pf} PF · ${standing.row.gw}W</span>
+         <span style="color:#fff;font-weight:800;font-size:14px">#${standing.rank} of ${standing.total} · ${standing.row.gp>0?standing.row.ppg.toFixed(1):'—'} PF/G · ${standing.row.gw}/${standing.row.gp}W</span>
        </div>`
     : '';
   return `
@@ -2937,8 +2937,14 @@ function rrStandings() {
       if (stats[p]) { stats[p].pf += g.s2; stats[p].pa += g.s1; stats[p].gp++; if (g.winner==='t2') stats[p].gw++; }
     });
   });
-  return stats.map(s => ({ ...s, diff: s.pf - s.pa }))
-    .sort((a,b) => b.pf - a.pf || b.diff - a.diff || b.gw - a.gw);
+  return stats.map(s => {
+      const diff = s.pf - s.pa;
+      const ppg = s.gp > 0 ? s.pf / s.gp : 0;
+      const diffPg = s.gp > 0 ? diff / s.gp : 0;
+      const winPct = s.gp > 0 ? s.gw / s.gp : 0;
+      return { ...s, diff, ppg, diffPg, winPct };
+    })
+    .sort((a,b) => b.ppg - a.ppg || b.diffPg - a.diffPg || b.winPct - a.winPct);
 }
 
 function rrRRComplete() {
@@ -3286,42 +3292,54 @@ function rrRenderStandings() {
     else if (i === 1) badgeCls = 'silver';
     else if (i === 2) badgeCls = 'bronze';
     else if (i >= 8) badgeCls = '';
+    const ppgTxt = row.gp > 0 ? row.ppg.toFixed(1) : '—';
+    const diffPgTxt = row.gp > 0 ? (row.diffPg > 0 ? '+' : '') + row.diffPg.toFixed(1) : '—';
     return `
       <div class="rr-standings-row">
         <div class="rr-rank-badge ${badgeCls}">${i+1}</div>
         <div class="rr-player-name">${row.name || 'Player '+(row.idx+1)}</div>
-        <div class="rr-stat primary">${row.pf}</div>
-        <div class="rr-stat">${row.diff>0?'+':''}${row.diff}</div>
+        <div class="rr-stat primary">${ppgTxt}</div>
+        <div class="rr-stat">${diffPgTxt}</div>
         <div class="rr-stat">${row.gw}/${row.gp}</div>
-        <div class="rr-stat">${row.pa}</div>
+        <div class="rr-stat">${row.pf}</div>
       </div>
     `;
   }).join('');
+
+  const counts = st.map(s => s.gp);
+  const maxGp = counts.length ? Math.max(...counts) : 0;
+  const minGp = counts.length ? Math.min(...counts) : 0;
+  const uneven = maxGp - minGp >= 2;
+  const unevenBanner = uneven ? `
+    <div style="margin:10px 12px 0;padding:10px 12px;background:#1e1a00;border:1px solid #3a2f00;border-radius:8px;color:#facc15;font-size:12px;line-height:1.5">
+      ⚠️ Game counts differ by ${maxGp - minGp}. Standings use per-game averages so players with fewer games aren't penalized.
+    </div>` : '';
 
   return `
     <div class="rr-page">
       <div class="rr-header">
         <h1>Individual Standings</h1>
-        <p>${rrDone ? 'Round robin complete · Top 4 move to draft' : 'Ranked by points scored, then differential, then wins'}</p>
+        <p>${rrDone ? 'Round robin complete · Top 4 move to draft' : 'Ranked by avg points per game, then avg differential, then win %'}</p>
       </div>
+      ${unevenBanner}
       <div class="card">
         <div class="rr-standings-row header-row">
           <span></span><span>Player</span>
-          <span style="text-align:center;color:#facc15">PF ↓</span>
-          <span style="text-align:center">+/−</span>
+          <span style="text-align:center;color:#facc15">PF/G ↓</span>
+          <span style="text-align:center">+/G</span>
           <span style="text-align:center">W/G</span>
-          <span style="text-align:center">PA</span>
+          <span style="text-align:center">PF</span>
         </div>
-        <div style="padding:4px 14px 6px;font-size:10px;color:#666;letter-spacing:0.4px;text-align:right">Sort: PF → +/− → W</div>
+        <div style="padding:4px 14px 6px;font-size:10px;color:#666;letter-spacing:0.4px;text-align:right">Sort: PF/G → +/G → Win%</div>
         ${rows}
       </div>
       <div class="card-label" style="margin:16px 12px 0">Scoring</div>
       <div class="card">
         <div class="info-card">
-          <div>🎯 <strong>PF</strong> — Points scored (primary rank). Score high even in losses.</div>
-          <div>📊 <strong>+/−</strong> — Point differential (tiebreak 1)</div>
-          <div>🏆 <strong>W/G</strong> — Wins / games played (tiebreak 2)</div>
-          <div>🛡️ <strong>PA</strong> — Points against you</div>
+          <div>🎯 <strong>PF/G</strong> — Avg points scored per game (primary rank). Fair when game counts differ.</div>
+          <div>📊 <strong>+/G</strong> — Avg point differential per game (tiebreak 1)</div>
+          <div>🏆 <strong>W/G</strong> — Wins / games played (tiebreak 2: win %)</div>
+          <div>🛡️ <strong>PF</strong> — Raw total points scored (reference)</div>
           <div style="margin-top:6px;color:#facc15">Top 4 choose partners from ranks 5-8 for semis.</div>
         </div>
       </div>
