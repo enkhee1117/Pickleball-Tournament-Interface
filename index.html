@@ -280,6 +280,23 @@
       transition: transform 0.15s, box-shadow 0.15s;
     }
     .rules-fab:active { transform: scale(0.92); box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+    .rules-fab::before {
+      content: ''; position: absolute; inset: -6px; border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.7);
+      pointer-events: none; opacity: 0;
+    }
+    .rules-fab.pulse::before { animation: rules-pulse 1.8s ease-out infinite; }
+    .rules-fab.pulse { animation: rules-wobble 1.8s ease-in-out infinite; }
+    @keyframes rules-pulse {
+      0%   { transform: scale(1);   opacity: 0.9; }
+      70%  { transform: scale(1.6); opacity: 0; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+    @keyframes rules-wobble {
+      0%, 80%, 100% { transform: scale(1); }
+      85%           { transform: scale(1.08) rotate(-4deg); }
+      92%           { transform: scale(1.08) rotate(4deg); }
+    }
 
     /* ── RULES MODAL ── */
     .rules-overlay {
@@ -4505,10 +4522,16 @@ try {
   </div>`;
 }
 
-// Inject the floating rules button once
+// Inject the floating rules button once. Pulses until the user opens the
+// rules for the first time, so it's discoverable during the first session.
 const fab = document.createElement('button');
 fab.className = 'rules-fab'; fab.title = 'Rules'; fab.textContent = '?';
-fab.onclick = showRules;
+if (localStorage.getItem('rules_seen') !== '1') fab.classList.add('pulse');
+fab.onclick = () => {
+  fab.classList.remove('pulse');
+  localStorage.setItem('rules_seen', '1');
+  showRules();
+};
 document.body.appendChild(fab);
 
 // Inject the settings gear FAB (sits to the left of the rules FAB)
