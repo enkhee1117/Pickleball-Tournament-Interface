@@ -3425,12 +3425,15 @@ function rrRenderSetup() {
 
 function rrRenderGames() {
   if (!rrState.games.length) {
+    const isPlayer = viewMode === 'player';
     return `
       <div class="rr-page">
         <div class="rr-coming-soon">
-          <h2>No games yet</h2>
-          <p>Go to Setup → tap <strong>Generate Random Games</strong> to begin.</p>
-          <button class="rr-generate-btn" style="max-width:260px;margin:20px auto;display:block" onclick="rrSetView('setup')">Go to Setup</button>
+          <h2>${isPlayer ? 'Waiting to start' : 'No games yet'}</h2>
+          <p>${isPlayer
+            ? 'The organizer is still setting up. While you wait, take a look at how the tournament works.'
+            : 'Go to Setup \u2192 tap <strong>Generate Random Games</strong> to begin.'}</p>
+          <button class="rr-generate-btn" style="max-width:260px;margin:20px auto;display:block" onclick="${isPlayer ? 'showRules()' : "rrSetView('setup')"}">${isPlayer ? '\ud83d\udcd6 How it works' : 'Go to Setup'}</button>
         </div>
       </div>
     `;
@@ -4183,12 +4186,15 @@ function ppaRenderSetup() {
 
 function ppaRenderGames() {
   if (!ppaState.games.length) {
+    const isPlayer = viewMode === 'player';
     return `
       <div class="rr-page">
         <div class="rr-coming-soon">
-          <h2>No games yet</h2>
-          <p>Go to Setup \u2192 tap <strong>Generate Schedule</strong> to begin.</p>
-          <button class="rr-generate-btn" style="max-width:260px;margin:20px auto;display:block" onclick="ppaSetView('setup')">Go to Setup</button>
+          <h2>${isPlayer ? 'Waiting to start' : 'No games yet'}</h2>
+          <p>${isPlayer
+            ? 'The organizer is still setting up. While you wait, take a look at how the tournament works.'
+            : 'Go to Setup \u2192 tap <strong>Generate Schedule</strong> to begin.'}</p>
+          <button class="rr-generate-btn" style="max-width:260px;margin:20px auto;display:block" onclick="${isPlayer ? 'showRules()' : "ppaSetView('setup')"}">${isPlayer ? '\ud83d\udcd6 How it works' : 'Go to Setup'}</button>
         </div>
       </div>`;
   }
