@@ -1892,19 +1892,26 @@ const RULES_RR = {
     close: 'Got it',
     sections: [
       { heading: 'Format', rows: [
-        ['\ud83d\udc65', '<strong>12 players · 6 games each</strong>. Partners and opponents are randomized each round so you rotate through everyone.'],
-        ['\u2696\ufe0f', 'Pairings are <strong>DUPR-balanced</strong>: the top-rated player in each 4-some plays with the lowest-rated so teams are roughly even.'],
-        ['\ud83d\udd01', 'The generator avoids repeat partners and repeat opponents whenever possible across your 6 games.'],
+        ['\ud83d\udc65', 'The organizer sets <strong>player count</strong> and <strong>games per player</strong> at setup. Every player gets the same number of games (spread \u2264 1).'],
+        ['\u2696\ufe0f', 'Pairings are <strong>DUPR-balanced</strong>: inside each 4-some the top-rated plays with the lowest-rated so teams are roughly even.'],
+        ['\ud83c\udfaf', 'If a player cancels or leaves mid-tournament, the organizer can <strong>drop them</strong> \u2014 past results stay, incomplete games are cleared, future games re-generate around the remaining players.'],
+      ]},
+      { heading: 'How games are generated', rows: [
+        ['\ud83c\udfb2', 'The scheduler tries <strong>400 random candidate schedules</strong> and keeps the one with the lowest total penalty.'],
+        ['\ud83e\udd1d', '<strong>Same-partner avoidance \u2014 highest priority.</strong> Heavy penalty (50\u00d7 per repeat, squared) so the generator aggressively spreads you across different partners.'],
+        ['\u2694\ufe0f', '<strong>Same-opponent avoidance</strong> \u2014 lighter penalty (5\u00d7 per repeat). Facing the same opponent again is allowed but discouraged so you rotate through the field.'],
+        ['\u2696\ufe0f', '<strong>DUPR balance</strong> \u2014 inside each 4-some the highest and lowest DUPR are paired, and the squared DUPR gap between the two teams is penalized so matches stay competitive.'],
+        ['\u26a0\ufe0f', 'With very few players and many games (e.g. 6 players \u00d7 5 games) there aren\u2019t enough unique partners to go around \u2014 the app warns you at setup when partner repeats become mathematically unavoidable.'],
       ]},
       { heading: 'Scoring', rows: [
         ['\ud83c\udfd3', 'Each game is played to <strong>11 points, win by 2</strong>. Enter your final score after the game.'],
         ['\u2705', 'Tap a game card, enter both scores, and mark it done \u2014 it syncs live for everyone.'],
       ]},
       { heading: 'Standings', rows: [
-        ['\ud83d\udd22', 'Ranked primarily by <strong>Points For (PF)</strong> \u2014 even when you lose, scoring hard matters.'],
-        ['\u2696\ufe0f', 'Tiebreaker 1 \u2014 <strong>Point Differential</strong> (PF \u2212 PA).'],
-        ['\ud83c\udfc6', 'Tiebreaker 2 \u2014 <strong>Games Won</strong>.'],
-        ['\ud83d\udcca', 'Columns: <strong>PF</strong> (points for) \u00b7 <strong>+/\u2212</strong> (differential) \u00b7 <strong>W/G</strong> (wins/games) \u00b7 <strong>PA</strong> (points against).'],
+        ['\ud83d\udd22', 'Ranked primarily by <strong>PF/G</strong> (points scored per game) \u2014 fair even when players finish with different game counts.'],
+        ['\u2696\ufe0f', 'Tiebreaker 1 \u2014 <strong>+/G</strong> (point differential per game).'],
+        ['\ud83c\udfc6', 'Tiebreaker 2 \u2014 <strong>Win %</strong> (games won \u00f7 games played).'],
+        ['\ud83d\udcca', 'Columns: <strong>PF/G</strong> \u00b7 <strong>+/G</strong> \u00b7 <strong>W/G</strong> \u00b7 <strong>PF</strong> (raw total for reference).'],
       ]},
       { heading: 'Playoffs \u2014 Draft Pick', rows: [
         ['\ud83e\udd47', 'After all round-robin games, the <strong>top 4</strong> in standings advance.'],
@@ -1924,19 +1931,26 @@ const RULES_RR = {
     close: '\ud655\uc778',
     sections: [
       { heading: '\ud615\uc2dd', rows: [
-        ['\ud83d\udc65', '<strong>12\uba85 \u00b7 \uac01 6\uacbd\uae30</strong>. \ud30c\ud2b8\ub108\uc640 \uc0c1\ub300\ub97c \ub9e4 \ub77c\uc6b4\ub4dc\ub9c8\ub2e4 \ubb34\uc791\uc704\ub85c \uad50\uccb4\ud569\ub2c8\ub2e4.'],
-        ['\u2696\ufe0f', '\ud30c\ud2b8\ub108 \ubc30\uc815\uc740 <strong>DUPR \uade0\ud615</strong>\uc744 \uace0\ub824 \u2014 \uac00\uc7a5 \ub192\uc740 \uc120\uc218\uc640 \uac00\uc7a5 \ub0ae\uc740 \uc120\uc218\uac00 \ud55c \ud300\uc774 \ub429\ub2c8\ub2e4.'],
-        ['\ud83d\udd01', '6\uacbd\uae30 \ub3d9\uc548 \uac00\ub2a5\ud55c \ud55c \uac19\uc740 \ud30c\ud2b8\ub108\u00b7\uc0c1\ub300\ub97c \ud53c\ud569\ub2c8\ub2e4.'],
+        ['\ud83d\udc65', '\uc8fc\ucd5c\uc790\uac00 \uc124\uc815\uc5d0\uc11c <strong>\ucc38\uac00\uc790 \uc218</strong>\uc640 <strong>\uc778\ub2f9 \uacbd\uae30 \uc218</strong>\ub97c \uc9c0\uc815\ud569\ub2c8\ub2e4. \ubaa8\ub4e0 \uc120\uc218\ub294 \ub3d9\uc77c\ud55c \uacbd\uae30 \uc218(\ucc28\uc774 \u2264 1)\ub97c \ubc30\uc815\ubc1b\uc2b5\ub2c8\ub2e4.'],
+        ['\u2696\ufe0f', '\ud30c\ud2b8\ub108 \ubc30\uc815\uc740 <strong>DUPR \uade0\ud615</strong>\uc744 \uace0\ub824 \u2014 4\uba85 \uadf8\ub8f9 \ub0b4 \ucd5c\uace0 \ub4f1\uae09 \uc120\uc218\uc640 \ucd5c\uc800 \ub4f1\uae09 \uc120\uc218\uac00 \ud55c \ud300\uc774 \ub429\ub2c8\ub2e4.'],
+        ['\ud83c\udfaf', '\uc120\uc218\uac00 \ucde8\uc18c\ud558\uac70\ub098 \uc911\ub3c4 \ud1f4\uc7a5\ud558\uba74 \uc8fc\ucd5c\uc790\uac00 <strong>\ub4dc\ub86d(drop)</strong>\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4 \u2014 \uc9c0\ub098\uac04 \uacb0\uacfc\ub294 \uc720\uc9c0\ub418\uace0, \ubbf8\uc644\ub8cc \uacbd\uae30\ub294 \uc0ad\uc81c\ub418\uba70, \ub0a8\uc740 \uc120\uc218\ub4e4\ub85c \ud5a5\ud6c4 \uacbd\uae30\uac00 \uc7ac\uc0dd\uc131\ub429\ub2c8\ub2e4.'],
+      ]},
+      { heading: '\uacbd\uae30 \uc0dd\uc131 \ubc29\uc2dd', rows: [
+        ['\ud83c\udfb2', '\uc2a4\ucf00\uc904\ub7ec\ub294 <strong>400\uac1c\uc758 \ubb34\uc791\uc704 \ud6c4\ubcf4 \uc2a4\ucf00\uc904</strong>\uc744 \uc2dc\ub3c4\ud558\uace0 \ucd1d \ud328\ub110\ud2f0\uac00 \uac00\uc7a5 \ub0ae\uc740 \uac83\uc744 \uc120\ud0dd\ud569\ub2c8\ub2e4.'],
+        ['\ud83e\udd1d', '<strong>\uac19\uc740 \ud30c\ud2b8\ub108 \ud53c\ud558\uae30 \u2014 \ucd5c\uc6b0\uc120</strong>. \ubb34\uac70\uc6b4 \ud328\ub110\ud2f0(\ub3d9\uc77c \ud30c\ud2b8\ub108 1\ud68c \ub09c \u00d7 50, \uc81c\uacf1)\ub97c \uc801\uc6a9\ud574 \ub2e4\uc591\ud55c \ud30c\ud2b8\ub108\uc640 \ub9cc\ub098\ub3c4\ub85d \uc801\uadf9\uc801\uc73c\ub85c \uc874\uc7ac\ud569\ub2c8\ub2e4.'],
+        ['\u2694\ufe0f', '<strong>\uac19\uc740 \uc0c1\ub300 \ud53c\ud558\uae30</strong> \u2014 \uac00\ubcbc\uc6b4 \ud328\ub110\ud2f0(\ub3d9\uc77c \uc0c1\ub300 1\ud68c \ub09c \u00d7 5). \uac19\uc740 \uc0c1\ub300\ub97c \ub2e4\uc2dc \ub9cc\ub098\ub294 \uac83\uc740 \ud5c8\uc6a9\ub418\uc9c0\ub9cc \uac00\ub2a5\ud55c \ud55c \ub2e4\uc591\ud55c \uc0c1\ub300\uc640 \ub9de\ubd99\ub3c4\ub85d \ud569\ub2c8\ub2e4.'],
+        ['\u2696\ufe0f', '<strong>DUPR \uade0\ud615</strong> \u2014 4\uba85 \uadf8\ub8f9 \ub0b4 \ucd5c\uace0\u00b7\ucd5c\uc800 DUPR\uac00 \ud55c \ud300\uc774 \ub418\uace0, \ub450 \ud300 \uac04 DUPR \ucc28\uc774\uc758 \uc81c\uacf1\uc5d0 \ud328\ub110\ud2f0\ub97c \ubd80\uc5ec\ud574 \ubaa8\ub450 \ud798\uc758 \uade0\ud615\uc744 \uc720\uc9c0\ud569\ub2c8\ub2e4.'],
+        ['\u26a0\ufe0f', '\uc120\uc218 \uc218\uac00 \uc801\uace0 \uacbd\uae30 \uc218\uac00 \ub9ce\uc73c\uba74(\uc608: 6\uba85 \u00d7 5\uacbd\uae30) \uc120\ud0dd\ud560 \uc218 \uc788\ub294 \ud30c\ud2b8\ub108\uac00 \ubd80\uc871\ud574 \u2014 \uc555\uc774 \uc54d\uc11c \uc124\uc815 \ud654\uba74\uc5d0\uc11c \ud30c\ud2b8\ub108 \uc911\ubcf5\uc774 \uc218\ud559\uc801\uc73c\ub85c \ubd88\uac00\ud53c\ud568\uc744 \uacbd\uace0\ud569\ub2c8\ub2e4.'],
       ]},
       { heading: '\uc810\uc218', rows: [
         ['\ud83c\udfd3', '\uac01 \uac8c\uc784\uc740 <strong>11\uc810, 2\uc810 \ucc28</strong>\ub85c \uc9c4\ud589\ub429\ub2c8\ub2e4. \uac8c\uc784 \ud6c4 \ucd5c\uc885 \uc810\uc218\ub97c \uc785\ub825\ud558\uc138\uc694.'],
         ['\u2705', '\uac8c\uc784 \uce74\ub4dc\ub97c \ud0ed\ud558\uace0 \uc810\uc218 \uc785\ub825 \ud6c4 \uc644\ub8cc\ub85c \ud45c\uc2dc\ud558\uba74 \uc2e4\uc2dc\uac04 \ub3d9\uae30\ud654\ub429\ub2c8\ub2e4.'],
       ]},
       { heading: '\uc21c\uc704', rows: [
-        ['\ud83d\udd22', '<strong>\ub4dd\uc810(PF)</strong>\uc73c\ub85c 1\ucc28 \uc21c\uc704 \uacb0\uc815 \u2014 \uc9c0\ub354\ub77c\ub3c4 \ub9ce\uc774 \ub4dd\uc810\ud558\ub294 \uac83\uc774 \uc911\uc694\ud569\ub2c8\ub2e4.'],
-        ['\u2696\ufe0f', '\ud0c0\uc774\ube0c\ub808\uc774\ucee4 1 \u2014 <strong>\ub4dd\uc2e4\uc810 \ucc28(+/\u2212)</strong>.'],
-        ['\ud83c\udfc6', '\ud0c0\uc774\ube0c\ub808\uc774\ucee4 2 \u2014 <strong>\uc2b9\ub9ac \uac8c\uc784 \uc218</strong>.'],
-        ['\ud83d\udcca', '\uc5f4: <strong>PF</strong>(\ub4dd\uc810) \u00b7 <strong>+/\u2212</strong>(\ub4dd\uc2e4\uc810) \u00b7 <strong>W/G</strong>(\uc2b9/\uacbd\uae30) \u00b7 <strong>PA</strong>(\uc2e4\uc810).'],
+        ['\ud83d\udd22', '<strong>PF/G</strong>(\uacbd\uae30\ub2f9 \ub4dd\uc810)\uc744 \uae30\uc900\uc73c\ub85c 1\ucc28 \uc21c\uc704 \uacb0\uc815 \u2014 \uc120\uc218\ub9c8\ub2e4 \uacbd\uae30 \uc218\uac00 \ub2ec\ub77c\ub3c4 \uacf5\uc815\ud569\ub2c8\ub2e4.'],
+        ['\u2696\ufe0f', '\ud0c0\uc774\ube0c\ub808\uc774\ucee4 1 \u2014 <strong>+/G</strong>(\uacbd\uae30\ub2f9 \ub4dd\uc2e4\uc810 \ucc28).'],
+        ['\ud83c\udfc6', '\ud0c0\uc774\ube0c\ub808\uc774\ucee4 2 \u2014 <strong>\uc2b9\ub960</strong>(\uc2b9 \u00f7 \uacbd\uae30 \uc218).'],
+        ['\ud83d\udcca', '\uc5f4: <strong>PF/G</strong> \u00b7 <strong>+/G</strong> \u00b7 <strong>W/G</strong>(\uc2b9/\uacbd\uae30) \u00b7 <strong>PF</strong>(\ucd1d\ub4dd\uc810, \ucc38\uace0\uc6a9).'],
       ]},
       { heading: '\ud50c\ub808\uc774\uc624\ud504 \u2014 \ub4dc\ub798\ud504\ud2b8 \ud53d', rows: [
         ['\ud83e\udd47', '\ub77c\uc6b4\ub4dc \ub85c\ube48 \uc885\ub8cc \ud6c4 \uc21c\uc704 <strong>\uc0c1\uc704 4\uba85</strong>\uc774 \uc9c4\ucd9c.'],
@@ -1952,19 +1966,26 @@ const RULES_RR = {
     close: '\u660e\u767d\u4e86',
     sections: [
       { heading: '\u8d5b\u5236', rows: [
-        ['\ud83d\udc65', '<strong>12\u4eba \u00b7 \u6bcf\u4eba6\u573a</strong>\u3002\u6bcf\u8f6e\u968f\u673a\u6253\u4e71\u642d\u6863\u548c\u5bf9\u624b\u3002'],
+        ['\ud83d\udc65', '\u7ec4\u7ec7\u8005\u5728\u8bbe\u7f6e\u65f6\u9009\u62e9<strong>\u73a9\u5bb6\u4eba\u6570</strong>\u548c<strong>\u6bcf\u4eba\u573a\u6b21</strong>\u3002\u6240\u6709\u73a9\u5bb6\u573a\u6b21\u76f8\u540c\uff08\u5dee\u8ddd \u2264 1\uff09\u3002'],
         ['\u2696\ufe0f', '\u914d\u5bf9\u91c7\u7528<strong>DUPR\u5747\u8861</strong>\uff1a\u6bcf4\u4eba\u4e2d\u6700\u9ad8\u5206\u4e0e\u6700\u4f4e\u5206\u642d\u6863\uff0c\u529b\u91cf\u5927\u81f4\u76f8\u5f53\u3002'],
-        ['\ud83d\udd01', '\u7cfb\u7edf\u4f1a\u5c3d\u91cf\u907f\u514d\u91cd\u590d\u642d\u6863\u548c\u91cd\u590d\u5bf9\u624b\u3002'],
+        ['\ud83c\udfaf', '\u82e5\u73a9\u5bb6\u53d6\u6d88\u6216\u4e2d\u9014\u9000\u51fa\uff0c\u7ec4\u7ec7\u8005\u53ef\u4ee5<strong>\u6807\u8bb0\u4e3a\u9000\u8d5b</strong>\u2014\u4e4b\u524d\u6bd4\u8d5b\u7ed3\u679c\u4fdd\u7559\uff0c\u672a\u5b8c\u6210\u7684\u6bd4\u8d5b\u6e05\u9664\uff0c\u540e\u7eed\u6bd4\u8d5b\u91cd\u65b0\u751f\u6210\u3002'],
+      ]},
+      { heading: '\u6bd4\u8d5b\u751f\u6210\u65b9\u5f0f', rows: [
+        ['\ud83c\udfb2', '\u8c03\u5ea6\u5668\u5c1d\u8bd5<strong>400\u4e2a\u968f\u673a\u5019\u9009\u65b9\u6848</strong>\uff0c\u9009\u53d6\u603b\u60e9\u7f5a\u6700\u4f4e\u7684\u4e00\u4e2a\u3002'],
+        ['\ud83e\udd1d', '<strong>\u907f\u514d\u91cd\u590d\u642d\u6863 \u2014 \u6700\u9ad8\u4f18\u5148\u7ea7</strong>\u3002\u91cd\u60e9\u7f5a\uff08\u91cd\u590d\u6b21\u6570\u00d750\uff0c\u5e73\u65b9\uff09\uff0c\u7cfb\u7edf\u79ef\u6781\u5c06\u4f60\u5206\u914d\u7ed9\u4e0d\u540c\u7684\u642d\u6863\u3002'],
+        ['\u2694\ufe0f', '<strong>\u907f\u514d\u91cd\u590d\u5bf9\u624b</strong> \u2014 \u8f83\u8f7b\u60e9\u7f5a\uff08\u91cd\u590d\u6b21\u6570\u00d75\uff09\u3002\u91cd\u78b0\u76f8\u540c\u5bf9\u624b\u5141\u8bb8\u4f46\u4e0d\u9f13\u52b1\uff0c\u8ba9\u4f60\u8f6e\u6d41\u7740\u548c\u4e0d\u540c\u4eba\u4ea4\u624b\u3002'],
+        ['\u2696\ufe0f', '<strong>DUPR\u5e73\u8861</strong> \u2014 \u6bcf4\u4eba\u4e2d\u6700\u9ad8\u4e0e\u6700\u4f4e\u914d\u5bf9\uff0c\u4e24\u961f\u4e4b\u95f4DUPR\u5dee\u8ddd\u7684\u5e73\u65b9\u4e5f\u4f1a\u88ab\u60e9\u7f5a\uff0c\u4fdd\u8bc1\u6bd4\u8d5b\u65d7\u9f13\u76f8\u5f53\u3002'],
+        ['\u26a0\ufe0f', '\u82e5\u73a9\u5bb6\u592a\u5c11\u3001\u573a\u6b21\u592a\u591a\uff08\u5982 6\u4eba\u00d75\u573a\uff09\uff0c\u53ef\u7528\u642d\u6863\u4e0d\u591f \u2014 \u8bbe\u7f6e\u754c\u9762\u4f1a\u63d0\u793a\u642d\u6863\u91cd\u590d\u5df2\u4e0d\u53ef\u907f\u514d\u3002'],
       ]},
       { heading: '\u8ba1\u5206', rows: [
         ['\ud83c\udfd3', '\u6bcf\u573a\u6bd4\u8d5b\u6253\u5230 <strong>11\u5206\uff0c\u9886\u51482\u5206\u80dc\u51fa</strong>\u3002\u8d5b\u540e\u8f93\u5165\u6700\u7ec8\u6bd4\u5206\u3002'],
         ['\u2705', '\u70b9\u51fb\u6bd4\u8d5b\u5361\u7247\u8f93\u5165\u5206\u6570\u5e76\u6807\u8bb0\u4e3a\u5b8c\u6210\uff0c\u4f1a\u5b9e\u65f6\u540c\u6b65\u3002'],
       ]},
       { heading: '\u6392\u540d', rows: [
-        ['\ud83d\udd22', '\u4ee5<strong>\u5f97\u5206\uff08PF\uff09</strong>\u4f5c\u4e3a\u4e3b\u8981\u6392\u540d\u4f9d\u636e \u2014 \u8f93\u4e86\u4e5f\u8981\u7528\u529b\u5f97\u5206\u3002'],
-        ['\u2696\ufe0f', '\u4e00\u9644 \u2014 <strong>\u51c0\u80dc\u5206\uff08+/\u2212\uff09</strong>.'],
-        ['\ud83c\udfc6', '\u4e8c\u9644 \u2014 <strong>\u80dc\u573a\u6570</strong>.'],
-        ['\ud83d\udcca', '\u5217\u8bf4\u660e\uff1a<strong>PF</strong>\u5f97\u5206 \u00b7 <strong>+/\u2212</strong>\u51c0\u80dc\u5206 \u00b7 <strong>W/G</strong>\u80dc/\u8d5b \u00b7 <strong>PA</strong>\u5931\u5206\u3002'],
+        ['\ud83d\udd22', '\u4ee5<strong>PF/G</strong>\uff08\u6bcf\u573a\u5f97\u5206\uff09\u4f5c\u4e3a\u4e3b\u8981\u6392\u540d\u4f9d\u636e \u2014 \u5373\u4f7f\u73a9\u5bb6\u573a\u6b21\u4e0d\u540c\u4e5f\u80fd\u516c\u5e73\u6bd4\u8f83\u3002'],
+        ['\u2696\ufe0f', '\u4e00\u9644 \u2014 <strong>+/G</strong>\uff08\u6bcf\u573a\u51c0\u80dc\u5206\uff09.'],
+        ['\ud83c\udfc6', '\u4e8c\u9644 \u2014 <strong>\u80dc\u7387</strong>\uff08\u80dc\u573a\u00f7\u603b\u573a\uff09.'],
+        ['\ud83d\udcca', '\u5217\u8bf4\u660e\uff1a<strong>PF/G</strong> \u00b7 <strong>+/G</strong> \u00b7 <strong>W/G</strong>\u80dc/\u8d5b \u00b7 <strong>PF</strong>\u603b\u5f97\u5206\uff08\u53c2\u8003\uff09\u3002'],
       ]},
       { heading: '\u5b63\u540e\u8d5b \u2014 \u9009\u79c0\u642d\u6863', rows: [
         ['\ud83e\udd47', '\u5faa\u73af\u8d5b\u7ed3\u675f\u540e\uff0c\u6392\u540d<strong>\u524d4\u540d</strong>\u664b\u7ea7\u3002'],
@@ -1980,19 +2001,26 @@ const RULES_RR = {
     close: 'Ойлголоо',
     sections: [
       { heading: 'Хэлбэр', rows: [
-        ['👥', '<strong>12 тоглогч · тус бүр 6 тоглоом</strong>. Хос болон өрсөлдөгчид тойрог бүрт санамсаргүй сонгогдоно.'],
+        ['👥', 'Зохион байгуулагч setup дээр <strong>тоглогчийн тоо</strong> болон <strong>нэг тоглогчид ногдох тоглолт</strong>ыг сонгоно. Бүх тоглогч адилхан тооны тоглолт авна (зөрүү ≤ 1).'],
         ['⚖️', 'Хос болгох нь <strong>DUPR-ээр тэнцвэртэй</strong>: 4 тоглогчийн дунд хамгийн өндөр үнэлгээтэй хамгийн багатайгаа хос болно.'],
-        ['🔁', '6 тоглоомын туршид давхцсан хос, өрсөлдөгчөөс зайлсхийхийг хичээнэ.'],
+        ['🎯', 'Тоглогч цуцлах юм уу дунд нь гарвал зохион байгуулагч <strong>drop</strong> хийж болно — өмнөх үр дүн хадгалагдана, дуусаагүй тоглолтууд арилна, үлдсэн тоглогчдоор шинэ хуваарь үүснэ.'],
+      ]},
+      { heading: 'Тоглоом хэрхэн үүсдэг', rows: [
+        ['🎲', 'Хуваарь үүсгэгч <strong>400 санамсаргүй нэр дэвшигч хуваарь</strong>ыг оролдож, нийт пенальти хамгийн бага нэгийг сонгоно.'],
+        ['🤝', '<strong>Нэг хостой давхардахаас зайлсхийх — хамгийн өндөр тэргүүлэх ач холбогдолтой</strong>. Хүнд пенальти (давхардсан удаа тутам ×50, квадратаар) тул систем таныг янз бүрийн хостой тоглуулахыг идэвхтэй эрэлхийлнэ.'],
+        ['⚔️', '<strong>Нэг өрсөлдөгчтэй давхардахаас зайлсхийх</strong> — хөнгөн пенальти (давхардсан удаа тутам ×5). Адил өрсөлдөгчтэй дахин тулгарах нь зөвшөөрөгддөг ч тохиромжтой биш гэж үзэж өөр өрсөлдөгчөөр солих хандлагатай.'],
+        ['⚖️', '<strong>DUPR тэнцвэр</strong> — 4 тоглогчийн дунд хамгийн өндөр, хамгийн бага DUPR хос болно; багуудын DUPR зөрүүний квадратад пенальти өгдөг тул тоглоом өрсөлдөхүйц байна.'],
+        ['⚠️', 'Цөөн тоглогч, олон тоглолттой (ж.нь. 6 × 5) тохиолдолд хангалттай тооны давхцалгүй хос оршихгүй — setup дэлгэц хос давхардал зайлшгүй болох үед анхааруулга харуулна.'],
       ]},
       { heading: 'Оноо', rows: [
         ['🏓', 'Тоглоом тус бүр <strong>11 оноонд, 2 онооны зөрүүтэй</strong>. Тоглоом дуусаад оноог оруулна уу.'],
         ['✅', 'Тоглоомын карт дээр дараад оноогоо оруулж дууссанаар тэмдэглэ — бүх хүнд шууд sync хийгдэнэ.'],
       ]},
       { heading: 'Байр', rows: [
-        ['🔢', 'Гол үзүүлэлт: <strong>Points For (PF)</strong> — ялагдсан ч гэсэн оноо их авах нь чухал.'],
-        ['⚖️', 'Tiebreaker 1 — <strong>Онооны Зөрүү (+/−)</strong>.'],
-        ['🏆', 'Tiebreaker 2 — <strong>Хожсон тоглолт</strong>.'],
-        ['📊', 'Багана: <strong>PF</strong> · <strong>+/−</strong> · <strong>W/G</strong>(хож/нийт) · <strong>PA</strong>(алдсан).'],
+        ['🔢', 'Гол үзүүлэлт: <strong>PF/G</strong> (нэг тоглолтын дундаж оноо) — тоглогчдын тоглолтын тоо адилгүй байсан ч шударга.'],
+        ['⚖️', 'Tiebreaker 1 — <strong>+/G</strong> (нэг тоглолтын дундаж онооны зөрүү).'],
+        ['🏆', 'Tiebreaker 2 — <strong>Хожлын %</strong> (хожсон ÷ нийт тоглолт).'],
+        ['📊', 'Багана: <strong>PF/G</strong> · <strong>+/G</strong> · <strong>W/G</strong>(хож/нийт) · <strong>PF</strong>(нийт оноо, лавлагаа).'],
       ]},
       { heading: 'Playoff — Draft Сонголт', rows: [
         ['🥇', 'Round robin дууссаны дараа шилдэг <strong>4 тоглогч</strong> дараагийн шатанд орно.'],
@@ -2012,19 +2040,26 @@ const RULES_RR = {
     close: 'متوجه شدم',
     sections: [
       { heading: 'قالب', rows: [
-        ['👥', '<strong>۱۲ بازیکن · هر نفر ۶ بازی</strong>. هم‌تیمی و حریف در هر دور تصادفی انتخاب می‌شوند تا با همه بچرخید.'],
+        ['👥', 'برگزارکننده در تنظیمات <strong>تعداد بازیکن</strong> و <strong>بازی به ازای هر نفر</strong> را انتخاب می‌کند. همه بازیکنان تعداد بازی برابر می‌گیرند (اختلاف ≤ ۱).'],
         ['⚖️', 'تیم‌بندی <strong>متعادل با DUPR</strong>: در هر ۴نفره، بالاترین امتیاز با پایین‌ترین امتیاز هم‌تیم می‌شود تا تیم‌ها متعادل باشند.'],
-        ['🔁', 'سیستم تا حد امکان از تکرار هم‌تیمی و حریف در طول ۶ بازی شما اجتناب می‌کند.'],
+        ['🎯', 'اگر بازیکنی انصراف دهد یا در میانه مسابقه برود، برگزارکننده می‌تواند او را <strong>حذف</strong> کند — نتایج قبلی می‌مانند، بازی‌های ناتمام پاک می‌شوند و ادامه برنامه با بازیکنان باقی‌مانده تولید می‌شود.'],
+      ]},
+      { heading: 'چگونگی تولید بازی‌ها', rows: [
+        ['🎲', 'زمان‌بند <strong>۴۰۰ برنامه کاندید تصادفی</strong> را امتحان می‌کند و آن که کمترین جریمه کل را دارد انتخاب می‌کند.'],
+        ['🤝', '<strong>پرهیز از هم‌تیمی تکراری — بالاترین اولویت</strong>. جریمه سنگین (۵۰× برای هر تکرار، به توان دو) تا سیستم به‌طور فعال شما را با هم‌تیمی‌های متفاوت جفت کند.'],
+        ['⚔️', '<strong>پرهیز از حریف تکراری</strong> — جریمه سبک‌تر (۵× برای هر تکرار). روبرو شدن دوباره با همان حریف مجاز است ولی نامطلوب تا در کل میدان بچرخید.'],
+        ['⚖️', '<strong>تعادل DUPR</strong> — در هر ۴نفره بالاترین و پایین‌ترین DUPR هم‌تیم می‌شوند؛ مربع اختلاف DUPR دو تیم جریمه می‌شود تا بازی‌ها رقابتی باقی بمانند.'],
+        ['⚠️', 'با بازیکنان کم و بازی‌های زیاد (مثلاً ۶ نفر × ۵ بازی) به اندازه کافی هم‌تیمی یکتا وجود ندارد — برنامه در هنگام تنظیم هشدار می‌دهد که تکرار هم‌تیمی به‌صورت ریاضی اجتناب‌ناپذیر است.'],
       ]},
       { heading: 'امتیازدهی', rows: [
         ['🏓', 'هر بازی تا <strong>۱۱ امتیاز، با اختلاف ۲</strong>. پس از پایان، امتیاز نهایی را وارد کنید.'],
         ['✅', 'روی کارت بازی ضربه بزنید، هر دو امتیاز را وارد کنید و آن را تمام‌شده علامت بزنید — بلافاصله همگام‌سازی می‌شود.'],
       ]},
       { heading: 'رده‌بندی', rows: [
-        ['🔢', 'معیار اصلی: <strong>Points For (PF)</strong> — حتی وقتی می‌بازید، گرفتن امتیاز اهمیت دارد.'],
-        ['⚖️', 'تای‌بریکر ۱ — <strong>تفاضل امتیاز (+/−)</strong>.'],
-        ['🏆', 'تای‌بریکر ۲ — <strong>تعداد برد</strong>.'],
-        ['📊', 'ستون‌ها: <strong>PF</strong> · <strong>+/−</strong> · <strong>W/G</strong>(برد/بازی) · <strong>PA</strong>(امتیاز از دست رفته).'],
+        ['🔢', 'معیار اصلی: <strong>PF/G</strong> (امتیاز به ازای هر بازی) — حتی وقتی بازیکنان تعداد بازی‌های متفاوتی داشته باشند منصفانه است.'],
+        ['⚖️', 'تای‌بریکر ۱ — <strong>+/G</strong> (تفاضل امتیاز به ازای هر بازی).'],
+        ['🏆', 'تای‌بریکر ۲ — <strong>درصد برد</strong> (بردها ÷ بازی‌ها).'],
+        ['📊', 'ستون‌ها: <strong>PF/G</strong> · <strong>+/G</strong> · <strong>W/G</strong>(برد/بازی) · <strong>PF</strong>(مجموع خام، مرجع).'],
       ]},
       { heading: 'پلی‌آف — انتخاب درفت', rows: [
         ['🥇', 'پس از پایان دور کامل، <strong>۴ نفر برتر</strong> صعود می‌کنند.'],
