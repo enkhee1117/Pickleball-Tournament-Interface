@@ -728,7 +728,13 @@ let syncSource = null;
 let saveTimer = null;
 let localWrite = false;
 let currentView = localStorage.getItem('mlp_view') || 'matches';
-let tournamentMode = localStorage.getItem('tournament_mode') || 'mlp';
+// One-time migration: existing users had 'mlp' saved as default. Today's tournament is Round Robin,
+// so move anyone who hasn't been migrated onto 'rr'. They can still switch back in Settings.
+if (!localStorage.getItem('tm_migrated_rr_v1')) {
+  localStorage.setItem('tournament_mode', 'rr');
+  localStorage.setItem('tm_migrated_rr_v1', '1');
+}
+let tournamentMode = localStorage.getItem('tournament_mode') || 'rr';
 
 function save() {
   localStorage.setItem('mlp_v3', JSON.stringify(state));
