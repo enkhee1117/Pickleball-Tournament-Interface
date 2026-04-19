@@ -2455,7 +2455,10 @@ function showWelcome() {
   document.body.appendChild(el);
 }
 function pickWelcomeIdentity(idx) {
-  myIdentity = parseInt(idx);
+  const id = parseInt(idx);
+  const p = rrState.players[id];
+  if (!Number.isInteger(id) || id < 0 || !p || p.dropped) { refreshWelcome(); return; }
+  myIdentity = id;
   localStorage.setItem('rr_identity', String(myIdentity));
   localStorage.setItem('welcomed', '1');
   const el = document.getElementById('welcome-overlay');
@@ -2898,11 +2901,11 @@ function rrDropPlayer(idx) {
     g.done || (!(g.team1||[]).includes(idx) && !(g.team2||[]).includes(idx))
   );
   rrState.games.forEach((g, i) => { g.i = i; });
-  const inBracket = (bg) => bg && !bg.done && ((bg.team1||[]).includes(idx) || (bg.team2||[]).includes(idx));
-  const draftRefs = rrState.draft && rrState.draft.picks
-    ? Object.values(rrState.draft.picks).includes(idx)
-    : false;
-  if (draftRefs || inBracket(rrState.semi1) || inBracket(rrState.semi2) ||
+  const inBracket = (bg) => bg && ((bg.team1||[]).includes(idx) || (bg.team2||[]).includes(idx));
+  const hasDraftPicks = rrState.draft && rrState.draft.picks && Object.keys(rrState.draft.picks).length > 0;
+  const top8 = rrActiveStandings().slice(0, 8).map(s => s.idx);
+  const affectsDraft = hasDraftPicks && top8.includes(idx);
+  if (affectsDraft || inBracket(rrState.semi1) || inBracket(rrState.semi2) ||
       inBracket(rrState.gold) || inBracket(rrState.bronze)) {
     rrState.draft = { picks: {} };
     rrState.semi1 = null; rrState.semi2 = null;
@@ -3095,7 +3098,7 @@ function rrActiveStandings() {
 function rrBuildSemis() {
   const st = rrActiveStandings();
   const picks = rrState.draft.picks;
-  // Teams: rank 0 team = [rank0.idx, picks[0]], etc.
+  if (st.length < 4) { rrState.draft = { picks: {} }; rrState.semi1 = rrState.semi2 = null; return; }
   const teamA = [st[0].idx, picks[0]]; // 1st + pick
   const teamB = [st[1].idx, picks[1]]; // 2nd + pick
   const teamC = [st[2].idx, picks[2]]; // 3rd + pick
