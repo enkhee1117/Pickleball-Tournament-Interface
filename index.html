@@ -3257,10 +3257,14 @@ function rrRenderSetup() {
           </div>
         </div>
         <div style="color:#666;font-size:12px;margin:10px 4px;line-height:1.5">
-          ${rrState.players.length} players × ${rrState.gamesPerPlayer} games each ÷ 4 players per game
+          ${activeCount} players × ${rrState.gamesPerPlayer} games each ÷ 4 players per game
           = <strong style="color:#ccc">${totalGames}</strong> total games
           (${Math.ceil(totalGames / rrState.numCourts)} rounds of ${rrState.numCourts}-court play).
         </div>
+        ${rrState.gamesPerPlayer >= activeCount - 1 && activeCount >= 4 ? `
+          <div style="margin:8px 4px 0;padding:10px 12px;background:#2a1f0a;border:1px solid #4a3810;border-radius:8px;color:#f0a070;font-size:12px;line-height:1.5">
+            ⚠️ ${rrState.gamesPerPlayer} games/player with only ${activeCount} players means each player has ${activeCount - 1} possible partner${activeCount-1===1?'':'s'} — <strong>partner repeats are unavoidable</strong>. Lower games/player or add players to guarantee unique partners.
+          </div>` : ''}
       </div>
 
       <button class="rr-generate-btn" onclick="rrGenerateAll()">
