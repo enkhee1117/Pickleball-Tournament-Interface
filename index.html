@@ -2973,8 +2973,9 @@ function showRegistry() {
         const gLabel = e.gender === 'm' ? 'M' : (e.gender === 'f' ? 'F' : '–');
         const gFg = e.gender === 'm' ? '#60a5fa' : (e.gender === 'f' ? '#f472b6' : '#666');
         const nameJs = e.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const searchKey = (e.name || '').toLowerCase();
         return `
-          <div class="settings-row" style="cursor:default">
+          <div class="settings-row rr-reg-row" data-name="${escapeHtml(searchKey)}" style="cursor:default">
             <div style="flex:1;min-width:0">
               <div style="font-weight:700;color:#eee;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(e.name)}</div>
               <div style="font-size:11px;color:#888;margin-top:2px">DUPR ${dLabel} · <span style="color:${gFg};font-weight:700">${gLabel}</span></div>
@@ -3003,10 +3004,29 @@ function showRegistry() {
       <button onclick="rrRegistryAddPlayer()" style="width:100%;margin-top:8px;padding:10px;background:#1a3f2a;border:1px solid #3a8a5f;border-radius:9px;color:#4ade80;font-size:13px;font-weight:800;cursor:pointer">+ Add to Registry</button>
 
       <div class="settings-section-label">All Players</div>
-      <div style="max-height:50vh;overflow-y:auto;margin:0 -2px;padding:0 2px">${rows}</div>
+      <input id="rr-reg-search" class="select-input" placeholder="Search by name…" autocomplete="off"
+        oninput="rrRegistryFilter(this.value)"
+        style="width:100%;margin-bottom:8px"/>
+      <div id="rr-reg-empty" style="display:none;padding:10px 14px;color:#666;font-size:12px">No matches.</div>
+      <div id="rr-reg-list" style="max-height:50vh;overflow-y:auto;margin:0 -2px;padding:0 2px">${rows}</div>
     </div>
   `;
   document.body.appendChild(el);
+}
+function rrRegistryFilter(q) {
+  const list = document.getElementById('rr-reg-list');
+  const empty = document.getElementById('rr-reg-empty');
+  if (!list) return;
+  const needle = (q || '').trim().toLowerCase();
+  const rows = list.querySelectorAll('.rr-reg-row');
+  let shown = 0;
+  rows.forEach(r => {
+    const name = r.getAttribute('data-name') || '';
+    const match = !needle || name.indexOf(needle) !== -1;
+    r.style.display = match ? '' : 'none';
+    if (match) shown++;
+  });
+  if (empty) empty.style.display = (shown === 0 && rows.length > 0) ? '' : 'none';
 }
 function rrRegistryAddRefresh() {
   const m = document.getElementById('rr-reg-m');
