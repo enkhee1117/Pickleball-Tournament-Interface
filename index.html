@@ -2501,6 +2501,63 @@ function setViewMode(mode) {
   render();
 }
 
+// ─── Game Log (individual game snapshots saved on reset) ───
+function rrLoadGameLog() {
+  try { const s = localStorage.getItem('rr_game_log'); if (s) return JSON.parse(s); } catch (e) {}
+  return [];
+}
+let rrGameLog = rrLoadGameLog();
+function rrSaveGameLog() {
+  localStorage.setItem('rr_game_log', JSON.stringify(rrGameLog));
+  if (typeof FIREBASE_URL !== 'undefined' && FIREBASE_URL) {
+    fetch(FIREBASE_URL + '/rr_game_log.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rrGameLog),
+    }).catch(() => {});
+  }
+}
+function rrGameLogLabel(gameKey, g) {
+  if (gameKey === 'semi1') return g.label || 'Semi 1';
+  if (gameKey === 'semi2') return g.label || 'Semi 2';
+  if (gameKey === 'gold') return g.label || 'Gold Medal';
+  if (gameKey === 'bronze') return g.label || 'Bronze Medal';
+  const idx = parseInt(gameKey);
+  return 'Game ' + (isNaN(idx) ? (parseInt(g.i) + 1 || '?') : idx + 1);
+}
+function rrGameLogAppend(gameKey, g) {
+  if (!g) return;
+  rrGameLog.unshift({
+    id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+    savedAt: Date.now(),
+    tournamentId: rrState.id,
+    tournamentName: rrState.name || 'Round Robin',
+    gameKey: String(gameKey),
+    label: rrGameLogLabel(gameKey, g),
+    court: g.court || 1,
+    team1Names: (g.team1 || []).map(i => rrPlayerNameRaw(i)),
+    team2Names: (g.team2 || []).map(i => rrPlayerNameRaw(i)),
+    s1: g.s1 || 0, s2: g.s2 || 0,
+    winner: g.winner || null,
+    wasDone: !!g.done,
+  });
+  if (rrGameLog.length > 500) rrGameLog.length = 500;
+  rrSaveGameLog();
+}
+function rrGameLogDelete(id) {
+  if (!confirm('Delete this saved game from Previous Games?')) return;
+  rrGameLog = rrGameLog.filter(e => e && e.id !== id);
+  rrSaveGameLog();
+  render();
+}
+function rrGameLogClearAll() {
+  if (rrGameLog.length === 0) return;
+  if (!confirm(`Clear all ${rrGameLog.length} saved games from Previous Games? This cannot be undone.`)) return;
+  rrGameLog = [];
+  rrSaveGameLog();
+  render();
+}
+
 // ─── Archive (past tournaments) ───
 function loadArchive() {
   try { const s = localStorage.getItem('rr_archive'); if (s) return JSON.parse(s); } catch(e){}
@@ -3061,6 +3118,16 @@ function rrInitSync() {
       }
     })
     .catch(()=>{});
+  // One-shot game log fetch so previous-game history shows up on any organizer device.
+  fetch(FIREBASE_URL + '/rr_game_log.json')
+    .then(r => r.json())
+    .then(data => {
+      if (Array.isArray(data)) {
+        rrGameLog = data;
+        localStorage.setItem('rr_game_log', JSON.stringify(rrGameLog));
+      }
+    })
+    .catch(()=>{});
 }
 
 function rrSetView(v) { rrView = v; localStorage.setItem('rr_view', v); render(); }
@@ -3535,9 +3602,17 @@ function rrSetScoreInline(gameKey, team, val) {
 }
 
 function rrResetGame(gameKey) {
-  if (!confirm('Reset this game? Its score will be cleared.')) return;
   const g = rrGetGame(gameKey);
   if (!g) return;
+  // If the game has any score, offer to store the result before clearing.
+  // Organizer-only prompt (players can't see the log anyway).
+  const hasScore = g.s1 > 0 || g.s2 > 0 || g.done;
+  if (hasScore && viewMode !== 'player') {
+    const store = confirm('Store this game\'s result in Previous Games before resetting?\n\nOK = store, Cancel = discard and reset.');
+    if (store) rrGameLogAppend(gameKey, g);
+  } else {
+    if (!confirm('Reset this game? Its score will be cleared.')) return;
+  }
   g.s1 = 0; g.s2 = 0; g.done = false; g.winner = null;
   if (gameKey === 'semi1' || gameKey === 'semi2') {
     rrState.gold = null; rrState.bronze = null;
@@ -4915,15 +4990,18 @@ function renderPPA() {
 function renderRR() {
   const rrDone = rrRRComplete();
   const isPlayer = viewMode === 'player';
-  if (isPlayer && rrView === 'setup') rrView = 'games';
+  if (isPlayer && (rrView === 'setup' || rrView === 'history')) rrView = 'games';
   const setupBtn = isPlayer ? '' :
     `<button onclick="rrSetView('setup')" class="${rrView==='setup'?'active':''}">Setup</button>`;
+  const historyBtn = isPlayer ? '' :
+    `<button onclick="rrSetView('history')" class="${rrView==='history'?'active':''}">Previous${rrGameLog.length?` · ${rrGameLog.length}`:''}</button>`;
   const nav = `
     <nav class="nav">
       ${setupBtn}
       <button onclick="rrSetView('games')"     class="${rrView==='games'?'active':''}">Games</button>
       <button onclick="rrSetView('standings')" class="${rrView==='standings'?'active':''}">Standings</button>
       <button onclick="rrSetView('playoffs')"  class="${rrView==='playoffs'?'active':''}" style="${rrDone?'':'opacity:0.6'}">Playoffs</button>
+      ${historyBtn}
     </nav>
     <div class="sync-bar sync-pending" id="sync-status-bar"></div>
   `;
@@ -4932,9 +5010,86 @@ function renderRR() {
   else if (rrView === 'games') body = rrMyCard() + rrRenderGames();
   else if (rrView === 'standings') body = rrMyCard() + rrRenderStandings();
   else if (rrView === 'playoffs') body = rrRenderPlayoffs();
+  else if (rrView === 'history') body = rrRenderHistory();
   else body = rrRenderSetup();
 
   swapApp(nav + body);
+}
+
+function rrRenderHistory() {
+  if (rrGameLog.length === 0) {
+    return `
+      <div class="rr-page">
+        <div class="rr-header">
+          <h1>Previous Games</h1>
+          <p>Game results saved before resets show up here.</p>
+        </div>
+        <div style="padding:24px;text-align:center;color:#666;font-size:13px;line-height:1.6">
+          No saved games yet.<br><br>
+          When you press <strong style="color:#aaa">↺ Reset</strong> on a game with any score, you'll be asked if you want to store its result here first.
+        </div>
+      </div>`;
+  }
+  const fmtTime = (ms) => {
+    const d = new Date(ms);
+    return d.toLocaleDateString() + ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+  const rows = rrGameLog.map(e => {
+    const t1 = (e.team1Names || []).map(escapeHtml).join(' &amp; ');
+    const t2 = (e.team2Names || []).map(escapeHtml).join(' &amp; ');
+    const w1 = e.winner === 't1', w2 = e.winner === 't2';
+    const c = rrCourtColor(e.court);
+    const statusBadge = e.wasDone
+      ? `<span class="badge badge-done">Final</span>`
+      : `<span class="badge badge-upcoming">In-progress</span>`;
+    const tournTag = e.tournamentName ? `<span style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:0.8px">${escapeHtml(e.tournamentName)}</span>` : '';
+    return `
+      <div class="rr-round-card" style="cursor:default">
+        <div class="rr-round-top">
+          <span style="display:flex;align-items:center;gap:8px;min-width:0">
+            <span class="rr-court-pill" style="background:${c.bg};border-color:${c.border};color:${c.fg}">Court ${e.court||1}</span>
+            <span class="rr-round-title">${escapeHtml(e.label || 'Game')}</span>
+          </span>
+          ${statusBadge}
+        </div>
+        <div class="rr-game-card">
+          <div class="rr-team-row">
+            <div class="rr-team-names t1" style="${w1?'color:#4ade80;font-weight:800':''}">${t1}</div>
+            <div class="rr-vs">vs</div>
+            <div class="rr-team-names t2 right" style="${w2?'color:#4ade80;font-weight:800':''}">${t2}</div>
+          </div>
+          <div class="score-row">
+            <div class="score-side" style="justify-content:center">
+              <div class="score-num-big" style="color:${w1?'#60a5fa':'#fff'}">${e.s1}</div>
+            </div>
+            <div class="score-sep">–</div>
+            <div class="score-side right" style="justify-content:center">
+              <div class="score-num-big" style="color:${w2?'#f472b6':'#fff'}">${e.s2}</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px;margin-top:8px">
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+            ${tournTag}
+            <span style="font-size:11px;color:#777">${fmtTime(e.savedAt)}</span>
+          </div>
+          <button class="reset-btn" onclick="rrGameLogDelete('${e.id}')" style="color:#ef4444;border-color:#3a1a1a">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="rr-page">
+      <div class="rr-header">
+        <h1>Previous Games · ${rrGameLog.length}</h1>
+        <p>Results saved when games were reset. Most recent first.</p>
+      </div>
+      <div style="padding: 0 12px">
+        ${rows}
+        <button onclick="rrGameLogClearAll()" style="width:100%;margin-top:12px;padding:10px;background:#1a1010;border:1px solid #3a1a1a;border-radius:9px;color:#f87171;font-size:12px;font-weight:700;cursor:pointer">
+          Clear all saved games
+        </button>
+      </div>
+    </div>`;
 }
 
 window.addEventListener('error', (e) => {
