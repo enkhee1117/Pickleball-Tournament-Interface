@@ -3062,15 +3062,21 @@ function rrSave() {
   clearTimeout(rrSaveTimer);
   rrSaveTimer = setTimeout(() => {
     rrLocalWrite = true;
+    // Guaranteed clear — if the SSE echo doesn't arrive (HTTP error returning
+    // 4xx/5xx without throwing, or Firebase rule deny), the next legitimate
+    // remote update would otherwise be dropped as if it were an echo.
+    clearTimeout(rrLocalWriteTimer);
+    rrLocalWriteTimer = setTimeout(() => { rrLocalWrite = false; }, 3000);
     fetch(FIREBASE_URL + '/rr_state.json', {
       method: 'PUT',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(rrState)
-    }).catch(()=>{ rrLocalWrite = false; });
+    }).catch(()=>{ rrLocalWrite = false; clearTimeout(rrLocalWriteTimer); });
   }, 150);
 }
 let rrSaveTimer = null;
 let rrLocalWrite = false;
+let rrLocalWriteTimer = null;
 let rrSyncSource = null;
 
 function rrDiffNewlyDone(prev, next) {
@@ -3104,7 +3110,7 @@ function rrInitSync() {
     try {
       const payload = JSON.parse(e.data);
       if (payload.data) {
-        if (rrLocalWrite) { rrLocalWrite = false; return; }
+        if (rrLocalWrite) { rrLocalWrite = false; clearTimeout(rrLocalWriteTimer); return; }
         const prev = rrState;
         const next = rrMigrateState(payload.data);
         const newlyDone = rrDiffNewlyDone(prev, next);
@@ -3499,7 +3505,12 @@ function rrEditTeams(gameKey) {
   }
   const existing = document.getElementById('rr-edit-teams');
   if (existing) existing.remove();
-  const active = rrState.players.map((p, i) => ({ p, i })).filter(x => x.p && !x.p.dropped);
+  // Include active players + any currently-assigned player even if dropped (so a
+  // remote drop that arrived mid-edit doesn't wipe the selection).
+  const assigned = new Set([...(g.team1||[]), ...(g.team2||[])]);
+  const active = rrState.players
+    .map((p, i) => ({ p, i }))
+    .filter(x => x.p && (!x.p.dropped || assigned.has(x.i)));
   const slots = [
     { label: 'Team 1 · Player A', val: g.team1[0] },
     { label: 'Team 1 · Player B', val: g.team1[1] },
@@ -3508,7 +3519,8 @@ function rrEditTeams(gameKey) {
   ];
   const opts = (sel) => active.map(x => {
     const d = (typeof x.p.dupr === 'number') ? ` (${x.p.dupr.toFixed(2)})` : '';
-    return `<option value="${x.i}" ${x.i===sel?'selected':''}>${escapeHtml(x.p.name||('Player '+(x.i+1)))}${d}</option>`;
+    const dropTag = x.p.dropped ? ' · dropped' : '';
+    return `<option value="${x.i}" ${x.i===sel?'selected':''}>${escapeHtml(x.p.name||('Player '+(x.i+1)))}${d}${dropTag}</option>`;
   }).join('');
   const rows = slots.map((s, k) => `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
@@ -3624,20 +3636,68 @@ function rrSetScoreInline(gameKey, team, val) {
 function rrResetGame(gameKey) {
   const g = rrGetGame(gameKey);
   if (!g) return;
-  // If the game has any score, offer to store the result before clearing.
-  // Organizer-only prompt (players can't see the log anyway).
   const hasScore = g.s1 > 0 || g.s2 > 0 || g.done;
-  if (hasScore && viewMode !== 'player') {
-    const store = confirm('Store this game\'s result in Previous Games before resetting?\n\nOK = store, Cancel = discard and reset.');
-    if (store) rrGameLogAppend(gameKey, g);
-  } else {
+  // Players never see the log — a simple confirm is enough for them.
+  if (!hasScore || viewMode === 'player') {
     if (!confirm('Reset this game? Its score will be cleared.')) return;
+    rrPerformReset(gameKey);
+    return;
   }
+  // Organizer + score present → 3-option modal so accidental taps can bail out.
+  rrShowResetModal(gameKey, g);
+}
+function rrPerformReset(gameKey) {
+  const g = rrGetGame(gameKey);
+  if (!g) return;
   g.s1 = 0; g.s2 = 0; g.done = false; g.winner = null;
   if (gameKey === 'semi1' || gameKey === 'semi2') {
     rrState.gold = null; rrState.bronze = null;
   }
   rrSave(); render();
+}
+function rrShowResetModal(gameKey, g) {
+  const existing = document.getElementById('rr-reset-modal');
+  if (existing) existing.remove();
+  const label = rrGameLogLabel(gameKey, g);
+  const scoreLine = g.done ? `${g.s1}–${g.s2} (final)` : `${g.s1}–${g.s2} (in progress)`;
+  const el = document.createElement('div');
+  el.className = 'settings-overlay';
+  el.id = 'rr-reset-modal';
+  el.onclick = (ev) => { if (ev.target === el) el.remove(); };
+  el.innerHTML = `
+    <div class="settings-sheet" onclick="event.stopPropagation()" style="max-width:460px">
+      <div class="settings-handle"></div>
+      <div class="settings-section-label" style="margin-top:4px">Reset ${escapeHtml(label)}</div>
+      <div style="padding:4px 2px 14px;color:#ddd;font-size:14px;line-height:1.5">
+        Current score: <strong style="color:#fff">${scoreLine}</strong>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button onclick="rrResetWithStore('${gameKey}')" style="padding:13px;background:#1a3f2a;border:1px solid #3a8a5f;border-radius:10px;color:#4ade80;font-size:14px;font-weight:800;cursor:pointer;text-align:left">
+          💾 Store in Previous Games, then reset
+          <div style="font-size:11px;font-weight:600;opacity:0.8;margin-top:2px">Keep the result in history</div>
+        </button>
+        <button onclick="rrResetWithoutStore('${gameKey}')" style="padding:13px;background:#2a1a1a;border:1px solid #4a2a2a;border-radius:10px;color:#f87171;font-size:14px;font-weight:800;cursor:pointer;text-align:left">
+          ✕ Discard and reset
+          <div style="font-size:11px;font-weight:600;opacity:0.8;margin-top:2px">Scores will be lost</div>
+        </button>
+        <button onclick="document.getElementById('rr-reset-modal').remove()" style="padding:13px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;color:#ddd;font-size:14px;font-weight:700;cursor:pointer">
+          Cancel
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(el);
+}
+function rrResetWithStore(gameKey) {
+  const g = rrGetGame(gameKey);
+  if (g) rrGameLogAppend(gameKey, g);
+  const el = document.getElementById('rr-reset-modal'); if (el) el.remove();
+  rrPerformReset(gameKey);
+  toast('Saved to Previous Games', 1500);
+}
+function rrResetWithoutStore(gameKey) {
+  const el = document.getElementById('rr-reset-modal'); if (el) el.remove();
+  rrPerformReset(gameKey);
 }
 
 function rrResetAll() {
