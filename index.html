@@ -2292,14 +2292,19 @@ let rrRegistry = rrLoadRegistry();
   }
 })();
 
+let rrRegistryLocalWrite = false;
+let rrRegistryLocalWriteTimer = null;
 function rrSaveRegistry() {
   localStorage.setItem('rr_registry', JSON.stringify(rrRegistry));
   if (typeof FIREBASE_URL !== 'undefined' && FIREBASE_URL) {
+    rrRegistryLocalWrite = true;
+    clearTimeout(rrRegistryLocalWriteTimer);
+    rrRegistryLocalWriteTimer = setTimeout(() => { rrRegistryLocalWrite = false; }, 3000);
     fetch(FIREBASE_URL + '/rr_registry.json', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(rrRegistry),
-    }).catch(() => {});
+    }).catch(() => { rrRegistryLocalWrite = false; clearTimeout(rrRegistryLocalWriteTimer); });
   }
 }
 function rrRegistryFind(name) {
@@ -2314,10 +2319,14 @@ function rrRegistryUpsert(entry) {
   if (!nm) return false;
   const lc = nm.toLowerCase();
   const idx = rrRegistry.findIndex(e => e && e.name && e.name.toLowerCase() === lc);
+  const prev = idx >= 0 ? rrRegistry[idx] : null;
   const next = {
     name: nm,
     dupr: (typeof entry.dupr === 'number' && !isNaN(entry.dupr)) ? entry.dupr : null,
     gender: (entry.gender === 'm' || entry.gender === 'f') ? entry.gender : null,
+    lastSeenAt: Date.now(),
+    // preserve original addedAt if we're updating, else set it now
+    addedAt: (prev && prev.addedAt) ? prev.addedAt : Date.now(),
   };
   const added = idx < 0;
   if (added) rrRegistry.push(next);
@@ -2661,8 +2670,21 @@ function rrMyCard() {
            </div>
            <div class="my-card-sub">Partner: <strong style="color:#fff">${rrPlayerName(next.partner)}</strong><br/>
            vs ${rrPlayerName(next.opponents[0])} &amp; ${rrPlayerName(next.opponents[1])}</div>`)
-    : `<div class="my-card-title">No upcoming games</div>
-       <div class="my-card-sub">All your games are done.</div>`;
+    : (rrRRComplete()
+        ? (() => {
+            const playoffsDone = !!(rrState.gold && rrState.gold.done && rrState.bronze && rrState.bronze.done);
+            const playoffsStarted = !!(rrState.gold);
+            const target = playoffsDone ? 'standings' : (playoffsStarted ? 'playoffs' : 'standings');
+            const label = playoffsDone ? 'final standings' : (playoffsStarted ? 'playoffs' : 'standings');
+            const subtext = playoffsDone
+              ? 'All playoffs done — tap Standings for final results.'
+              : (playoffsStarted ? 'Playoffs in progress.' : 'Round robin is over. Tap Standings to pick the top 4.');
+            return `<div class="my-card-title">🏆 Tournament complete</div>
+               <div class="my-card-sub">${subtext}</div>
+               <button onclick="rrSetView('${target}')" style="margin-top:10px;width:100%;padding:11px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;letter-spacing:0.3px">View ${label} →</button>`;
+          })()
+        : `<div class="my-card-title">No upcoming games</div>
+           <div class="my-card-sub">All your games are done.</div>`);
   const standingHtml = standing
     ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center">
          <span style="color:#c5d5ff;font-size:12px">Your standing</span>
@@ -2962,13 +2984,17 @@ function viewArchived(id) {
   document.body.appendChild(el);
 }
 
+let rrRegistrySort = 'name'; // 'name' | 'recent'
 function showRegistry() {
   hideSettings();
   const existing = document.getElementById('registry-overlay');
   if (existing) existing.remove();
+  const sortedRegistry = rrRegistrySort === 'recent'
+    ? rrRegistry.slice().sort((a, b) => (b.lastSeenAt || b.addedAt || 0) - (a.lastSeenAt || a.addedAt || 0))
+    : rrRegistry.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const rows = rrRegistry.length === 0
     ? `<div style="padding:10px 14px;color:#666;font-size:12px">Registry is empty. Add players below or via “Save roster to registry” in Setup.</div>`
-    : rrRegistry.map(e => {
+    : sortedRegistry.map(e => {
         const dLabel = (typeof e.dupr === 'number') ? e.dupr.toFixed(2) : '—';
         const gLabel = e.gender === 'm' ? 'M' : (e.gender === 'f' ? 'F' : '–');
         const gFg = e.gender === 'm' ? '#60a5fa' : (e.gender === 'f' ? '#f472b6' : '#666');
@@ -3003,7 +3029,13 @@ function showRegistry() {
       </div>
       <button onclick="rrRegistryAddPlayer()" style="width:100%;margin-top:8px;padding:10px;background:#1a3f2a;border:1px solid #3a8a5f;border-radius:9px;color:#4ade80;font-size:13px;font-weight:800;cursor:pointer">+ Add to Registry</button>
 
-      <div class="settings-section-label">All Players</div>
+      <div class="settings-section-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>All Players</span>
+        <div style="display:flex;gap:4px">
+          <button onclick="rrSetRegistrySort('name')" style="padding:4px 10px;background:${rrRegistrySort==='name'?'#fff':'#1a1a1a'};color:${rrRegistrySort==='name'?'#000':'#aaa'};border:1px solid #2a2a2a;border-radius:6px;font-size:10px;font-weight:800;letter-spacing:0.5px;cursor:pointer">A–Z</button>
+          <button onclick="rrSetRegistrySort('recent')" style="padding:4px 10px;background:${rrRegistrySort==='recent'?'#fff':'#1a1a1a'};color:${rrRegistrySort==='recent'?'#000':'#aaa'};border:1px solid #2a2a2a;border-radius:6px;font-size:10px;font-weight:800;letter-spacing:0.5px;cursor:pointer">Recent</button>
+        </div>
+      </div>
       <input id="rr-reg-search" class="select-input" placeholder="Search by name…" autocomplete="off"
         oninput="rrRegistryFilter(this.value)"
         style="width:100%;margin-bottom:8px"/>
@@ -3012,6 +3044,11 @@ function showRegistry() {
     </div>
   `;
   document.body.appendChild(el);
+}
+function rrSetRegistrySort(s) {
+  if (s !== 'name' && s !== 'recent') return;
+  rrRegistrySort = s;
+  showRegistry();
 }
 function rrRegistryFilter(q) {
   const list = document.getElementById('rr-reg-list');
@@ -3078,6 +3115,7 @@ let rrSaveTimer = null;
 let rrLocalWrite = false;
 let rrLocalWriteTimer = null;
 let rrSyncSource = null;
+let rrRegistrySyncSource = null;
 
 function rrDiffNewlyDone(prev, next) {
   const msgs = [];
@@ -3134,16 +3172,22 @@ function rrInitSync() {
       }
     })
     .catch(()=>{});
-  // One-shot registry fetch so new players added on other devices are suggested here.
-  fetch(FIREBASE_URL + '/rr_registry.json')
-    .then(r => r.json())
-    .then(data => {
-      if (Array.isArray(data) && data.length) {
-        rrRegistry = data;
-        localStorage.setItem('rr_registry', JSON.stringify(rrRegistry));
-      }
-    })
-    .catch(()=>{});
+  // Live registry subscription — edits from other devices show up immediately.
+  if (rrRegistrySyncSource) { rrRegistrySyncSource.close(); rrRegistrySyncSource = null; }
+  rrRegistrySyncSource = new EventSource(FIREBASE_URL + '/rr_registry.json');
+  rrRegistrySyncSource.addEventListener('put', e => {
+    try {
+      const payload = JSON.parse(e.data);
+      if (!payload || !Array.isArray(payload.data)) return;
+      if (rrRegistryLocalWrite) { rrRegistryLocalWrite = false; clearTimeout(rrRegistryLocalWriteTimer); return; }
+      rrRegistry = payload.data;
+      localStorage.setItem('rr_registry', JSON.stringify(rrRegistry));
+      // Re-render the registry sheet if it's open, and the Setup page so the
+      // <datalist> picks up the new names.
+      if (document.getElementById('registry-overlay')) showRegistry();
+      else if (tournamentMode === 'rr' && rrView === 'setup') render();
+    } catch (_) {}
+  });
   // One-shot game log fetch so previous-game history shows up on any organizer device.
   fetch(FIREBASE_URL + '/rr_game_log.json')
     .then(r => r.json())
@@ -3485,11 +3529,46 @@ function rrGenerateAll() {
   if (offenders.length) {
     const detail = offenders.map(x => `${rrPlayerNameRaw(x.i)}:${x.c}`).join(', ');
     toast(`Uneven schedule — expected ${lo===hi?lo:lo+'\u2013'+hi}/player. ${detail}`, 3500);
-  } else if (lo !== hi) {
-    const highCount = counts.filter((c, i) => activeIdxSet.has(i) && c === hi).length;
-    toast(`Schedule balanced: ${P - highCount} play ${lo}, ${highCount} play ${hi}.`, 2500);
+  } else {
+    const s = rrScheduleStats();
+    if (s) {
+      const parts = [];
+      if (lo !== hi) {
+        const highCount = counts.filter((c, i) => activeIdxSet.has(i) && c === hi).length;
+        parts.push(`${P - highCount}×${lo}, ${highCount}×${hi} games`);
+      }
+      parts.push(`${s.partnerRepeats} partner repeat${s.partnerRepeats===1?'':'s'}`);
+      parts.push(`${s.opponentRepeats} opp repeat${s.opponentRepeats===1?'':'s'}`);
+      toast('Schedule: ' + parts.join(' · '), 3200);
+    }
   }
   rrSave(); rrSetView('games');
+}
+
+// Counts distinct partner pairs, opponent pairs, and repeat totals in the
+// current schedule. Used for the "pairing preview" info on the Games tab.
+function rrScheduleStats() {
+  const games = rrState.games || [];
+  if (!games.length) return null;
+  const partnerCount = {}, oppCount = {};
+  games.forEach(g => {
+    const t1 = (g.team1 || []).slice().sort((a, b) => a - b);
+    const t2 = (g.team2 || []).slice().sort((a, b) => a - b);
+    if (t1.length === 2) { const k = t1.join('_'); partnerCount[k] = (partnerCount[k]||0) + 1; }
+    if (t2.length === 2) { const k = t2.join('_'); partnerCount[k] = (partnerCount[k]||0) + 1; }
+    for (const a of (g.team1 || [])) for (const b of (g.team2 || [])) {
+      const k = a < b ? a + '_' + b : b + '_' + a;
+      oppCount[k] = (oppCount[k] || 0) + 1;
+    }
+  });
+  const sumRepeats = (o) => Object.values(o).reduce((s, c) => s + (c > 1 ? c - 1 : 0), 0);
+  return {
+    totalGames: games.length,
+    uniquePartners: Object.keys(partnerCount).length,
+    uniqueOpponents: Object.keys(oppCount).length,
+    partnerRepeats: sumRepeats(partnerCount),
+    opponentRepeats: sumRepeats(oppCount),
+  };
 }
 
 // Manual team editor — organizer-only. Lets you swap any of the 4 player slots
@@ -4116,6 +4195,12 @@ function rrRenderGames() {
     </div>
   `;
 
+  const stats = (viewMode !== 'player' && !mineOnly) ? rrScheduleStats() : null;
+  const statsBanner = stats ? `
+    <div style="padding:0 12px 4px;color:#666;font-size:11px">
+      ${stats.uniquePartners} unique partnerships${stats.partnerRepeats ? ` · <span style="color:#f0a070">${stats.partnerRepeats} repeat</span>` : ' · no repeats'} · ${stats.uniqueOpponents} unique matchups${stats.opponentRepeats ? ` · <span style="color:#888">${stats.opponentRepeats} matchup repeat</span>` : ''}
+    </div>` : '';
+
   const subhead = mineOnly
     ? `Your games only \u00b7 ${rrShowDone ? 'all' : 'upcoming &amp; live'}`
     : (rrShowDone ? 'All games' : 'Upcoming &amp; live games only');
@@ -4126,6 +4211,7 @@ function rrRenderGames() {
         <p>${subhead}</p>
       </div>
       ${filterPill}
+      ${statsBanner}
       ${gamesHtml}
       ${viewMode === 'player' ? '' : `
         <div style="padding:16px 12px;text-align:center">
@@ -5096,6 +5182,44 @@ function renderRR() {
   swapApp(nav + body);
 }
 
+// Aggregate per-player stats from the game log. Matches by case-insensitive
+// name (the log stores denormalized names, so this is robust to roster changes).
+function rrCareerStats() {
+  const stats = {}; // { lcName -> { name, gp, gw, pf, pa } }
+  rrGameLog.forEach(e => {
+    if (!e || !e.team1Names || !e.team2Names) return;
+    const s1 = e.s1 || 0, s2 = e.s2 || 0;
+    const t1Won = e.winner === 't1';
+    const t2Won = e.winner === 't2';
+    const upd = (nm, pf, pa, won) => {
+      const key = (nm || '').toLowerCase();
+      if (!key) return;
+      if (!stats[key]) stats[key] = { name: nm, gp: 0, gw: 0, pf: 0, pa: 0 };
+      stats[key].gp++;
+      if (won) stats[key].gw++;
+      stats[key].pf += pf;
+      stats[key].pa += pa;
+    };
+    e.team1Names.forEach(nm => upd(nm, s1, s2, t1Won));
+    e.team2Names.forEach(nm => upd(nm, s2, s1, t2Won));
+  });
+  return Object.values(stats)
+    .map(s => ({
+      ...s,
+      winPct: s.gp > 0 ? s.gw / s.gp : 0,
+      diff: s.pf - s.pa,
+    }))
+    .sort((a, b) => {
+      // Primary: win%. Tiebreak: games played (more = more signal). Then diff.
+      if (b.winPct !== a.winPct) return b.winPct - a.winPct;
+      if (b.gp !== a.gp) return b.gp - a.gp;
+      return b.diff - a.diff;
+    });
+}
+
+let rrHistoryView = 'games'; // 'games' | 'career'
+function rrSetHistoryView(v) { rrHistoryView = v; render(); }
+
 function rrRenderHistory() {
   if (rrGameLog.length === 0) {
     return `
@@ -5157,18 +5281,48 @@ function rrRenderHistory() {
         </div>
       </div>`;
   }).join('');
+  const career = rrCareerStats();
+  const careerRows = career.map((s, i) => {
+    const pct = s.gp > 0 ? Math.round(s.winPct * 100) : 0;
+    const diffColor = s.diff > 0 ? '#4ade80' : (s.diff < 0 ? '#f87171' : '#888');
+    const diffStr = (s.diff > 0 ? '+' : '') + s.diff;
+    return `
+      <div style="display:grid;grid-template-columns:28px 1fr 52px 56px 52px;gap:8px;align-items:center;padding:10px 12px;background:${i%2?'#131313':'#171717'};border:1px solid #222;border-radius:9px;margin-bottom:4px;font-size:13px">
+        <div style="color:#666;font-weight:700">${i+1}</div>
+        <div style="color:#eee;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(s.name)}</div>
+        <div style="color:#aaa;font-weight:700;text-align:right">${s.gw}/${s.gp}</div>
+        <div style="color:#fff;font-weight:800;text-align:right">${pct}%</div>
+        <div style="color:${diffColor};font-weight:700;text-align:right">${diffStr}</div>
+      </div>`;
+  }).join('');
+  const tabBar = `
+    <div style="padding:8px 12px 4px;display:flex;gap:6px">
+      <button onclick="rrSetHistoryView('games')" style="flex:1;padding:9px;background:${rrHistoryView==='games'?'#fff':'#1a1a1a'};color:${rrHistoryView==='games'?'#000':'#ddd'};border:1px solid #2a2a2a;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer">Games</button>
+      <button onclick="rrSetHistoryView('career')" style="flex:1;padding:9px;background:${rrHistoryView==='career'?'#fff':'#1a1a1a'};color:${rrHistoryView==='career'?'#000':'#ddd'};border:1px solid #2a2a2a;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer">Career · ${career.length}</button>
+    </div>`;
+  const body = rrHistoryView === 'career'
+    ? (career.length === 0
+        ? `<div style="padding:24px;text-align:center;color:#666;font-size:13px">No career stats yet.</div>`
+        : `
+          <div style="display:grid;grid-template-columns:28px 1fr 52px 56px 52px;gap:8px;padding:4px 12px 6px;color:#666;font-size:10px;font-weight:800;letter-spacing:0.8px;text-transform:uppercase">
+            <div>#</div><div>Player</div><div style="text-align:right">W/GP</div><div style="text-align:right">Win%</div><div style="text-align:right">Diff</div>
+          </div>
+          <div style="padding: 0 12px">${careerRows}</div>`)
+    : `
+        <div style="padding: 0 12px">
+          ${rows}
+          <button onclick="rrGameLogClearAll()" style="width:100%;margin-top:12px;padding:10px;background:#1a1010;border:1px solid #3a1a1a;border-radius:9px;color:#f87171;font-size:12px;font-weight:700;cursor:pointer">
+            Clear all saved games
+          </button>
+        </div>`;
   return `
     <div class="rr-page">
       <div class="rr-header">
         <h1>Previous Games · ${rrGameLog.length}</h1>
-        <p>Results saved when games were reset. Most recent first.</p>
+        <p>${rrHistoryView === 'career' ? 'Per-player record across all saved games.' : 'Results saved when games were reset. Most recent first.'}</p>
       </div>
-      <div style="padding: 0 12px">
-        ${rows}
-        <button onclick="rrGameLogClearAll()" style="width:100%;margin-top:12px;padding:10px;background:#1a1010;border:1px solid #3a1a1a;border-radius:9px;color:#f87171;font-size:12px;font-weight:700;cursor:pointer">
-          Clear all saved games
-        </button>
-      </div>
+      ${tabBar}
+      ${body}
     </div>`;
 }
 
