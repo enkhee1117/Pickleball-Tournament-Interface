@@ -2875,16 +2875,31 @@ function rrGenerateGames(players, numGames, numCourts, mode) {
     return 3.5;
   });
 
-  // High/Low split for hilo mode — top half by DUPR vs bottom half.
-  // Odd counts fall back to random (can't cleanly split).
-  let highSet = null, lowSet = null;
+  // Pool-split modes pair one player from each of two pools on every team.
+  //   hilo:  top half by DUPR vs bottom half
+  //   mixed: males vs females
+  // Requires equal-sized pools, else falls back to random.
+  let poolA = null, poolB = null;
   if (mode === 'hilo') {
     if (P % 2 !== 0) { mode = 'random'; }
     else {
       const byDupr = Array.from({ length: P }, (_, i) => i).sort((a, b) => duprs[b] - duprs[a]);
       const half = P / 2;
-      highSet = new Set(byDupr.slice(0, half));
-      lowSet  = new Set(byDupr.slice(half));
+      poolA = new Set(byDupr.slice(0, half));
+      poolB = new Set(byDupr.slice(half));
+    }
+  } else if (mode === 'mixed') {
+    const males = [], females = [];
+    players.forEach((p, i) => {
+      const g = p && p.gender;
+      if (g === 'm') males.push(i);
+      else if (g === 'f') females.push(i);
+    });
+    if (males.length !== females.length || males.length < 2) {
+      mode = 'random';
+    } else {
+      poolA = new Set(males);
+      poolB = new Set(females);
     }
   }
 
@@ -2897,14 +2912,16 @@ function rrGenerateGames(players, numGames, numCourts, mode) {
     return { team1: [sorted[0], sorted[3]], team2: [sorted[1], sorted[2]] };
   }
 
-  // In hilo mode every game has 2 highs + 2 lows. Put one of each on each team
-  // (strong-high + weak-low vs weak-high + strong-low) so sums are near-even.
-  function balanceTeamsHiLo(four) {
-    const hs = four.filter(p => highSet.has(p)).sort((a, b) => duprs[b] - duprs[a]);
-    const ls = four.filter(p => lowSet.has(p)).sort((a, b) => duprs[b] - duprs[a]);
-    if (hs.length !== 2 || ls.length !== 2) return balanceTeams(four);
-    return { team1: [hs[0], ls[1]], team2: [hs[1], ls[0]] };
+  // Pool modes always get 2 from poolA + 2 from poolB. Snake-balance by DUPR
+  // within each pool so team sums are near-even.
+  function balanceTeamsPooled(four) {
+    const a = four.filter(p => poolA.has(p)).sort((x, y) => duprs[y] - duprs[x]);
+    const b = four.filter(p => poolB.has(p)).sort((x, y) => duprs[y] - duprs[x]);
+    if (a.length !== 2 || b.length !== 2) return balanceTeams(four);
+    return { team1: [a[0], b[1]], team2: [a[1], b[0]] };
   }
+
+  const pooled = (mode === 'hilo' || mode === 'mixed');
 
   function attempt() {
     const played = Array(P).fill(0);
@@ -2914,18 +2931,18 @@ function rrGenerateGames(players, numGames, numCourts, mode) {
       // How many games fit in this round — might be fewer than perRound on the last round.
       const thisRound = Math.min(perRound, numGames - games.length);
       let playing;
-      if (mode === 'hilo') {
-        // Pick thisRound*2 highs and thisRound*2 lows (least-played first), then
-        // interleave into groups of 4 (2H + 2L per game).
-        const hs = rrShuffle([...highSet]);
-        hs.sort((a, b) => played[a] - played[b]);
-        const ls = rrShuffle([...lowSet]);
-        ls.sort((a, b) => played[a] - played[b]);
-        const pickH = rrShuffle(hs.slice(0, thisRound * 2));
-        const pickL = rrShuffle(ls.slice(0, thisRound * 2));
+      if (pooled) {
+        // Pick thisRound*2 from each pool (least-played first), then interleave
+        // into groups of 4 (2A + 2B per game).
+        const as = rrShuffle([...poolA]);
+        as.sort((a, b) => played[a] - played[b]);
+        const bs = rrShuffle([...poolB]);
+        bs.sort((a, b) => played[a] - played[b]);
+        const pickA = rrShuffle(as.slice(0, thisRound * 2));
+        const pickB = rrShuffle(bs.slice(0, thisRound * 2));
         playing = [];
         for (let g = 0; g < thisRound; g++) {
-          playing.push(pickH[g * 2], pickH[g * 2 + 1], pickL[g * 2], pickL[g * 2 + 1]);
+          playing.push(pickA[g * 2], pickA[g * 2 + 1], pickB[g * 2], pickB[g * 2 + 1]);
         }
       } else {
         const indices = rrShuffle([...Array(P).keys()]);
@@ -2936,7 +2953,7 @@ function rrGenerateGames(players, numGames, numCourts, mode) {
         const four = playing.slice(g * 4, g * 4 + 4);
         if (four.length < 4) break;
         four.forEach(p => played[p]++);
-        const { team1, team2 } = (mode === 'hilo') ? balanceTeamsHiLo(four) : balanceTeams(four);
+        const { team1, team2 } = pooled ? balanceTeamsPooled(four) : balanceTeams(four);
         games.push({
           i: games.length,
           round: r + 1,
@@ -3014,6 +3031,17 @@ function rrUpdatePlayerDUPR(idx, val) {
     rrState.players[idx].dupr = isNaN(n) ? null : n;
   }
   rrSave();
+}
+function rrCyclePlayerGender(idx) {
+  const p = rrState.players[idx];
+  if (!p || typeof p === 'string') {
+    rrState.players[idx] = { name: typeof p === 'string' ? p : 'Player ' + (idx+1), dupr: null, gender: 'm' };
+  } else {
+    // cycle: undefined/null → 'm' → 'f' → undefined
+    const g = p.gender;
+    p.gender = (g == null) ? 'm' : (g === 'm' ? 'f' : null);
+  }
+  rrSave(); render();
 }
 function rrUpdateConfig(key, val) {
   const n = parseInt(val);
@@ -3109,7 +3137,16 @@ function rrGenerateAll() {
   const activePlayers = activeIdxs.map(i => rrState.players[i]);
   const total = rrTotalGames();
   // Generate in the active-only index space, then remap to global player indices.
-  const algo = (rrState.genAlgo === 'hilo' && activePlayers.length % 2 === 0) ? 'hilo' : 'random';
+  let algo = rrState.genAlgo || 'random';
+  if (algo === 'hilo' && activePlayers.length % 2 !== 0) { algo = 'random'; toast('High-Low needs an even player count — using Random.', 2500); }
+  if (algo === 'mixed') {
+    const males = activePlayers.filter(p => p && p.gender === 'm').length;
+    const females = activePlayers.filter(p => p && p.gender === 'f').length;
+    if (males !== females || males < 2) {
+      algo = 'random';
+      toast(`Mixed needs equal M/F (have ${males}M/${females}F) — using Random.`, 3000);
+    }
+  }
   const localGames = rrGenerateGames(activePlayers, total, rrState.numCourts, algo);
   rrState.games = localGames.map(g => ({
     ...g,
@@ -3497,6 +3534,7 @@ function rrRenderSetup() {
     const name = rrPlayerName(i);
     const dupr = rrPlayerDUPR(i);
     const isDropped = !!(p && p.dropped);
+    const gender = (p && typeof p === 'object') ? p.gender : null;
     let btnHtml;
     if (isDropped) {
       btnHtml = `<button onclick="rrUndropPlayer(${i})" title="Restore player" style="width:32px;height:32px;background:#1a2a3f;border:1px solid #3a5f8a;border-radius:8px;color:#60a5fa;font-size:14px;cursor:pointer">↩</button>`;
@@ -3509,8 +3547,13 @@ function rrRenderSetup() {
     }
     const rowStyle = isDropped ? 'opacity:0.5' : '';
     const droppedTag = isDropped ? `<span style="display:inline-block;margin-left:6px;padding:1px 6px;background:#2a2a2a;border-radius:4px;color:#f0a070;font-size:9px;font-weight:800;letter-spacing:0.5px">DROPPED</span>` : '';
+    const gLabel = gender === 'm' ? 'M' : (gender === 'f' ? 'F' : '–');
+    const gBg = gender === 'm' ? '#1a2a3f' : (gender === 'f' ? '#3f1a2a' : '#1a1a1a');
+    const gBorder = gender === 'm' ? '#3a5f8a' : (gender === 'f' ? '#8a3a5f' : '#2a2a2a');
+    const gFg = gender === 'm' ? '#60a5fa' : (gender === 'f' ? '#f472b6' : '#666');
+    const genderBtn = `<button onclick="rrCyclePlayerGender(${i})" title="Toggle gender (for Mixed Doubles)" ${isDropped?'disabled':''} style="width:30px;height:32px;background:${gBg};border:1px solid ${gBorder};border-radius:8px;color:${gFg};font-size:12px;font-weight:800;cursor:${isDropped?'not-allowed':'pointer'};padding:0">${gLabel}</button>`;
     return `
-      <div class="rr-player-row" style="grid-template-columns:26px 1fr 70px 32px;${rowStyle}">
+      <div class="rr-player-row" style="grid-template-columns:26px 1fr 64px 30px 32px;${rowStyle}">
         <div class="rr-player-num">${i+1}.${droppedTag}</div>
         <input class="rr-player-input" value="${(name||'').replace(/"/g,'&quot;')}"
           data-focus-key="rr-pname-${i}"
@@ -3521,6 +3564,7 @@ function rrRenderSetup() {
           ${isDropped ? 'disabled' : ''}
           value="${dupr!=null?dupr:''}" placeholder="DUPR"
           onchange="rrUpdatePlayerDUPR(${i}, this.value)"/>
+        ${genderBtn}
         ${btnHtml}
       </div>`;
   }).join('');
@@ -3568,21 +3612,30 @@ function rrRenderSetup() {
           (${Math.ceil(totalGames / rrState.numCourts)} rounds of ${rrState.numCourts}-court play).
         </div>
         <div class="rr-config-label" style="margin-top:6px">Pairing Algorithm</div>
-        <div style="display:flex;gap:6px">
-          ${[['random','🎲 Random','Balanced random partners'],['hilo','⚖️ High-Low','Top ½ DUPR pairs with bottom ½']].map(([val,label,sub]) => {
-            const active = (rrState.genAlgo || 'random') === val;
-            const disabled = val === 'hilo' && activeCount % 2 !== 0;
-            const bg = active ? '#fff' : '#1a1a1a';
-            const fg = active ? '#000' : '#ddd';
-            const op = disabled ? 'opacity:0.4;cursor:not-allowed' : 'cursor:pointer';
-            const handler = disabled ? '' : `rrSetGenAlgo('${val}')`;
-            return `<button onclick="${handler}" ${disabled?'disabled':''} style="flex:1;padding:10px 6px;background:${bg};color:${fg};border:1px solid #2a2a2a;border-radius:8px;font-size:12px;font-weight:800;${op};text-align:left">
-              <div style="font-weight:800">${label}</div>
-              <div style="font-size:10px;font-weight:600;opacity:0.75;margin-top:2px">${sub}</div>
-            </button>`;
-          }).join('')}
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${(() => {
+            const activeList = rrState.players.filter(p => p && !p.dropped);
+            const males = activeList.filter(p => p.gender === 'm').length;
+            const females = activeList.filter(p => p.gender === 'f').length;
+            const mixedOk = males === females && males >= 2;
+            return [
+              ['random','🎲 Random','Balanced random partners', false],
+              ['hilo','⚖️ High-Low','Top ½ DUPR pairs with bottom ½', activeCount % 2 !== 0],
+              ['mixed','👫 Mixed Doubles', mixedOk ? 'Male pairs with female' : `Need equal M/F (have ${males}M/${females}F)`, !mixedOk],
+            ].map(([val,label,sub,disabled]) => {
+              const active = (rrState.genAlgo || 'random') === val;
+              const bg = active ? '#fff' : '#1a1a1a';
+              const fg = active ? '#000' : '#ddd';
+              const op = disabled ? 'opacity:0.4;cursor:not-allowed' : 'cursor:pointer';
+              const handler = disabled ? '' : `rrSetGenAlgo('${val}')`;
+              return `<button onclick="${handler}" ${disabled?'disabled':''} style="flex:1 1 45%;min-width:140px;padding:10px 6px;background:${bg};color:${fg};border:1px solid #2a2a2a;border-radius:8px;font-size:12px;font-weight:800;${op};text-align:left">
+                <div style="font-weight:800">${label}</div>
+                <div style="font-size:10px;font-weight:600;opacity:0.75;margin-top:2px">${sub}</div>
+              </button>`;
+            }).join('');
+          })()}
         </div>
-        ${activeCount % 2 !== 0 ? `<div style="font-size:11px;color:#888;margin:6px 4px 0">High-Low requires an even player count.</div>` : ''}
+        ${activeCount % 2 !== 0 ? `<div style="font-size:11px;color:#888;margin:6px 4px 0">High-Low / Mixed require an even player count.</div>` : ''}
         ${rrState.gamesPerPlayer >= activeCount - 1 && activeCount >= 4 ? `
           <div style="margin:8px 4px 0;padding:10px 12px;background:#2a1f0a;border:1px solid #4a3810;border-radius:8px;color:#f0a070;font-size:12px;line-height:1.5">
             ⚠️ ${rrState.gamesPerPlayer} games/player with only ${activeCount} players means each player has ${activeCount - 1} possible partner${activeCount-1===1?'':'s'} — <strong>partner repeats are unavoidable</strong>. Lower games/player or add players to guarantee unique partners.
