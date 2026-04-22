@@ -2211,6 +2211,22 @@ const RR_DEFAULT_PLAYERS = [
   { name: 'Shilan',    dupr: 3.60 },
 ];
 
+// Sunday men's tournament roster — 12 players, balanced by high/low DUPR pairing.
+const RR_MENS_SUN_PLAYERS = [
+  { name: 'Josh',    dupr: 4.425 },
+  { name: 'Angel',   dupr: 4.371 },
+  { name: 'Thai',    dupr: 4.316 },
+  { name: 'Casey',   dupr: 4.209 },
+  { name: 'Alix',    dupr: 3.745 },
+  { name: 'Ed',      dupr: 3.614 },
+  { name: 'Doug',    dupr: 3.600 },
+  { name: 'Marco',   dupr: 3.600 },
+  { name: 'David N', dupr: 3.588 },
+  { name: 'Miguel',  dupr: 3.503 },
+  { name: 'Andrew',  dupr: 3.187 },
+  { name: 'Paul',    dupr: 3.175 },
+];
+
 // Returns HTML-escaped name — safe to interpolate into innerHTML directly.
 function rrPlayerName(i) {
   const p = rrState && rrState.players && rrState.players[i];
@@ -2257,6 +2273,7 @@ function defaultRRState() {
     players: RR_DEFAULT_PLAYERS.map(p => ({...p})),
     gamesPerPlayer: 6,
     numCourts: 3,
+    genAlgo: 'random',
     games: [],
     draft: { picks: {} },
     semi1: null, semi2: null, gold: null, bronze: null,
@@ -2845,7 +2862,8 @@ function rrShuffle(arr) {
 // the one with the lowest total penalty: partner repeats, opponent repeats, and DUPR
 // imbalance within each game. Within a game, teams are balanced by "snake" pairing
 // (high+low vs mid+mid) so the sum of DUPRs on each side is as close as possible.
-function rrGenerateGames(players, numGames, numCourts) {
+function rrGenerateGames(players, numGames, numCourts, mode) {
+  mode = mode || 'random';
   const P = players.length;
   const perRound = Math.min(numCourts, Math.floor(P / 4));
   if (perRound < 1) return [];
@@ -2857,6 +2875,19 @@ function rrGenerateGames(players, numGames, numCourts) {
     return 3.5;
   });
 
+  // High/Low split for hilo mode — top half by DUPR vs bottom half.
+  // Odd counts fall back to random (can't cleanly split).
+  let highSet = null, lowSet = null;
+  if (mode === 'hilo') {
+    if (P % 2 !== 0) { mode = 'random'; }
+    else {
+      const byDupr = Array.from({ length: P }, (_, i) => i).sort((a, b) => duprs[b] - duprs[a]);
+      const half = P / 2;
+      highSet = new Set(byDupr.slice(0, half));
+      lowSet  = new Set(byDupr.slice(half));
+    }
+  }
+
   // Balance a 4-player set into two teams by DUPR.
   // Sort by DUPR desc → pair highest with lowest, mid with mid. This minimises the
   // sum-difference between teams for a fixed set of 4.
@@ -2866,6 +2897,15 @@ function rrGenerateGames(players, numGames, numCourts) {
     return { team1: [sorted[0], sorted[3]], team2: [sorted[1], sorted[2]] };
   }
 
+  // In hilo mode every game has 2 highs + 2 lows. Put one of each on each team
+  // (strong-high + weak-low vs weak-high + strong-low) so sums are near-even.
+  function balanceTeamsHiLo(four) {
+    const hs = four.filter(p => highSet.has(p)).sort((a, b) => duprs[b] - duprs[a]);
+    const ls = four.filter(p => lowSet.has(p)).sort((a, b) => duprs[b] - duprs[a]);
+    if (hs.length !== 2 || ls.length !== 2) return balanceTeams(four);
+    return { team1: [hs[0], ls[1]], team2: [hs[1], ls[0]] };
+  }
+
   function attempt() {
     const played = Array(P).fill(0);
     const games = [];
@@ -2873,16 +2913,30 @@ function rrGenerateGames(players, numGames, numCourts) {
     while (games.length < numGames && r < totalRounds + 2) {
       // How many games fit in this round — might be fewer than perRound on the last round.
       const thisRound = Math.min(perRound, numGames - games.length);
-      // Pick only as many players as will actually play this round. This avoids
-      // "selected but bumped" imbalances when the last round is truncated.
-      const indices = rrShuffle([...Array(P).keys()]);
-      indices.sort((a, b) => played[a] - played[b]);
-      const playing = rrShuffle(indices.slice(0, thisRound * 4));
+      let playing;
+      if (mode === 'hilo') {
+        // Pick thisRound*2 highs and thisRound*2 lows (least-played first), then
+        // interleave into groups of 4 (2H + 2L per game).
+        const hs = rrShuffle([...highSet]);
+        hs.sort((a, b) => played[a] - played[b]);
+        const ls = rrShuffle([...lowSet]);
+        ls.sort((a, b) => played[a] - played[b]);
+        const pickH = rrShuffle(hs.slice(0, thisRound * 2));
+        const pickL = rrShuffle(ls.slice(0, thisRound * 2));
+        playing = [];
+        for (let g = 0; g < thisRound; g++) {
+          playing.push(pickH[g * 2], pickH[g * 2 + 1], pickL[g * 2], pickL[g * 2 + 1]);
+        }
+      } else {
+        const indices = rrShuffle([...Array(P).keys()]);
+        indices.sort((a, b) => played[a] - played[b]);
+        playing = rrShuffle(indices.slice(0, thisRound * 4));
+      }
       for (let g = 0; g < thisRound; g++) {
         const four = playing.slice(g * 4, g * 4 + 4);
         if (four.length < 4) break;
         four.forEach(p => played[p]++);
-        const { team1, team2 } = balanceTeams(four);
+        const { team1, team2 } = (mode === 'hilo') ? balanceTeamsHiLo(four) : balanceTeams(four);
         games.push({
           i: games.length,
           round: r + 1,
@@ -2970,9 +3024,25 @@ function rrLoadApr19Players() {
   const hasAny = rrState.players.length > 0 || rrState.games.length > 0;
   if (hasAny && !confirm('Replace current players with the 12 Apr 19 players and clear any generated games?')) return;
   rrState.players = RR_DEFAULT_PLAYERS.map(p => ({ ...p }));
+  rrState.genAlgo = 'random';
   rrClearSchedule();
   // Identity may now point at a different player — clear it.
   if (myIdentity !== null && myIdentity >= rrState.players.length) setIdentity(null);
+  rrSave(); render();
+}
+function rrLoadMensSunPlayers() {
+  const hasAny = rrState.players.length > 0 || rrState.games.length > 0;
+  if (hasAny && !confirm("Replace current players with the 12 Sunday Men's players and clear any generated games?")) return;
+  rrState.players = RR_MENS_SUN_PLAYERS.map(p => ({ ...p }));
+  rrState.name = "Men's Round Robin";
+  rrState.genAlgo = 'hilo';
+  rrClearSchedule();
+  if (myIdentity !== null && myIdentity >= rrState.players.length) setIdentity(null);
+  rrSave(); render();
+}
+function rrSetGenAlgo(algo) {
+  if (algo !== 'random' && algo !== 'hilo') return;
+  rrState.genAlgo = algo;
   rrSave(); render();
 }
 function rrClearSchedule() {
@@ -3049,7 +3119,8 @@ function rrGenerateAll() {
   const activePlayers = activeIdxs.map(i => rrState.players[i]);
   const total = rrTotalGames();
   // Generate in the active-only index space, then remap to global player indices.
-  const localGames = rrGenerateGames(activePlayers, total, rrState.numCourts);
+  const algo = (rrState.genAlgo === 'hilo' && activePlayers.length % 2 === 0) ? 'hilo' : 'random';
+  const localGames = rrGenerateGames(activePlayers, total, rrState.numCourts, algo);
   rrState.games = localGames.map(g => ({
     ...g,
     team1: (g.team1 || []).map(li => activeIdxs[li]),
@@ -3079,6 +3150,68 @@ function rrGenerateAll() {
     toast(`Schedule balanced: ${P - highCount} play ${lo}, ${highCount} play ${hi}.`, 2500);
   }
   rrSave(); rrSetView('games');
+}
+
+// Manual team editor — organizer-only. Lets you swap any of the 4 player slots
+// to another active player. Saves back to the same game. Not allowed on done
+// games (would invalidate standings) or on bracket games (semi/gold/bronze)
+// since those are computed from standings.
+function rrEditTeams(gameKey) {
+  const g = rrGetGame(gameKey);
+  if (!g || g.done) return;
+  if (['semi1','semi2','gold','bronze'].includes(String(gameKey))) {
+    toast('Bracket matches are set from standings — edit regular games instead.', 2500);
+    return;
+  }
+  const existing = document.getElementById('rr-edit-teams');
+  if (existing) existing.remove();
+  const active = rrState.players.map((p, i) => ({ p, i })).filter(x => x.p && !x.p.dropped);
+  const slots = [
+    { label: 'Team 1 · Player A', val: g.team1[0] },
+    { label: 'Team 1 · Player B', val: g.team1[1] },
+    { label: 'Team 2 · Player A', val: g.team2[0] },
+    { label: 'Team 2 · Player B', val: g.team2[1] },
+  ];
+  const opts = (sel) => active.map(x => {
+    const d = (typeof x.p.dupr === 'number') ? ` (${x.p.dupr.toFixed(2)})` : '';
+    return `<option value="${x.i}" ${x.i===sel?'selected':''}>${escapeHtml(x.p.name||('Player '+(x.i+1)))}${d}</option>`;
+  }).join('');
+  const rows = slots.map((s, k) => `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="flex:0 0 140px;color:#aaa;font-size:12px;font-weight:700">${s.label}</div>
+      <select id="rr-edit-slot-${k}" class="select-input" style="flex:1">${opts(s.val)}</select>
+    </div>
+  `).join('');
+  const el = document.createElement('div');
+  el.className = 'settings-overlay';
+  el.id = 'rr-edit-teams';
+  el.onclick = (e) => { if (e.target === el) el.remove(); };
+  el.innerHTML = `
+    <div class="settings-sheet" onclick="event.stopPropagation()">
+      <div class="settings-handle"></div>
+      <button onclick="document.getElementById('rr-edit-teams').remove()" aria-label="Close" style="position:absolute;top:10px;right:12px;background:#1a1a1a;border:1px solid #2a2a2a;color:#ddd;width:34px;height:34px;border-radius:50%;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2">×</button>
+      <div class="settings-section-label">Edit Teams · Game ${parseInt(gameKey)+1}</div>
+      <div style="padding:4px 2px 2px">${rows}</div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button onclick="document.getElementById('rr-edit-teams').remove()" style="flex:1;padding:11px;background:#1a1a1a;border:1px solid #2a2a2a;color:#ddd;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer">Cancel</button>
+        <button onclick="rrSaveEditedTeams('${gameKey}')" style="flex:1;padding:11px;background:#fff;border:none;color:#000;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer">Save</button>
+      </div>
+      <div style="font-size:11px;color:#777;margin-top:10px;line-height:1.5">Picking the same player twice is not allowed. This only edits this one game; other games are untouched.</div>
+    </div>
+  `;
+  document.body.appendChild(el);
+}
+function rrSaveEditedTeams(gameKey) {
+  const g = rrGetGame(gameKey);
+  if (!g || g.done) return;
+  const picks = [0,1,2,3].map(k => parseInt(document.getElementById('rr-edit-slot-'+k).value));
+  if (picks.some(v => !Number.isInteger(v) || v < 0)) { alert('Pick a player for every slot.'); return; }
+  if (new Set(picks).size !== 4) { alert('Each slot must be a different player.'); return; }
+  g.team1 = [picks[0], picks[1]];
+  g.team2 = [picks[2], picks[3]];
+  const el = document.getElementById('rr-edit-teams'); if (el) el.remove();
+  toast('Teams updated');
+  rrSave(); render();
 }
 
 // Pickleball clamp: cap at 11 unless the other team is at 10+ (deuce), then other+2.
@@ -3357,6 +3490,9 @@ function rrGameCard(g, gameKey, title) {
       </div>
       ${resultHtml}
       <div class="reset-row">
+        ${(!g.done && viewMode !== 'player' && !['semi1','semi2','gold','bronze'].includes(String(gameKey)))
+          ? `<button class="reset-btn" onclick="rrEditTeams('${gameKey}')" style="margin-right:6px">✎ Edit teams</button>`
+          : ''}
         <button class="reset-btn" onclick="rrResetGame('${gameKey}')">↺ Reset</button>
       </div>
     </div>
@@ -3410,9 +3546,12 @@ function rrRenderSetup() {
       </div>
 
       <div class="rr-subsection-label">Players · ${rrState.players.length}</div>
-      <div style="padding: 0 12px 8px">
+      <div style="padding: 0 12px 8px;display:flex;flex-direction:column;gap:6px">
         <button onclick="rrLoadApr19Players()" style="width:100%;padding:11px;background:#1a2a3f;border:1px solid #3a5f8a;border-radius:9px;color:#60a5fa;font-size:13px;font-weight:800;cursor:pointer;letter-spacing:0.3px">
           ⬇ Load Apr 19 Players (12 with DUPR)
+        </button>
+        <button onclick="rrLoadMensSunPlayers()" style="width:100%;padding:11px;background:#1a3f2a;border:1px solid #3a8a5f;border-radius:9px;color:#4ade80;font-size:13px;font-weight:800;cursor:pointer;letter-spacing:0.3px">
+          ⬇ Load Sunday Men's Players (12, High-Low pairing)
         </button>
       </div>
       <div style="padding: 0 12px">
@@ -3441,6 +3580,22 @@ function rrRenderSetup() {
           = <strong style="color:#ccc">${totalGames}</strong> total games
           (${Math.ceil(totalGames / rrState.numCourts)} rounds of ${rrState.numCourts}-court play).
         </div>
+        <div class="rr-config-label" style="margin-top:6px">Pairing Algorithm</div>
+        <div style="display:flex;gap:6px">
+          ${[['random','🎲 Random','Balanced random partners'],['hilo','⚖️ High-Low','Top ½ DUPR pairs with bottom ½']].map(([val,label,sub]) => {
+            const active = (rrState.genAlgo || 'random') === val;
+            const disabled = val === 'hilo' && activeCount % 2 !== 0;
+            const bg = active ? '#fff' : '#1a1a1a';
+            const fg = active ? '#000' : '#ddd';
+            const op = disabled ? 'opacity:0.4;cursor:not-allowed' : 'cursor:pointer';
+            const handler = disabled ? '' : `rrSetGenAlgo('${val}')`;
+            return `<button onclick="${handler}" ${disabled?'disabled':''} style="flex:1;padding:10px 6px;background:${bg};color:${fg};border:1px solid #2a2a2a;border-radius:8px;font-size:12px;font-weight:800;${op};text-align:left">
+              <div style="font-weight:800">${label}</div>
+              <div style="font-size:10px;font-weight:600;opacity:0.75;margin-top:2px">${sub}</div>
+            </button>`;
+          }).join('')}
+        </div>
+        ${activeCount % 2 !== 0 ? `<div style="font-size:11px;color:#888;margin:6px 4px 0">High-Low requires an even player count.</div>` : ''}
         ${rrState.gamesPerPlayer >= activeCount - 1 && activeCount >= 4 ? `
           <div style="margin:8px 4px 0;padding:10px 12px;background:#2a1f0a;border:1px solid #4a3810;border-radius:8px;color:#f0a070;font-size:12px;line-height:1.5">
             ⚠️ ${rrState.gamesPerPlayer} games/player with only ${activeCount} players means each player has ${activeCount - 1} possible partner${activeCount-1===1?'':'s'} — <strong>partner repeats are unavoidable</strong>. Lower games/player or add players to guarantee unique partners.
