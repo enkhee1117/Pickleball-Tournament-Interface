@@ -2227,6 +2227,119 @@ const RR_MENS_SUN_PLAYERS = [
   { name: 'Paul',    dupr: 3.175 },
 ];
 
+// ─── Player Registry ───
+// Persistent list of known players (name + DUPR + gender). Used to autocomplete
+// names in the Setup roster: picking a known name auto-fills DUPR/gender.
+// Seeded from past tournaments; syncs via localStorage + Firebase like rr_archive.
+const RR_REGISTRY_SEED = [
+  // Sunday men's tournament
+  { name: 'Josh',      dupr: 4.425, gender: 'm' },
+  { name: 'Angel',     dupr: 4.371, gender: 'm' },
+  { name: 'Thai',      dupr: 4.316, gender: 'm' },
+  { name: 'Casey',     dupr: 4.209, gender: 'm' },
+  { name: 'Alix',      dupr: 3.745, gender: 'm' },
+  { name: 'Ed',        dupr: 3.614, gender: 'm' },
+  { name: 'Doug',      dupr: 3.600, gender: 'm' },
+  { name: 'Marco',     dupr: 3.600, gender: 'm' },
+  { name: 'David N',   dupr: 3.588, gender: 'm' },
+  { name: 'Miguel',    dupr: 3.503, gender: 'm' },
+  { name: 'Andrew',    dupr: 3.187, gender: 'm' },
+  { name: 'Paul',      dupr: 3.175, gender: 'm' },
+  // Apr 19 women's tournament
+  { name: 'Manal',     dupr: 4.02,  gender: 'f' },
+  { name: 'Xiangdong', dupr: 4.04,  gender: 'f' },
+  { name: 'Emily',     dupr: 3.90,  gender: 'f' },
+  { name: 'Ency',      dupr: 3.80,  gender: 'f' },
+  { name: 'Cathy',     dupr: 4.00,  gender: 'f' },
+  { name: 'Elina',     dupr: 3.50,  gender: 'f' },
+  { name: 'Young',     dupr: 3.50,  gender: 'f' },
+  { name: 'Terry',     dupr: 3.40,  gender: 'f' },
+  { name: 'Jenny',     dupr: 3.10,  gender: 'f' },
+  { name: 'Joo Mi',    dupr: 3.10,  gender: 'f' },
+  { name: 'Sainaa',    dupr: 3.40,  gender: 'f' },
+  { name: 'Shilan',    dupr: 3.60,  gender: 'f' },
+];
+
+function rrLoadRegistry() {
+  try {
+    const s = localStorage.getItem('rr_registry');
+    if (s) {
+      const parsed = JSON.parse(s);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+  return RR_REGISTRY_SEED.map(p => ({ ...p }));
+}
+let rrRegistry = rrLoadRegistry();
+if (!localStorage.getItem('rr_registry')) {
+  localStorage.setItem('rr_registry', JSON.stringify(rrRegistry));
+}
+
+function rrSaveRegistry() {
+  localStorage.setItem('rr_registry', JSON.stringify(rrRegistry));
+  if (typeof FIREBASE_URL !== 'undefined' && FIREBASE_URL) {
+    fetch(FIREBASE_URL + '/rr_registry.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rrRegistry),
+    }).catch(() => {});
+  }
+}
+function rrRegistryFind(name) {
+  if (!name) return null;
+  const lc = String(name).trim().toLowerCase();
+  if (!lc) return null;
+  return rrRegistry.find(e => e && e.name && e.name.toLowerCase() === lc) || null;
+}
+function rrRegistryUpsert(entry) {
+  if (!entry || !entry.name) return false;
+  const nm = entry.name.trim();
+  if (!nm) return false;
+  const lc = nm.toLowerCase();
+  const idx = rrRegistry.findIndex(e => e && e.name && e.name.toLowerCase() === lc);
+  const next = {
+    name: nm,
+    dupr: (typeof entry.dupr === 'number' && !isNaN(entry.dupr)) ? entry.dupr : null,
+    gender: (entry.gender === 'm' || entry.gender === 'f') ? entry.gender : null,
+  };
+  const added = idx < 0;
+  if (added) rrRegistry.push(next);
+  else rrRegistry[idx] = next;
+  rrRegistry.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  rrSaveRegistry();
+  return added;
+}
+function rrRegistryRemove(name) {
+  const lc = (name || '').toLowerCase();
+  rrRegistry = rrRegistry.filter(e => e && e.name && e.name.toLowerCase() !== lc);
+  rrSaveRegistry();
+}
+function rrSaveRosterToRegistry() {
+  let added = 0, updated = 0;
+  rrState.players.forEach(p => {
+    if (!p || typeof p !== 'object' || !p.name) return;
+    const wasNew = !rrRegistryFind(p.name);
+    rrRegistryUpsert({ name: p.name, dupr: p.dupr, gender: p.gender });
+    if (wasNew) added++; else updated++;
+  });
+  toast(`Registry: ${added} added, ${updated} updated`, 2200);
+  render();
+}
+function rrAutofillFromRegistry(idx) {
+  const p = rrState.players[idx];
+  if (!p || typeof p !== 'object' || !p.name) return;
+  const entry = rrRegistryFind(p.name);
+  if (!entry) return;
+  let filled = false;
+  if ((p.dupr == null || (typeof p.dupr === 'number' && isNaN(p.dupr))) && typeof entry.dupr === 'number') {
+    p.dupr = entry.dupr; filled = true;
+  }
+  if (!p.gender && entry.gender) {
+    p.gender = entry.gender; filled = true;
+  }
+  if (filled) { rrSave(); render(); toast(`Auto-filled ${escapeHtml(p.name)} from registry`, 1400); }
+}
+
 // Returns HTML-escaped name — safe to interpolate into innerHTML directly.
 function rrPlayerName(i) {
   const p = rrState && rrState.players && rrState.players[i];
@@ -2661,6 +2774,12 @@ function showSettings() {
             <span class="chev">›</span>
           </div>
 
+          <div class="settings-section-label">Player Registry · ${rrRegistry.length}</div>
+          <div class="settings-row" onclick="showRegistry()">
+            <div><div style="color:#eee;font-weight:700">Manage Registry</div><div style="font-size:11px;color:#777;margin-top:2px">Autocomplete pool for future tournaments</div></div>
+            <span class="chev">›</span>
+          </div>
+
           <div class="settings-section-label">Archive · ${totalArchive}</div>
           ${archiveList}
         `}
@@ -2769,6 +2888,80 @@ function viewArchived(id) {
   document.body.appendChild(el);
 }
 
+function showRegistry() {
+  hideSettings();
+  const existing = document.getElementById('registry-overlay');
+  if (existing) existing.remove();
+  const rows = rrRegistry.length === 0
+    ? `<div style="padding:10px 14px;color:#666;font-size:12px">Registry is empty. Add players below or via “Save roster to registry” in Setup.</div>`
+    : rrRegistry.map(e => {
+        const dLabel = (typeof e.dupr === 'number') ? e.dupr.toFixed(2) : '—';
+        const gLabel = e.gender === 'm' ? 'M' : (e.gender === 'f' ? 'F' : '–');
+        const gFg = e.gender === 'm' ? '#60a5fa' : (e.gender === 'f' ? '#f472b6' : '#666');
+        const nameJs = e.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return `
+          <div class="settings-row" style="cursor:default">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;color:#eee;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(e.name)}</div>
+              <div style="font-size:11px;color:#888;margin-top:2px">DUPR ${dLabel} · <span style="color:${gFg};font-weight:700">${gLabel}</span></div>
+            </div>
+            <button onclick="rrRegistryRemove('${nameJs}'); showRegistry()" style="background:none;border:none;color:#ef4444;font-size:18px;cursor:pointer">×</button>
+          </div>`;
+      }).join('');
+  const el = document.createElement('div');
+  el.className = 'settings-overlay';
+  el.id = 'registry-overlay';
+  el.onclick = (ev) => { if (ev.target === el) el.remove(); };
+  el.innerHTML = `
+    <div class="settings-sheet" onclick="event.stopPropagation()">
+      <div class="settings-handle"></div>
+      <button onclick="document.getElementById('registry-overlay').remove()" aria-label="Close" style="position:absolute;top:10px;right:12px;background:#1a1a1a;border:1px solid #2a2a2a;color:#ddd;width:34px;height:34px;border-radius:50%;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2">×</button>
+      <div class="settings-section-label">Player Registry · ${rrRegistry.length}</div>
+      <div style="font-size:12px;color:#888;margin:0 2px 10px;line-height:1.5">Typing a name in Setup autocompletes from this list and fills DUPR / gender.</div>
+
+      <div class="settings-section-label">Add Player</div>
+      <div style="display:grid;grid-template-columns:1fr 70px 30px 30px;gap:6px;align-items:center">
+        <input id="rr-reg-name" class="select-input" placeholder="Name" style="min-width:0"/>
+        <input id="rr-reg-dupr" class="select-input" placeholder="DUPR" type="number" step="0.01" min="0" style="min-width:0"/>
+        <button id="rr-reg-m" onclick="document.getElementById('rr-reg-m').dataset.on = document.getElementById('rr-reg-m').dataset.on==='1'?'0':'1'; document.getElementById('rr-reg-f').dataset.on='0'; rrRegistryAddRefresh();" data-on="0" style="height:34px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#60a5fa;font-size:12px;font-weight:800;cursor:pointer">M</button>
+        <button id="rr-reg-f" onclick="document.getElementById('rr-reg-f').dataset.on = document.getElementById('rr-reg-f').dataset.on==='1'?'0':'1'; document.getElementById('rr-reg-m').dataset.on='0'; rrRegistryAddRefresh();" data-on="0" style="height:34px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;color:#f472b6;font-size:12px;font-weight:800;cursor:pointer">F</button>
+      </div>
+      <button onclick="rrRegistryAddPlayer()" style="width:100%;margin-top:8px;padding:10px;background:#1a3f2a;border:1px solid #3a8a5f;border-radius:9px;color:#4ade80;font-size:13px;font-weight:800;cursor:pointer">+ Add to Registry</button>
+
+      <div class="settings-section-label">All Players</div>
+      <div style="max-height:50vh;overflow-y:auto;margin:0 -2px;padding:0 2px">${rows}</div>
+    </div>
+  `;
+  document.body.appendChild(el);
+}
+function rrRegistryAddRefresh() {
+  const m = document.getElementById('rr-reg-m');
+  const f = document.getElementById('rr-reg-f');
+  if (m) {
+    const on = m.dataset.on === '1';
+    m.style.background = on ? '#1a2a3f' : '#1a1a1a';
+    m.style.borderColor = on ? '#3a5f8a' : '#2a2a2a';
+  }
+  if (f) {
+    const on = f.dataset.on === '1';
+    f.style.background = on ? '#3f1a2a' : '#1a1a1a';
+    f.style.borderColor = on ? '#8a3a5f' : '#2a2a2a';
+  }
+}
+function rrRegistryAddPlayer() {
+  const nameEl = document.getElementById('rr-reg-name');
+  const duprEl = document.getElementById('rr-reg-dupr');
+  const mEl = document.getElementById('rr-reg-m');
+  const fEl = document.getElementById('rr-reg-f');
+  const name = (nameEl && nameEl.value || '').trim();
+  if (!name) { alert('Enter a name.'); return; }
+  const duprRaw = parseFloat(duprEl && duprEl.value);
+  const gender = (mEl && mEl.dataset.on === '1') ? 'm' : ((fEl && fEl.dataset.on === '1') ? 'f' : null);
+  const added = rrRegistryUpsert({ name, dupr: isNaN(duprRaw) ? null : duprRaw, gender });
+  toast(added ? `Added ${name}` : `Updated ${name}`, 1600);
+  showRegistry();
+}
+
 function rrSave() {
   localStorage.setItem('rr_v1', JSON.stringify(rrState));
   if (!FIREBASE_URL) return;
@@ -2838,6 +3031,16 @@ function rrInitSync() {
       if (Array.isArray(data) && data.length) {
         rrArchive = data;
         localStorage.setItem('rr_archive', JSON.stringify(rrArchive));
+      }
+    })
+    .catch(()=>{});
+  // One-shot registry fetch so new players added on other devices are suggested here.
+  fetch(FIREBASE_URL + '/rr_registry.json')
+    .then(r => r.json())
+    .then(data => {
+      if (Array.isArray(data) && data.length) {
+        rrRegistry = data;
+        localStorage.setItem('rr_registry', JSON.stringify(rrRegistry));
       }
     })
     .catch(()=>{});
@@ -3557,8 +3760,12 @@ function rrRenderSetup() {
         <div class="rr-player-num">${i+1}.${droppedTag}</div>
         <input class="rr-player-input" value="${(name||'').replace(/"/g,'&quot;')}"
           data-focus-key="rr-pname-${i}"
+          list="rr-registry-list"
+          autocomplete="off"
           ${isDropped ? 'disabled' : ''}
-          oninput="rrUpdatePlayer(${i}, this.value)" placeholder="Player ${i+1}"/>
+          oninput="rrUpdatePlayer(${i}, this.value)"
+          onchange="rrUpdatePlayer(${i}, this.value); rrAutofillFromRegistry(${i})"
+          placeholder="Player ${i+1}"/>
         <input class="rr-player-input" type="number" step="0.01" min="0"
           data-focus-key="rr-pdupr-${i}"
           ${isDropped ? 'disabled' : ''}
@@ -3569,17 +3776,23 @@ function rrRenderSetup() {
       </div>`;
   }).join('');
 
+  const registryOptions = rrRegistry.map(e => {
+    const lbl = (typeof e.dupr === 'number') ? `${e.name} · ${e.dupr.toFixed(2)}` : e.name;
+    return `<option value="${escapeHtml(e.name)}" label="${escapeHtml(lbl)}"></option>`;
+  }).join('');
+
   const started = rrState.games.some(g => g.done || g.s1>0 || g.s2>0);
 
   const totalGames = rrTotalGames();
   return `
     <div class="rr-page">
+      <datalist id="rr-registry-list">${registryOptions}</datalist>
       <div class="rr-header">
         <h1>Round Robin Setup</h1>
         <p>${activeCount}${activeCount!==rrState.players.length?' active ('+(rrState.players.length-activeCount)+' dropped)':''} · ${rrState.gamesPerPlayer} games each · ${totalGames} total games</p>
       </div>
 
-      <div class="rr-subsection-label">Players · ${rrState.players.length}</div>
+      <div class="rr-subsection-label">Players · ${rrState.players.length} <span style="color:#555;font-weight:600;letter-spacing:0">· ${rrRegistry.length} in registry</span></div>
       <div style="padding: 0 12px 8px">
         <button onclick="rrLoadMensSunPlayers()" style="width:100%;padding:11px;background:#1a3f2a;border:1px solid #3a8a5f;border-radius:9px;color:#4ade80;font-size:13px;font-weight:800;cursor:pointer;letter-spacing:0.3px">
           ⬇ Load Sunday Men's Players (12, High-Low pairing)
@@ -3589,6 +3802,9 @@ function rrRenderSetup() {
         ${playerRows}
         <button onclick="rrAddPlayer()" style="width:100%;margin-top:4px;padding:10px;background:#1e1e1e;border:1px dashed #333;border-radius:9px;color:#888;font-size:13px;font-weight:700;cursor:pointer">
           + Add Player
+        </button>
+        <button onclick="rrSaveRosterToRegistry()" style="width:100%;margin-top:6px;padding:9px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:9px;color:#aaa;font-size:12px;font-weight:700;cursor:pointer">
+          💾 Save roster to registry
         </button>
       </div>
 
