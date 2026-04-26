@@ -789,7 +789,11 @@ function initSync() {
       }
     } catch(_) {}
   });
-  syncSource.onerror = () => { setSyncStatusFor('mlp', 'error'); };
+  syncSource.onopen  = () => { setSyncStatusFor('mlp', 'ok'); };
+  syncSource.onerror = () => {
+    if (!syncSource || syncSource.readyState === 2) setSyncStatusFor('mlp', 'error');
+    else setSyncStatusFor('mlp', 'pending');
+  };
 }
 
 function connectFirebase() {
@@ -3183,7 +3187,13 @@ function rrInitSync() {
       }
     } catch(_) {}
   });
-  rrSyncSource.onerror = () => { setSyncStatusFor('rr', 'error'); };
+  rrSyncSource.onopen  = () => { setSyncStatusFor('rr', 'ok'); };
+  rrSyncSource.onerror = () => {
+    // EventSource auto-reconnects. Only flag 'error' if we're not in the
+    // middle of a successful reconnect (readyState 0 = CONNECTING).
+    if (!rrSyncSource || rrSyncSource.readyState === 2) setSyncStatusFor('rr', 'error');
+    else setSyncStatusFor('rr', 'pending');
+  };
   // One-shot archive fetch so archives show up on any device.
   fetch(FIREBASE_URL + '/rr_archive.json')
     .then(r => r.json())
@@ -4533,7 +4543,11 @@ function ppaInitSync() {
       }
     } catch(_) {}
   });
-  ppaSyncSource.onerror = () => { setSyncStatusFor('ppa', 'error'); };
+  ppaSyncSource.onopen  = () => { setSyncStatusFor('ppa', 'ok'); };
+  ppaSyncSource.onerror = () => {
+    if (!ppaSyncSource || ppaSyncSource.readyState === 2) setSyncStatusFor('ppa', 'error');
+    else setSyncStatusFor('ppa', 'pending');
+  };
 }
 function ppaSetView(v) { ppaView = v; localStorage.setItem('ppa_view', v); render(); }
 function ppaTeam(i) { return ppaState.teams[i] || null; }
