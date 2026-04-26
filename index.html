@@ -724,6 +724,17 @@ function loadState() {
 const HARDCODED_FIREBASE_URL = 'https://mlp-scoreboard-default-rtdb.firebaseio.com';
 let FIREBASE_URL = HARDCODED_FIREBASE_URL || localStorage.getItem('mlp_firebase_url') || '';
 let syncStatus = FIREBASE_URL ? 'pending' : 'off'; // 'off'|'pending'|'ok'|'error'
+// Per-mode sync status. The bar in the active mode reflects ONLY that mode's
+// EventSource — so an MLP socket error doesn't flag the RR view as broken.
+const syncStatusByMode = {
+  mlp: FIREBASE_URL ? 'pending' : 'off',
+  rr:  FIREBASE_URL ? 'pending' : 'off',
+  ppa: FIREBASE_URL ? 'pending' : 'off',
+};
+function setSyncStatusFor(mode, st) {
+  syncStatusByMode[mode] = st;
+  if (mode === tournamentMode) { syncStatus = st; renderSyncBar(); }
+}
 let syncSource = null;
 let saveTimer = null;
 let localWrite = false;
@@ -746,14 +757,14 @@ function save() {
       method: 'PUT',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(state)
-    }).catch(()=>{ localWrite = false; syncStatus='error'; renderSyncBar(); });
+    }).catch(()=>{ localWrite = false; setSyncStatusFor('mlp', 'error'); });
   }, 150); // debounce rapid taps
 }
 
 function initSync() {
   if (syncSource) { syncSource.close(); syncSource = null; }
-  if (!FIREBASE_URL) { syncStatus='off'; renderSyncBar(); return; }
-  syncStatus = 'pending'; renderSyncBar();
+  if (!FIREBASE_URL) { setSyncStatusFor('mlp', 'off'); return; }
+  setSyncStatusFor('mlp', 'pending');
   syncSource = new EventSource(FIREBASE_URL + '/mlp_state.json');
   syncSource.addEventListener('put', e => {
     try {
@@ -762,7 +773,7 @@ function initSync() {
         if (localWrite) {
           // This is our own write echoed back — skip re-render to preserve input focus
           localWrite = false;
-          syncStatus = 'ok'; renderSyncBar();
+          setSyncStatusFor('mlp', 'ok');
           return;
         }
         state = payload.data;
@@ -770,15 +781,15 @@ function initSync() {
         if (!state.teams) state.teams = JSON.parse(JSON.stringify(DEFAULT_TEAMS));
         if (!state.courts) state.courts = ['Court 1','Court 2','Court 3'];
         localStorage.setItem('mlp_v3', JSON.stringify(state));
-        syncStatus = 'ok'; render();
+        setSyncStatusFor('mlp', 'ok'); render();
       } else if (payload.path === '/' && payload.data === null) {
         // DB is empty — push our local state up
         save();
-        syncStatus = 'ok'; renderSyncBar();
+        setSyncStatusFor('mlp', 'ok');
       }
     } catch(_) {}
   });
-  syncSource.onerror = () => { syncStatus='error'; renderSyncBar(); };
+  syncSource.onerror = () => { setSyncStatusFor('mlp', 'error'); };
 }
 
 function connectFirebase() {
@@ -1579,6 +1590,11 @@ function setTournamentMode(mode) {
   }
   tournamentMode = mode;
   localStorage.setItem('tournament_mode', mode);
+  syncStatus = syncStatusByMode[mode] || 'off';
+  // Open the new mode's sync source if it isn't already open.
+  if (mode === 'mlp' && !syncSource) initSync();
+  if (mode === 'rr'  && !rrSyncSource) rrInitSync();
+  if (mode === 'ppa' && !ppaSyncSource) ppaInitSync();
   hideSettings();
   const labels = { mlp:'MLP', rr:'Round Robin', ppa:'PPA' };
   toast('Switched to ' + labels[mode]);
@@ -2792,7 +2808,9 @@ function showSettings() {
     return `<option value="${i}"${sel}>${nm}</option>`;
   }).join('');
   const modeLabels = { mlp:'MLP', rr:'Round Robin', ppa:'PPA' };
-  const modeButtons = ['mlp','rr','ppa'].map(m => {
+  // MLP hidden — keeping the code path & data intact, but only RR and PPA
+  // surface in the picker. Re-add 'mlp' here if you want it back.
+  const modeButtons = ['rr','ppa'].map(m => {
     const active = (tournamentMode === m) ? 'background:#fff;color:#000' : 'background:#1a1a1a;color:#ddd';
     return `<button onclick="setTournamentMode('${m}')" style="flex:1;padding:10px 6px;border:1px solid #2a2a2a;border-radius:8px;font-size:13px;font-weight:700;${active}">${modeLabels[m]}</button>`;
   }).join('');
@@ -3142,26 +3160,30 @@ function rrDiffNewlyDone(prev, next) {
 
 function rrInitSync() {
   if (rrSyncSource) { rrSyncSource.close(); rrSyncSource = null; }
-  if (!FIREBASE_URL) return;
+  if (!FIREBASE_URL) { setSyncStatusFor('rr', 'off'); return; }
+  setSyncStatusFor('rr', 'pending');
   rrSyncSource = new EventSource(FIREBASE_URL + '/rr_state.json');
   rrSyncSource.addEventListener('put', e => {
     try {
       const payload = JSON.parse(e.data);
       if (payload.data) {
-        if (rrLocalWrite) { rrLocalWrite = false; clearTimeout(rrLocalWriteTimer); return; }
+        if (rrLocalWrite) { rrLocalWrite = false; clearTimeout(rrLocalWriteTimer); setSyncStatusFor('rr', 'ok'); return; }
         const prev = rrState;
         const next = rrMigrateState(payload.data);
         const newlyDone = rrDiffNewlyDone(prev, next);
         rrState = next;
         localStorage.setItem('rr_v1', JSON.stringify(rrState));
+        setSyncStatusFor('rr', 'ok');
         if (tournamentMode === 'rr') render();
         refreshWelcome();
         newlyDone.forEach(msg => toast(msg, 2200));
       } else if (payload.path === '/' && payload.data === null) {
         rrSave();
+        setSyncStatusFor('rr', 'ok');
       }
     } catch(_) {}
   });
+  rrSyncSource.onerror = () => { setSyncStatusFor('rr', 'error'); };
   // One-shot archive fetch so archives show up on any device.
   fetch(FIREBASE_URL + '/rr_archive.json')
     .then(r => r.json())
@@ -4493,21 +4515,25 @@ function ppaSave() {
 }
 function ppaInitSync() {
   if (ppaSyncSource) { ppaSyncSource.close(); ppaSyncSource = null; }
-  if (!FIREBASE_URL) return;
+  if (!FIREBASE_URL) { setSyncStatusFor('ppa', 'off'); return; }
+  setSyncStatusFor('ppa', 'pending');
   ppaSyncSource = new EventSource(FIREBASE_URL + '/ppa_state.json');
   ppaSyncSource.addEventListener('put', e => {
     try {
       const payload = JSON.parse(e.data);
       if (payload.data) {
-        if (ppaLocalWrite) { ppaLocalWrite = false; return; }
+        if (ppaLocalWrite) { ppaLocalWrite = false; setSyncStatusFor('ppa', 'ok'); return; }
         ppaState = ppaMigrate(payload.data);
         localStorage.setItem('ppa_v1', JSON.stringify(ppaState));
+        setSyncStatusFor('ppa', 'ok');
         if (tournamentMode === 'ppa') render();
       } else if (payload.path === '/' && payload.data === null) {
         ppaSave();
+        setSyncStatusFor('ppa', 'ok');
       }
     } catch(_) {}
   });
+  ppaSyncSource.onerror = () => { setSyncStatusFor('ppa', 'error'); };
 }
 function ppaSetView(v) { ppaView = v; localStorage.setItem('ppa_view', v); render(); }
 function ppaTeam(i) { return ppaState.teams[i] || null; }
@@ -5445,9 +5471,11 @@ window.addEventListener('error', (e) => {
 
 try {
   render();
-  initSync();
-  rrInitSync();
-  ppaInitSync();
+  // Only open the active mode's sync source — keeps the network quiet and
+  // avoids unrelated EventSource errors flipping the status bar.
+  if (tournamentMode === 'mlp') initSync();
+  if (tournamentMode === 'rr')  rrInitSync();
+  if (tournamentMode === 'ppa') ppaInitSync();
   if (tournamentMode === 'rr' && localStorage.getItem('welcomed') !== '1') showWelcome();
 } catch (err) {
   document.getElementById('app').innerHTML = `<div style="padding:20px;color:#f87171;font-family:monospace;font-size:12px;line-height:1.6">
