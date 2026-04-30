@@ -3,14 +3,7 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-
-function normalizeWhatsAppUrl(raw: string): string | null {
-  const v = raw.trim();
-  if (!v) return null;
-  if (v.startsWith('https://chat.whatsapp.com/')) return v;
-  if (v.startsWith('chat.whatsapp.com/')) return `https://${v}`;
-  return null;
-}
+import { generateRoundRobinDrafts, normalizeWhatsAppUrl } from '@/lib/tournaments';
 
 export async function createTournament(formData: FormData) {
   const supabase = await createClient();
@@ -109,20 +102,15 @@ export async function generateRoundRobinMatches(formData: FormData) {
     redirect(`/tournaments/${tournamentId}?error=Add%20at%20least%202%20players%20before%20generating%20matches`);
   }
 
-  const pairs: Array<{ a: string; b: string; round: number }> = [];
-  for (let i = 0; i < players.length; i += 1) {
-    for (let j = i + 1; j < players.length; j += 1) {
-      pairs.push({ a: players[i].display_name, b: players[j].display_name, round: i + 1 });
-    }
-  }
+  const drafts = generateRoundRobinDrafts(players.map((p) => p.display_name));
 
   const { error } = await supabase.from('matches').insert(
-    pairs.map((p, idx) => ({
+    drafts.map((p) => ({
       tournament_id: tournamentId,
-      round_label: `Round ${p.round}`,
-      court_label: `Court ${((idx % 4) + 1).toString()}`,
-      team_a_label: p.a,
-      team_b_label: p.b,
+      round_label: p.round_label,
+      court_label: p.court_label,
+      team_a_label: p.team_a_label,
+      team_b_label: p.team_b_label,
       created_by_user_id: user.id,
     })),
   );
