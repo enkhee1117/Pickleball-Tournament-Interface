@@ -12,7 +12,7 @@ export function ChatRoom({
   initialMessages,
   profileMap,
 }: {
-  meId: string;
+  meId: string | null;
   meName: string;
   initialMessages: Message[];
   profileMap: Record<string, ProfileLite>;
@@ -54,6 +54,7 @@ export function ChatRoom({
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
+    if (!meId) return;
     const content = draft.trim();
     if (!content || sending) return;
     setSending(true);
@@ -102,12 +103,13 @@ export function ChatRoom({
       <form onSubmit={send} className="flex gap-2 border-t border-neutral-800 p-3">
         <input
           className="input"
-          placeholder="Message #general"
+          placeholder={meId ? 'Message #general' : 'Sign in to send messages'}
           value={draft}
           maxLength={2000}
+          disabled={!meId}
           onChange={(e) => setDraft(e.target.value)}
         />
-        <button className="btn btn-primary" type="submit" disabled={sending || !draft.trim()}>
+        <button className="btn btn-primary" type="submit" disabled={!meId || sending || !draft.trim()}>
           Send
         </button>
       </form>

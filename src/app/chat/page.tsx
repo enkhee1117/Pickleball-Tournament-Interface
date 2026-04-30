@@ -1,9 +1,9 @@
-import { requireProfile } from '@/lib/auth';
+import { getProfile } from '@/lib/auth';
 import { ChatRoom } from './ChatRoom';
 import { createClient } from '@/lib/supabase/server';
 
 export default async function ChatPage() {
-  const me = await requireProfile();
+  const me = await getProfile();
   const supabase = await createClient();
   const { data: messages } = await supabase
     .from('messages')
@@ -21,8 +21,8 @@ export default async function ChatPage() {
   return (
     <div className="card h-[70vh] p-0">
       <ChatRoom
-        meId={me.id}
-        meName={me.display_name ?? 'me'}
+        meId={me?.id ?? null}
+        meName={me?.display_name ?? 'Guest'}
         initialMessages={(messages ?? []).reverse()}
         profileMap={profileMap}
       />

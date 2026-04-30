@@ -13,7 +13,7 @@ export function Nav({ profile }: { profile: Profile | null }) {
     <nav className="sticky top-0 z-40 flex items-center gap-1 border-b border-neutral-800 bg-neutral-950 px-3 py-2 text-sm">
       <Link href="/" className="mr-3 font-bold tracking-tight">MLP</Link>
       <div className="flex flex-1 items-center gap-1 overflow-x-auto">
-        {profile && LINKS.map((l) => (
+        {LINKS.map((l) => (
           <Link key={l.href} href={l.href} className="rounded px-3 py-1.5 text-neutral-300 hover:bg-neutral-800 hover:text-white">
             {l.label}
           </Link>

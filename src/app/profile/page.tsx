@@ -1,4 +1,4 @@
-import { requireProfile } from '@/lib/auth';
+import { getProfile } from '@/lib/auth';
 import { saveProfile } from './actions';
 import { AvatarUpload } from '@/components/AvatarUpload';
 
@@ -7,8 +7,20 @@ export default async function ProfilePage({
 }: {
   searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
-  const profile = await requireProfile();
+  const profile = await getProfile();
   const sp = await searchParams;
+
+  if (!profile) {
+    return (
+      <div className="card max-w-xl">
+        <h1 className="text-xl font-bold">Profile</h1>
+        <p className="mt-2 text-neutral-400">
+          Authentication is temporarily disabled. Sign-in is not required for browsing features,
+          but profile editing is unavailable while logged out.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6 md:grid-cols-[260px_1fr]">

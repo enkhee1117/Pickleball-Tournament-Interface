@@ -9,11 +9,12 @@ export default async function HomePage() {
       <div className="card max-w-xl">
         <h1 className="text-2xl font-bold">MLP Scoreboard</h1>
         <p className="mt-2 text-neutral-400">
-          Invite-only league scoreboard, player profiles, realtime chat. Sign in to continue.
+          Public mode is enabled while authentication is being fixed. You can browse the app
+          without signing in.
         </p>
         <div className="mt-4 flex gap-2">
-          <Link href="/login" className="btn btn-primary">Sign in</Link>
-          <Link href="/legacy/index.html" className="btn btn-ghost">Public scoreboard</Link>
+          <Link href="/scoreboard" className="btn btn-primary">Open scoreboard</Link>
+          <Link href="/chat" className="btn btn-ghost">Open chat</Link>
         </div>
       </div>
     );

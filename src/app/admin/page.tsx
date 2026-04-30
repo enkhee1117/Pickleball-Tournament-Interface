@@ -1,4 +1,4 @@
-import { requireRole } from '@/lib/auth';
+import { getProfile } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createInvite, deleteInvite, setRole } from './actions';
 import type { AppRole, Invite, Profile } from '@/lib/types';
@@ -8,7 +8,17 @@ export default async function AdminPage({
 }: {
   searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
-  const me = await requireRole(['admin', 'organizer']);
+  const me = await getProfile();
+  if (!me || (me.role !== 'admin' && me.role !== 'organizer')) {
+    return (
+      <div className="card max-w-xl">
+        <h1 className="text-2xl font-bold">Admin</h1>
+        <p className="mt-2 text-neutral-400">
+          Admin tools are currently available only to organizer/admin accounts.
+        </p>
+      </div>
+    );
+  }
   const sp = await searchParams;
 
   const admin = createAdminClient();
