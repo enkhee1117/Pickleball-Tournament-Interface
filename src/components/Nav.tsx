@@ -3,8 +3,9 @@ import type { Profile } from '@/lib/types';
 
 const LINKS = [
   { href: '/', label: 'Home' },
+  { href: '/tournaments', label: 'Tournaments' },
   { href: '/scoreboard', label: 'Scoreboard' },
-  { href: '/chat', label: 'Chat' },
+  { href: '/history', label: 'History' },
   { href: '/profile', label: 'Profile' },
 ];
 

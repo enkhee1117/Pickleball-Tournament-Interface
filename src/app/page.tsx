@@ -16,8 +16,9 @@ export default async function HomePage() {
           player profiles, and staff operations.
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
+          <Link href="/tournaments" className="btn btn-primary">My tournaments</Link>
           <Link href="/scoreboard" className="btn btn-primary">Open scoreboard</Link>
-          <Link href="/chat" className="btn btn-ghost">Open chat</Link>
+          <Link href="/history" className="btn btn-ghost">Player history</Link>
           <Link href="/profile" className="btn btn-ghost">Player profile</Link>
           {(profile?.role === 'admin' || profile?.role === 'organizer') && (
             <Link href="/admin" className="btn btn-ghost">
@@ -33,6 +34,15 @@ export default async function HomePage() {
           <Link href="/scoreboard" className="text-sm font-semibold text-volt hover:text-volt-hover">View all</Link>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <MatchCard
+            court="Tourney"
+            division="Create and manage"
+            teamA="Your Tournaments"
+            scoreA={1}
+            teamB="Draft setup"
+            scoreB={0}
+            status="upcoming"
+          />
           <MatchCard
             court="Center Court"
             division="Men's Doubles Finals"

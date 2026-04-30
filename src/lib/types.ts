@@ -34,3 +34,25 @@ export type Message = {
   content: string;
   created_at: string;
 };
+
+export type TournamentStatus = 'draft' | 'active' | 'completed' | 'archived';
+export type TournamentMemberRole = 'owner' | 'organizer' | 'player' | 'viewer';
+
+export type Tournament = {
+  id: string;
+  owner_user_id: string;
+  name: string;
+  format: string;
+  status: TournamentStatus;
+  whatsapp_group_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TournamentMember = {
+  id: string;
+  tournament_id: string;
+  user_id: string;
+  role: TournamentMemberRole;
+  created_at: string;
+};
