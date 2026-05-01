@@ -1,9 +1,29 @@
 import Link from 'next/link';
 import { getProfile } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { MatchCard } from '@/components/ui/MatchCard';
+
+type LiveMatch = {
+  id: string;
+  tournament_id: string;
+  court_label: string | null;
+  round_label: string | null;
+  team_a_label: string;
+  team_b_label: string;
+  team_a_score: number | null;
+  team_b_score: number | null;
+  completed_at: string | null;
+};
 
 export default async function HomePage() {
   const profile = await getProfile();
+  const supabase = await createClient();
+  const { data: liveData } = await supabase
+    .from('matches')
+    .select('id,tournament_id,court_label,round_label,team_a_label,team_b_label,team_a_score,team_b_score,completed_at')
+    .order('created_at', { ascending: false })
+    .limit(6);
+  const liveMatches = (liveData ?? []) as LiveMatch[];
 
   return (
     <div className="space-y-6">
@@ -33,44 +53,31 @@ export default async function HomePage() {
           <h2 className="font-display text-xl font-bold">Live Courts</h2>
           <Link href="/scoreboard" className="text-sm font-semibold text-volt hover:text-volt-hover">View all</Link>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <MatchCard
-            court="Tourney"
-            division="Create and manage"
-            teamA="Your Tournaments"
-            scoreA={1}
-            teamB="Draft setup"
-            scoreB={0}
-            status="upcoming"
-          />
-          <MatchCard
-            court="Center Court"
-            division="Men's Doubles Finals"
-            teamA="Johns / Johns"
-            scoreA={10}
-            teamB="Newman / Wright"
-            scoreB={8}
-            status="live"
-          />
-          <MatchCard
-            court="Court 2"
-            division="Women's Quarterfinal"
-            teamA="Waters / Parenteau"
-            scoreA={11}
-            teamB="Bright / Dizon"
-            scoreB={4}
-            status="live"
-          />
-          <MatchCard
-            court="Court 3"
-            division="Mixed Quarterfinal"
-            teamA="Johnson / Johnson"
-            scoreA={11}
-            teamB="Tardio / David"
-            scoreB={9}
-            status="final"
-          />
-        </div>
+        {liveMatches.length === 0 ? (
+          <div className="card p-6 text-center text-sm text-text-muted">
+            No matches yet.{' '}
+            <Link href="/tournaments" className="font-semibold text-volt hover:text-volt-hover">
+              Create a tournament
+            </Link>{' '}
+            to get started.
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {liveMatches.map((m) => (
+              <Link key={m.id} href={`/tournaments/${m.tournament_id}`} className="block">
+                <MatchCard
+                  court={m.court_label ?? 'Court'}
+                  division={m.round_label ?? 'Round'}
+                  teamA={m.team_a_label}
+                  scoreA={m.team_a_score ?? 0}
+                  teamB={m.team_b_label}
+                  scoreB={m.team_b_score ?? 0}
+                  status={m.completed_at ? 'final' : 'live'}
+                />
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
       {!profile && (

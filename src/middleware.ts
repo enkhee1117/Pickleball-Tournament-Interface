@@ -7,8 +7,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Run on all paths except: static files, image optimization, favicon, the
-    // legacy static app (still served from /public/legacy).
-    '/((?!_next/static|_next/image|favicon.ico|legacy/.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };
