@@ -12,11 +12,10 @@ export default async function ProfilePage({
 
   if (!profile) {
     return (
-      <div className="card max-w-xl">
-        <h1 className="font-display text-xl font-bold">Profile</h1>
-        <p className="mt-2 text-text-muted">
-          Authentication is temporarily disabled. Sign-in is not required for browsing features,
-          but profile editing is unavailable while logged out.
+      <div className="card mx-auto mt-12 max-w-xl p-6">
+        <h1 className="font-display text-2xl font-bold">Profile</h1>
+        <p className="mt-2 text-sm text-text-muted">
+          Sign in to view and edit your TourneyPal profile.
         </p>
       </div>
     );
@@ -35,12 +34,12 @@ export default async function ProfilePage({
         <h1 className="font-display text-xl font-bold">My profile</h1>
 
         {sp.saved && (
-          <div className="rounded border border-emerald-700 bg-emerald-950 px-3 py-2 text-sm text-emerald-300">
+          <div className="rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm text-emerald-300">
             Saved.
           </div>
         )}
         {sp.error && (
-          <div className="rounded border border-red-700 bg-red-950 px-3 py-2 text-sm text-red-300">
+          <div className="rounded-md border border-error/40 bg-error/10 px-3 py-2 text-sm text-red-300">
             {sp.error}
           </div>
         )}

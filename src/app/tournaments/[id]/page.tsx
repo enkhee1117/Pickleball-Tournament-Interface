@@ -12,6 +12,8 @@ type PageProps = {
 type PlayerRow = {
   id: string;
   display_name: string;
+  email: string | null;
+  profile_id: string | null;
   created_at: string;
 };
 
@@ -33,7 +35,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
 
   const [{ data: tournament }, { data: players }, { data: matches }, { data: userData }] = await Promise.all([
     supabase.from('tournaments').select('*').eq('id', id).single(),
-    supabase.from('tournament_players').select('id,display_name,created_at').eq('tournament_id', id).order('created_at', { ascending: true }),
+    supabase.from('tournament_players').select('id,display_name,email,profile_id,created_at').eq('tournament_id', id).order('created_at', { ascending: true }),
     supabase.from('matches').select('id,round_label,court_label,team_a_label,team_b_label,team_a_score,team_b_score,created_at').eq('tournament_id', id).order('created_at', { ascending: false }).limit(100),
     supabase.auth.getUser(),
   ]);
@@ -105,9 +107,10 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
             <span className="text-xs text-text-muted">{p.length} total</span>
           </div>
           {canManage && (
-            <form action={addTournamentPlayer} className="mb-4 flex gap-2">
+            <form action={addTournamentPlayer} className="mb-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
               <input type="hidden" name="tournament_id" value={t.id} />
               <input className="input" name="display_name" placeholder="Player name" required />
+              <input className="input" name="email" type="email" placeholder="Email (optional, links history)" />
               <button className="btn btn-primary" type="submit">Add</button>
             </form>
           )}
@@ -116,8 +119,22 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
           ) : (
             <div className="space-y-2">
               {p.map((player) => (
-                <div key={player.id} className="rounded-md border border-border-dark bg-dark-bg px-3 py-2">
-                  <p className="font-medium">{player.display_name}</p>
+                <div key={player.id} className="flex items-center justify-between rounded-md border border-border-dark bg-dark-bg px-3 py-2">
+                  <div>
+                    <p className="font-medium">{player.display_name}</p>
+                    {player.email && (
+                      <p className="text-xs text-text-muted">{player.email}</p>
+                    )}
+                  </div>
+                  {player.profile_id ? (
+                    <span className="rounded-full border border-success/40 bg-success/10 px-2 py-0.5 text-xs text-emerald-300">
+                      linked
+                    </span>
+                  ) : player.email ? (
+                    <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs text-amber-300">
+                      pending signup
+                    </span>
+                  ) : null}
                 </div>
               ))}
             </div>

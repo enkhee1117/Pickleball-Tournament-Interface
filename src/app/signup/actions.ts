@@ -2,41 +2,43 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 
-function siteUrl() {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+function safeNext(raw: string): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/';
+  return raw;
 }
 
-export async function acceptInvite(formData: FormData) {
-  const token = String(formData.get('token') ?? '');
+export async function signUpWithPassword(formData: FormData) {
+  const email = String(formData.get('email') ?? '').trim().toLowerCase();
+  const password = String(formData.get('password') ?? '');
   const display_name = String(formData.get('display_name') ?? '').trim();
+  const next = safeNext(String(formData.get('next') ?? '/'));
 
-  if (!token || !display_name) {
-    redirect(`/signup?token=${token}&error=Display%20name%20required`);
+  if (!email || !password || !display_name) {
+    redirect(`/signup?error=${encodeURIComponent('All fields are required')}`);
   }
-
-  const admin = createAdminClient();
-  const { data: invite } = await admin
-    .from('invites')
-    .select('email, expires_at, accepted_at')
-    .eq('token', token)
-    .maybeSingle();
-
-  if (!invite || invite.accepted_at || new Date(invite.expires_at) < new Date()) {
-    redirect(`/signup?token=${token}&error=Invite%20invalid`);
+  if (password.length < 8) {
+    redirect(`/signup?error=${encodeURIComponent('Password must be at least 8 characters')}`);
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithOtp({
-    email: invite.email,
-    options: {
-      emailRedirectTo: `${siteUrl()}/auth/confirm?next=/profile`,
-      shouldCreateUser: true,
-      data: { display_name },
-    },
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { display_name } },
   });
 
-  if (error) redirect(`/signup?token=${token}&error=${encodeURIComponent(error.message)}`);
-  redirect('/login?sent=1');
+  if (error) {
+    redirect(`/signup?error=${encodeURIComponent(error.message)}`);
+  }
+
+  // If email confirmation is required, no session is returned. Send the user
+  // to login with a confirmation message; otherwise they are already signed in.
+  if (!data.session) {
+    redirect(
+      `/login?ok=${encodeURIComponent('Account created. Check your email to confirm, then sign in.')}`,
+    );
+  }
+
+  redirect(next);
 }

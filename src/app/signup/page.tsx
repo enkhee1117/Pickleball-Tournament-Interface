@@ -1,65 +1,57 @@
-import { createAdminClient } from '@/lib/supabase/admin';
-import { acceptInvite } from './actions';
+import Link from 'next/link';
+import { signUpWithPassword } from './actions';
 
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string; error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
   const sp = await searchParams;
-  const token = sp.token ?? '';
-
-  if (!token) {
-    return (
-      <div className="card mx-auto mt-12 max-w-md">
-        <h1 className="text-2xl font-bold">Invite required</h1>
-        <p className="mt-2 text-sm text-neutral-400">
-          Sign-ups are invite-only. Ask an admin to send you a link.
-        </p>
-      </div>
-    );
-  }
-
-  const admin = createAdminClient();
-  const { data: invite } = await admin
-    .from('invites')
-    .select('id, email, role, expires_at, accepted_at')
-    .eq('token', token)
-    .maybeSingle();
-
-  if (!invite || invite.accepted_at || new Date(invite.expires_at) < new Date()) {
-    return (
-      <div className="card mx-auto mt-12 max-w-md">
-        <h1 className="text-2xl font-bold">Invite invalid</h1>
-        <p className="mt-2 text-sm text-neutral-400">
-          This invite has expired or already been used.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="card mx-auto mt-12 max-w-md">
-      <h1 className="text-2xl font-bold">Accept invite</h1>
-      <p className="mt-1 text-sm text-neutral-400">
-        Welcome. We&rsquo;ll email a sign-in link to{' '}
-        <span className="font-mono text-neutral-200">{invite.email}</span>.
+    <div className="card mx-auto mt-12 max-w-md p-6">
+      <h1 className="font-display text-2xl font-bold">Create your account</h1>
+      <p className="mt-1 text-sm text-text-muted">
+        Join TourneyPal to run tournaments, manage players, and track match history.
       </p>
 
       {sp.error && (
-        <div className="mt-4 rounded border border-red-700 bg-red-950 px-3 py-2 text-sm text-red-300">
+        <div className="mt-4 rounded-md border border-error/40 bg-error/10 px-3 py-2 text-sm text-red-300">
           {sp.error}
         </div>
       )}
 
-      <form action={acceptInvite} className="mt-4 space-y-3">
-        <input type="hidden" name="token" value={token} />
+      <form action={signUpWithPassword} className="mt-4 space-y-3">
+        <input type="hidden" name="next" value={sp.next ?? '/'} />
         <div>
           <label className="label" htmlFor="display_name">Display name</label>
-          <input className="input" id="display_name" name="display_name" required />
+          <input className="input" id="display_name" name="display_name" required autoFocus />
         </div>
-        <button className="btn btn-primary w-full" type="submit">Accept &amp; send link</button>
+        <div>
+          <label className="label" htmlFor="email">Email</label>
+          <input className="input" id="email" name="email" type="email" required autoComplete="email" />
+        </div>
+        <div>
+          <label className="label" htmlFor="password">Password</label>
+          <input
+            className="input"
+            id="password"
+            name="password"
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+          />
+          <p className="mt-1 text-xs text-text-muted">At least 8 characters.</p>
+        </div>
+        <button className="btn btn-primary w-full" type="submit">Create account</button>
       </form>
+
+      <p className="mt-4 text-xs text-text-muted">
+        Already have an account?{' '}
+        <Link href={`/login${sp.next ? `?next=${encodeURIComponent(sp.next)}` : ''}`} className="font-semibold text-volt hover:text-volt-hover">
+          Sign in
+        </Link>
+      </p>
     </div>
   );
 }

@@ -75,11 +75,15 @@ export default async function HomePage() {
 
       {!profile && (
         <section className="card">
-          <h3 className="font-display text-lg font-semibold">Public Mode Enabled</h3>
+          <h3 className="font-display text-lg font-semibold">Get started</h3>
           <p className="mt-2 text-sm text-text-muted">
-            Authentication is temporarily disabled while magic link login is being fixed.
-            Everyone can access features for development and testing.
+            Sign in with your email and password to create tournaments, manage rosters, and
+            track your match history. New players can register in seconds.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/login" className="btn btn-primary">Sign in</Link>
+            <Link href="/signup" className="btn btn-ghost">Create account</Link>
+          </div>
         </section>
       )}
     </div>

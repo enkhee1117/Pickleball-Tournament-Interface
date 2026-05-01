@@ -70,6 +70,11 @@ export async function addTournamentPlayer(formData: FormData) {
 
   const tournamentId = String(formData.get('tournament_id') ?? '');
   const displayName = String(formData.get('display_name') ?? '').trim();
+  const emailRaw = String(formData.get('email') ?? '').trim().toLowerCase();
+  const email = emailRaw || null;
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    redirect(`/tournaments/${tournamentId}?error=${encodeURIComponent('Invalid email address')}`);
+  }
   if (!tournamentId || displayName.length < 2) {
     redirect(`/tournaments/${tournamentId}?error=Player%20name%20must%20be%20at%20least%202%20characters`);
   }
@@ -77,6 +82,7 @@ export async function addTournamentPlayer(formData: FormData) {
   const { error } = await supabase.from('tournament_players').insert({
     tournament_id: tournamentId,
     display_name: displayName,
+    email,
   });
   if (error) redirect(`/tournaments/${tournamentId}?error=${encodeURIComponent(error.message)}`);
 

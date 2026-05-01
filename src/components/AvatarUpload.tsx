@@ -36,12 +36,12 @@ export function AvatarUpload({ userId, initialUrl }: { userId: string; initialUr
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="h-40 w-40 overflow-hidden rounded-full border border-neutral-700 bg-neutral-800">
+      <div className="h-40 w-40 overflow-hidden rounded-full border border-border-dark bg-dark-bg">
         {url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt="Avatar" className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-neutral-500">No photo</div>
+          <div className="flex h-full w-full items-center justify-center text-text-muted">No photo</div>
         )}
       </div>
       <label className="btn btn-ghost cursor-pointer">
