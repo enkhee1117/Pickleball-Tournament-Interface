@@ -6,9 +6,13 @@ import { SubmitButton } from '@/components/ui/SubmitButton';
 import { FormStatus } from '@/components/ui/FormStatus';
 import { emptyFormState } from '@/lib/forms';
 
+type DivisionOption = { id: string; name: string; assignedPlayers: number };
+
 type Props = {
   tournamentId: string;
   playerCount: number;
+  openDivisionPlayerCount: number;
+  divisions: DivisionOption[];
 };
 
 const SCHEMES = [
@@ -35,14 +39,27 @@ const SCHEMES = [
   },
 ] as const;
 
-export function GenerateMatchesForm({ tournamentId, playerCount }: Props) {
+export function GenerateMatchesForm({
+  tournamentId,
+  playerCount,
+  openDivisionPlayerCount,
+  divisions,
+}: Props) {
   const [state, formAction] = useActionState(generateMatches, emptyFormState);
   const [scheme, setScheme] = useState<(typeof SCHEMES)[number]['id']>('rotating_partners');
   const [rounds, setRounds] = useState(5);
   const [courts, setCourts] = useState(2);
+  const [divisionId, setDivisionId] = useState<string>('open');
+
+  const scopedPlayerCount = useMemo(() => {
+    if (divisionId === 'open') return openDivisionPlayerCount;
+    return divisions.find((d) => d.id === divisionId)?.assignedPlayers ?? 0;
+  }, [divisionId, divisions, openDivisionPlayerCount]);
+  void playerCount; // total roster size displayed elsewhere
 
   const preview = useMemo(() => {
-    if (playerCount < 4) return 'Add at least 4 players first.';
+    const playerCount = scopedPlayerCount;
+    if (playerCount < 4) return 'Add at least 4 players to this scope.';
     if (scheme === 'rotating_partners') {
       const gamesPerRound = Math.floor(playerCount / 4);
       const sittingOut = playerCount - gamesPerRound * 4;
@@ -66,11 +83,31 @@ export function GenerateMatchesForm({ tournamentId, playerCount }: Props) {
       return `${teams} teams (bracket of ${bracket}), Round 1: up to ${Math.floor(round1 / 2)} games. Add later rounds after R1 finishes.`;
     }
     return '';
-  }, [scheme, rounds, playerCount]);
+  }, [scheme, rounds, scopedPlayerCount]);
 
   return (
     <form action={formAction} className="space-y-3">
       <input type="hidden" name="tournament_id" value={tournamentId} />
+      <input type="hidden" name="division_id" value={divisionId} />
+
+      {divisions.length > 0 && (
+        <div>
+          <label className="label" htmlFor="gm-div">Generate for</label>
+          <select
+            id="gm-div"
+            className="input !py-1"
+            value={divisionId}
+            onChange={(e) => setDivisionId(e.target.value)}
+          >
+            <option value="open">Unassigned roster ({openDivisionPlayerCount})</option>
+            {divisions.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name} ({d.assignedPlayers} player{d.assignedPlayers === 1 ? '' : 's'})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <fieldset className="space-y-2">
         <legend className="label">Pairing scheme</legend>
@@ -138,7 +175,7 @@ export function GenerateMatchesForm({ tournamentId, playerCount }: Props) {
       <FormStatus state={state} />
 
       <SubmitButton className="btn btn-primary" pendingLabel="Generating...">
-        Generate {playerCount > 0 ? `for ${playerCount} players` : 'matches'}
+        Generate {scopedPlayerCount > 0 ? `for ${scopedPlayerCount} players` : 'matches'}
       </SubmitButton>
       <p className="text-xs text-text-muted">
         Heads up: regenerating wipes any matches that haven&rsquo;t been scored yet. Completed
