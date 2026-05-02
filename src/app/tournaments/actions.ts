@@ -256,6 +256,40 @@ export async function scoreMatch(_prev: FormState, formData: FormData): Promise<
   return { ok: 'Score saved.' };
 }
 
+export async function editMatch(_prev: FormState, formData: FormData): Promise<FormState> {
+  const matchId = fieldString(formData, 'match_id');
+  const tournamentId = fieldString(formData, 'tournament_id');
+  const teamALabel = fieldString(formData, 'team_a_label');
+  const teamBLabel = fieldString(formData, 'team_b_label');
+  const roundLabel = fieldString(formData, 'round_label');
+  const courtLabel = fieldString(formData, 'court_label');
+
+  if (!matchId || !tournamentId) return { error: 'Missing identifiers.' };
+  if (!teamALabel) return { error: 'Team A name is required.' };
+  if (!teamBLabel) return { error: 'Team B name is required.' };
+
+  const { supabase, user } = await getAuthedClient();
+  if (!user) return { error: 'Please sign in.' };
+
+  const { error } = await supabase
+    .from('matches')
+    .update({
+      team_a_label: teamALabel,
+      team_b_label: teamBLabel,
+      round_label: roundLabel || null,
+      court_label: courtLabel || null,
+    })
+    .eq('id', matchId)
+    .eq('tournament_id', tournamentId)
+    .is('completed_at', null);
+
+  if (error) return { error: formatPgError(error) };
+
+  revalidatePath(`/scoreboard/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  return { ok: 'Match updated.' };
+}
+
 // ---------------------------------------------------------------------------
 // Divisions.
 // ---------------------------------------------------------------------------
