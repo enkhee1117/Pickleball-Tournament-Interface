@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { GenerateMatchesForm } from '@/app/tournaments/_components/GenerateMatchesForm';
+import { EditMatchForm } from '@/app/tournaments/_components/EditMatchForm';
 import { ScoreMatchForm, type GameInput } from '@/app/tournaments/_components/ScoreMatchForm';
 import {
   computePlayerStandings,
@@ -249,9 +250,21 @@ export default async function TournamentScoreboard({
                       .map((g) => ({ team_a_score: g.team_a_score, team_b_score: g.team_b_score }));
                     return (
                       <li key={match.id} className="rounded-lg border border-border-dark bg-dark-bg p-3">
-                        <p className="text-xs uppercase tracking-wider text-text-muted">
-                          {match.round_label ?? 'Round'} - {match.court_label ?? 'Court'}
-                        </p>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-xs uppercase tracking-wider text-text-muted">
+                            {match.round_label ?? 'Round'} - {match.court_label ?? 'Court'}
+                          </p>
+                          {canManage && (
+                            <EditMatchForm
+                              tournamentId={id}
+                              matchId={match.id}
+                              defaultTeamA={match.team_a_label}
+                              defaultTeamB={match.team_b_label}
+                              defaultRound={match.round_label ?? ''}
+                              defaultCourt={match.court_label ?? ''}
+                            />
+                          )}
+                        </div>
                         <div className="mt-2 space-y-1">
                           <p className="font-medium">{match.team_a_label}</p>
                           <p className="font-medium">{match.team_b_label}</p>
