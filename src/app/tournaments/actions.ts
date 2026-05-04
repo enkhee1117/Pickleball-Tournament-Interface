@@ -210,8 +210,6 @@ export async function generateMatches(_prev: FormState, formData: FormData): Pro
   if (error) return { error: formatPgError(error) };
 
   revalidatePath(`/tournaments/${tournamentId}`);
-  revalidatePath('/scoreboard');
-  revalidatePath(`/scoreboard/${tournamentId}`);
   return { ok: `Generated ${count ?? drafts.length} matches.` };
 }
 
@@ -249,8 +247,6 @@ export async function scoreMatch(_prev: FormState, formData: FormData): Promise<
   if (error) return { error: formatPgError(error) };
 
   revalidatePath(`/tournaments/${tournamentId}`);
-  revalidatePath(`/scoreboard/${tournamentId}`);
-  revalidatePath('/scoreboard');
   revalidatePath('/');
   revalidatePath('/history');
   return { ok: 'Score saved.' };
@@ -285,7 +281,6 @@ export async function editMatch(_prev: FormState, formData: FormData): Promise<F
 
   if (error) return { error: formatPgError(error) };
 
-  revalidatePath(`/scoreboard/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}`);
   return { ok: 'Match updated.' };
 }
@@ -332,7 +327,6 @@ export async function createDivision(_prev: FormState, formData: FormData): Prom
   if (error) return { error: formatPgError(error) };
 
   revalidatePath(`/tournaments/${tournamentId}`);
-  revalidatePath(`/scoreboard/${tournamentId}`);
   return { ok: 'Division created.' };
 }
 
@@ -348,7 +342,6 @@ export async function deleteDivision(_prev: FormState, formData: FormData): Prom
   if (error) return { error: formatPgError(error) };
 
   revalidatePath(`/tournaments/${tournamentId}`);
-  revalidatePath(`/scoreboard/${tournamentId}`);
   return { ok: 'Division removed.' };
 }
 
@@ -368,6 +361,5 @@ export async function assignPlayerDivision(_prev: FormState, formData: FormData)
   if (error) return { error: formatPgError(error) };
 
   revalidatePath(`/tournaments/${tournamentId}`);
-  revalidatePath(`/scoreboard/${tournamentId}`);
   return { ok: 'Saved.' };
 }

@@ -1,201 +1,201 @@
 import Link from 'next/link';
 import { getProfile } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
-import { MatchCard } from '@/components/ui/MatchCard';
-
-type LiveMatch = {
-  id: string;
-  tournament_id: string;
-  court_label: string | null;
-  round_label: string | null;
-  team_a_label: string;
-  team_b_label: string;
-  team_a_score: number | null;
-  team_b_score: number | null;
-  completed_at: string | null;
-};
-
-type RosterRow = {
-  display_name: string;
-  tournament_id: string;
-};
+import { TPWordmark } from '@/components/ui/TPMark';
+import { Chip } from '@/components/ui/Chip';
+import { Avatar } from '@/components/ui/Avatar';
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { Icons } from '@/components/ui/icons';
+import { SAMPLE_MATCHES, SAMPLE_ME, getSamplePlayer } from '@/lib/sample-data';
 
 export default async function HomePage() {
   const profile = await getProfile();
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const greetingName = profile?.display_name?.split(' ')[0] ?? SAMPLE_ME.name.split(' ')[0];
 
-  const [{ data: liveData }, { data: myRoster }] = await Promise.all([
-    supabase
-      .from('matches')
-      .select(
-        'id,tournament_id,court_label,round_label,team_a_label,team_b_label,team_a_score,team_b_score,completed_at',
-      )
-      .order('created_at', { ascending: false })
-      .limit(6),
-    user
-      ? supabase
-          .from('tournament_players')
-          .select('display_name,tournament_id')
-          .eq('profile_id', user.id)
-      : Promise.resolve({ data: [] }),
-  ]);
-  const liveMatches = (liveData ?? []) as LiveMatch[];
-
-  // "My next match" lookup: find the oldest pending match across the user's
-  // tournaments where their display name appears on either team.
-  let myNextMatch: LiveMatch | null = null;
-  if (user && (myRoster as RosterRow[] | undefined)?.length) {
-    const roster = myRoster as RosterRow[];
-    const tournamentIds = Array.from(new Set(roster.map((r) => r.tournament_id)));
-    const namesByTournament = new Map<string, Set<string>>();
-    for (const r of roster) {
-      let s = namesByTournament.get(r.tournament_id);
-      if (!s) {
-        s = new Set();
-        namesByTournament.set(r.tournament_id, s);
-      }
-      s.add(r.display_name.trim());
-    }
-    const { data: pending } = await supabase
-      .from('matches')
-      .select(
-        'id,tournament_id,court_label,round_label,team_a_label,team_b_label,team_a_score,team_b_score,completed_at',
-      )
-      .in('tournament_id', tournamentIds)
-      .is('completed_at', null)
-      .order('created_at', { ascending: true })
-      .limit(50);
-    for (const match of (pending ?? []) as LiveMatch[]) {
-      const names = namesByTournament.get(match.tournament_id);
-      if (!names) continue;
-      const aHas = match.team_a_label.split('&').some((p) => names.has(p.trim()));
-      const bHas = match.team_b_label.split('&').some((p) => names.has(p.trim()));
-      if (aHas || bHas) {
-        myNextMatch = match;
-        break;
-      }
-    }
-  }
+  const live = SAMPLE_MATCHES.filter((m) => m.status === 'live');
 
   return (
-    <div className="space-y-6">
-      <section className="card relative overflow-hidden p-6">
-        <div className="absolute right-0 top-0 h-40 w-40 -translate-y-1/4 translate-x-1/4 rounded-full bg-volt/10 blur-3xl" />
-        <p className="text-xs font-semibold uppercase tracking-wider text-volt">Live Tournament Platform</p>
-        <h1 className="mt-2 font-display text-4xl font-bold tracking-tight sm:text-5xl">TourneyPal</h1>
-        <p className="mt-3 max-w-2xl text-text-muted">
-          Premium dark-mode tournament platform: divisions, best-of-N scoring, and standings with
-          proper tiebreakers - built for actual pickleball events.
-        </p>
-        <div className="mt-5 flex flex-wrap gap-2">
-          <Link href="/tournaments" className="btn btn-primary">
-            My tournaments
-          </Link>
-          <Link href="/scoreboard" className="btn btn-primary">
-            Open scoreboard
-          </Link>
-          <Link href="/history" className="btn btn-ghost">
-            Player history
-          </Link>
-          <Link href="/profile" className="btn btn-ghost">
-            Player profile
-          </Link>
-          {(profile?.role === 'admin' || profile?.role === 'organizer') && (
-            <Link href="/admin" className="btn btn-ghost">
-              Admin
-            </Link>
-          )}
-        </div>
-      </section>
+    <div className="flex min-h-full flex-col bg-paper">
+      <div className="flex items-center justify-between px-[18px] pt-3.5 pb-3">
+        <TPWordmark size={14} />
+        <Link href="/history" aria-label="History" className="flex h-10 w-10 items-center justify-center rounded-xl text-ink">
+          {Icons.history}
+        </Link>
+      </div>
 
-      {myNextMatch && (
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-xl font-bold">Up next for you</h2>
-            <Link
-              href={`/scoreboard/${myNextMatch.tournament_id}`}
-              className="text-sm font-semibold text-volt hover:text-volt-hover"
-            >
-              Open scoreboard
-            </Link>
+      <div className="flex-1">
+        <div className="px-[18px] pt-2 pb-[18px]">
+          <div className="text-[13px] tracking-wide text-ink-3">Good evening, {greetingName} 🎾</div>
+          <div className="serif mt-1 text-[40px] leading-[1.05] tracking-tight text-ink">
+            Two courts hot.
+            <br />
+            <span className="italic" style={{ color: 'var(--court-deep)' }}>You&rsquo;re up next.</span>
           </div>
+        </div>
+
+        <div className="px-[18px] pb-[18px]">
           <Link
-            href={`/scoreboard/${myNextMatch.tournament_id}`}
-            className="card relative block overflow-hidden p-5 transition hover:border-volt/40"
+            href="/tournaments"
+            className="relative block overflow-hidden rounded-[22px] p-5 text-paper"
+            style={{ background: 'linear-gradient(140deg, oklch(0.22 0.04 140), oklch(0.16 0.02 100))' }}
           >
-            <p className="text-xs uppercase tracking-wider text-volt">
-              {myNextMatch.court_label ?? 'Court'} - {myNextMatch.round_label ?? 'Round'}
-            </p>
-            <p className="mt-2 font-display text-2xl font-bold">
-              {myNextMatch.team_a_label} <span className="text-text-muted">vs</span>{' '}
-              {myNextMatch.team_b_label}
-            </p>
-            <p className="mt-1 text-xs text-text-muted">
-              Tap to score this match or see your division&rsquo;s standings.
-            </p>
-          </Link>
-        </section>
-      )}
-
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-display text-xl font-bold">Live courts</h2>
-          <Link href="/scoreboard" className="text-sm font-semibold text-volt hover:text-volt-hover">
-            View all
+            <svg
+              className="pointer-events-none absolute -right-[30px] -top-[10px] opacity-15"
+              width="180"
+              height="180"
+              viewBox="0 0 180 180"
+              aria-hidden
+            >
+              <rect x="20" y="20" width="140" height="140" stroke="var(--court)" strokeWidth="1.5" fill="none" />
+              <line x1="20" y1="90" x2="160" y2="90" stroke="var(--court)" strokeWidth="1" strokeDasharray="3 3" />
+              <line x1="60" y1="20" x2="60" y2="160" stroke="var(--court)" strokeWidth="1" />
+              <line x1="120" y1="20" x2="120" y2="160" stroke="var(--court)" strokeWidth="1" />
+            </svg>
+            <div className="relative">
+              <Chip tone="live">LIVE · ROUND 3 / 5</Chip>
+              <div className="serif mt-2.5 pb-2 text-[28px] leading-[1.25]">Friday Night Lights</div>
+              <div className="mt-2 text-xs" style={{ color: 'oklch(0.85 0.04 140)' }}>
+                10 players · Round Robin · 2 courts
+              </div>
+            </div>
+            <div className="relative mt-4 flex gap-2">
+              <div className="flex-1 rounded-xl px-3 py-2.5" style={{ background: 'oklch(0.28 0.04 140)' }}>
+                <div className="text-[10px] tracking-[0.06em]" style={{ color: 'oklch(0.78 0.18 135)' }}>NEXT UP</div>
+                <div className="mt-0.5 text-[13px] font-semibold">You vs Jordan</div>
+              </div>
+              <div className="flex-1 rounded-xl px-3 py-2.5" style={{ background: 'oklch(0.28 0.04 140)' }}>
+                <div className="text-[10px] tracking-[0.06em]" style={{ color: 'oklch(0.78 0.18 135)' }}>YOUR RANK</div>
+                <div className="mt-0.5 text-[13px] font-semibold">2nd · 6–3 record</div>
+              </div>
+            </div>
           </Link>
         </div>
-        {liveMatches.length === 0 ? (
-          <div className="card p-6 text-center text-sm text-text-muted">
-            No matches yet.{' '}
-            <Link href="/tournaments" className="font-semibold text-volt hover:text-volt-hover">
-              Create a tournament
-            </Link>{' '}
-            to get started.
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {liveMatches.map((m) => {
-              const status: 'live' | 'final' | 'upcoming' = m.completed_at
-                ? 'final'
-                : m.team_a_score !== null || m.team_b_score !== null
-                  ? 'live'
-                  : 'upcoming';
-              return (
-                <Link key={m.id} href={`/scoreboard/${m.tournament_id}`} className="block">
-                  <MatchCard
-                    court={m.court_label ?? 'Court'}
-                    division={m.round_label ?? 'Round'}
-                    teamA={m.team_a_label}
-                    scoreA={m.team_a_score ?? 0}
-                    teamB={m.team_b_label}
-                    scoreB={m.team_b_score ?? 0}
-                    status={status}
-                  />
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </section>
 
-      {!profile && (
-        <section className="card">
-          <h3 className="font-display text-lg font-semibold">Get started</h3>
-          <p className="mt-2 text-sm text-text-muted">
-            Sign in with your email and password to create tournaments, manage rosters, and track
-            your match history. New players can register in seconds.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link href="/login" className="btn btn-primary">
-              Sign in
-            </Link>
-            <Link href="/signup" className="btn btn-ghost">
-              Create account
-            </Link>
-          </div>
-        </section>
-      )}
+        <SectionHeader title="On court right now" action={<Link href="/tournaments">See all</Link>} />
+        <div className="grid gap-3 px-[18px]">
+          {live.map((m) => (
+            <LiveMatchCard key={m.id} matchId={m.id} m={m} />
+          ))}
+        </div>
+
+        <SectionHeader title="Quick start" />
+        <div className="grid grid-cols-2 gap-2.5 px-[18px]">
+          <QuickAction href="/tournaments/new" tone="ink" icon={Icons.plus} label="New tournament" />
+          <QuickAction href="/join" icon={Icons.qr} label="Join with code" />
+          <QuickAction href="/profile" icon={Icons.bars} label="My stats" />
+          <QuickAction href="/history" icon={Icons.trophy} label="History" />
+        </div>
+
+        <div className="h-24" />
+      </div>
+    </div>
+  );
+}
+
+function QuickAction({
+  href,
+  icon,
+  label,
+  tone = 'ghost',
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  tone?: 'ink' | 'ghost';
+}) {
+  const ink = tone === 'ink';
+  return (
+    <Link
+      href={href}
+      className="flex min-h-[88px] flex-col items-start gap-4 rounded-2xl p-3.5"
+      style={{
+        background: ink ? 'var(--ink)' : '#fff',
+        color: ink ? 'var(--paper)' : 'var(--ink)',
+        border: ink ? 'none' : '1px solid var(--line)',
+      }}
+    >
+      <div
+        className="flex h-8 w-8 items-center justify-center rounded-[10px]"
+        style={{
+          background: ink ? 'oklch(0.28 0.04 140)' : 'var(--paper-2)',
+          color: ink ? 'var(--court)' : 'var(--ink-2)',
+        }}
+      >
+        {icon}
+      </div>
+      <div className="text-sm font-semibold tracking-tight">{label}</div>
+    </Link>
+  );
+}
+
+function LiveMatchCard({
+  matchId: _matchId,
+  m,
+}: {
+  matchId: string;
+  m: (typeof SAMPLE_MATCHES)[number];
+}) {
+  const a1 = getSamplePlayer(m.teamA[0]);
+  const a2 = getSamplePlayer(m.teamA[1]);
+  const b1 = getSamplePlayer(m.teamB[0]);
+  const b2 = getSamplePlayer(m.teamB[1]);
+  const aWins = m.scoreA > m.scoreB;
+
+  return (
+    <Link
+      href="/tournaments"
+      className="relative block overflow-hidden rounded-[18px] bg-white p-3.5"
+      style={{ border: '1px solid var(--line)' }}
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="text-xs font-bold tracking-[0.04em] text-ink-2">COURT {m.court}</div>
+          <Chip tone="live">LIVE</Chip>
+        </div>
+        <div className="text-[11px] tracking-[0.04em] text-ink-3">R{m.round} · TO 11</div>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <TeamRow p1={a1} p2={a2} score={m.scoreA} winning={aWins} />
+        <TeamRow p1={b1} p2={b2} score={m.scoreB} winning={!aWins} flip />
+      </div>
+    </Link>
+  );
+}
+
+function TeamRow({
+  p1,
+  p2,
+  score,
+  winning,
+  flip,
+}: {
+  p1?: { short: string; color: string; name: string };
+  p2?: { short: string; color: string; name: string };
+  score: number;
+  winning?: boolean;
+  flip?: boolean;
+}) {
+  return (
+    <div
+      className="flex flex-1 items-center gap-2"
+      style={{ flexDirection: flip ? 'row-reverse' : 'row' }}
+    >
+      <div className="flex" style={{ flexDirection: flip ? 'row-reverse' : 'row' }}>
+        <Avatar player={p1} size={32} />
+        <div style={{ marginLeft: flip ? 0 : -10, marginRight: flip ? -10 : 0 }}>
+          <Avatar player={p2} size={32} />
+        </div>
+      </div>
+      <div className="min-w-0 flex-1" style={{ textAlign: flip ? 'right' : 'left' }}>
+        <div className="truncate text-xs font-semibold text-ink">
+          {p1?.name.split(' ')[0]} & {p2?.name.split(' ')[0]}
+        </div>
+        <div
+          className="mono -mt-0.5 text-[26px] font-bold tracking-tight"
+          style={{ color: winning ? 'var(--court-deep)' : 'var(--ink-3)', letterSpacing: '-0.02em' }}
+        >
+          {score}
+        </div>
+      </div>
     </div>
   );
 }

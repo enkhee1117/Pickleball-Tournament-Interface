@@ -36,19 +36,31 @@ export function AvatarUpload({ userId, initialUrl }: { userId: string; initialUr
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="h-40 w-40 overflow-hidden rounded-full border border-border-dark bg-dark-bg">
+      <div
+        className="h-[110px] w-[110px] overflow-hidden rounded-full"
+        style={{ background: 'var(--paper-2)', border: '1px solid var(--line)' }}
+      >
         {url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt="Avatar" className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-text-muted">No photo</div>
+          <div className="flex h-full w-full items-center justify-center text-xs text-ink-3">
+            No photo
+          </div>
         )}
       </div>
-      <label className="btn btn-ghost cursor-pointer">
+      <label
+        className="cursor-pointer rounded-full px-4 py-2 text-[13px] font-semibold transition active:scale-95"
+        style={{ background: '#fff', color: 'var(--ink)', border: '1px solid var(--line)' }}
+      >
         {isPending ? 'Saving…' : 'Upload photo'}
         <input type="file" accept="image/*" className="hidden" onChange={onPick} />
       </label>
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && (
+        <p className="text-xs" style={{ color: 'var(--berry)' }}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }

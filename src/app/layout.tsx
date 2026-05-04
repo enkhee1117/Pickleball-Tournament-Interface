@@ -1,31 +1,50 @@
-import type { Metadata } from 'next';
-import { Inter, Space_Grotesk } from 'next/font/google';
+import type { Metadata, Viewport } from 'next';
+import { Instrument_Serif, JetBrains_Mono, Geist } from 'next/font/google';
 import './globals.css';
-import { Nav } from '@/components/Nav';
-import { getProfile } from '@/lib/auth';
+import { TabBar } from '@/components/TabBar';
 
 export const metadata: Metadata = {
   title: 'TourneyPal',
-  description: 'Pickleball league scoreboard, profiles, chat',
+  description: 'Run a tournament in 90 seconds.',
 };
 
-const inter = Inter({
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: '#F8F6F1',
+};
+
+const instrumentSerif = Instrument_Serif({
   subsets: ['latin'],
-  variable: '--font-inter',
+  weight: '400',
+  style: ['normal', 'italic'],
+  variable: '--font-instrument-serif',
 });
 
-const spaceGrotesk = Space_Grotesk({
+const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
-  variable: '--font-space-grotesk',
+  weight: ['500', '700'],
+  variable: '--font-jetbrains-mono',
 });
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const profile = await getProfile();
+const geist = Geist({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-geist',
+});
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} ${spaceGrotesk.variable} bg-dark-bg text-slate-50`}>
-        <Nav profile={profile} />
-        <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+    <html
+      lang="en"
+      className={`${instrumentSerif.variable} ${jetbrainsMono.variable} ${geist.variable}`}
+    >
+      <body className="bg-paper text-ink">
+        <div className="mx-auto flex min-h-[100dvh] max-w-[480px] flex-col">
+          <main className="flex flex-1 flex-col">{children}</main>
+          <TabBar />
+        </div>
       </body>
     </html>
   );

@@ -3,30 +3,77 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  --paper: oklch(0.97 0.008 95);
+  --paper-2: oklch(0.94 0.012 95);
+  --ink: oklch(0.18 0.01 80);
+  --ink-2: oklch(0.35 0.01 80);
+  --ink-3: oklch(0.55 0.01 80);
+  --line: oklch(0.86 0.012 95);
+  --court: oklch(0.78 0.18 135);
+  --court-deep: oklch(0.55 0.16 138);
+  --serve: oklch(0.7 0.19 48);
+  --berry: oklch(0.55 0.2 12);
+  --sky: oklch(0.78 0.12 230);
 }
 
 html, body {
-  background: #050608;
-  color: #f8fafc;
-  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-geist), Geist, -apple-system, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.btn {
-  @apply inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold transition;
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
-.btn-primary { @apply bg-volt text-slate-900 hover:bg-volt-hover; }
-.btn-ghost   { @apply border border-border-dark bg-card-bg text-slate-100 hover:border-slate-500; }
-.btn-danger  { @apply bg-red-600 text-white hover:bg-red-500; }
 
-.input {
-  @apply w-full rounded-md border border-border-dark bg-dark-bg px-3 py-2 text-sm text-white
-         placeholder:text-slate-500 focus:border-volt focus:outline-none;
+.serif {
+  font-family: var(--font-instrument-serif), 'Instrument Serif', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
-.label { @apply mb-1 block text-xs font-semibold uppercase tracking-wider text-text-muted; }
-.card  { @apply rounded-xl border border-border-dark bg-card-bg p-4; }
 
-.glass-panel {
-  background: rgba(21, 26, 35, 0.72);
-  backdrop-filter: blur(12px);
+.mono {
+  font-family: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, monospace;
 }
+
+.scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.scroll::-webkit-scrollbar { width: 0; height: 0; }
+
+button { font-family: inherit; }
+input, textarea, select { font-family: inherit; }
+
+@keyframes pop {
+  0% { transform: scale(.6); opacity: 0; }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50% { opacity: .4; }
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+@keyframes confetti {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(-600px) rotate(720deg); opacity: 0; }
+}
+
+.animate-pulse-dot { animation: pulse 1.4s infinite; }
+.animate-pop { animation: pop .25s ease; }
+.animate-slide-up { animation: slideUp .25s ease; }
+.animate-shimmer { animation: shimmer 2s infinite; }
