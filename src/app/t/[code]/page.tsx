@@ -27,6 +27,7 @@ type PublicMatch = {
   team_b_score: number | null;
   winner_side: 'a' | 'b' | null;
   completed_at: string | null;
+  recording_url: string | null;
   match_games: { team_a_score: number; team_b_score: number }[];
 };
 
@@ -293,9 +294,24 @@ function PublicMatchCard({ row }: { row: PublicMatch }) {
         <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-ink-2">
           {row.court_label ?? 'COURT —'}
         </div>
-        {isLive && <Chip tone="live">LIVE</Chip>}
-        {isDone && <Chip tone="court">FINAL</Chip>}
-        {!isLive && !isDone && <Chip tone="ghost">UP NEXT</Chip>}
+        <div className="flex items-center gap-1.5">
+          {row.recording_url && (
+            <a
+              href={row.recording_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex h-5 items-center gap-1 rounded-full px-1.5 text-[10px] font-bold text-white"
+              style={{ background: /(?:youtube\.com|youtu\.be)/i.test(row.recording_url) ? '#FF0033' : 'var(--ink)' }}
+              aria-label="Watch recording"
+            >
+              ▶
+            </a>
+          )}
+          {isLive && <Chip tone="live">LIVE</Chip>}
+          {isDone && <Chip tone="court">FINAL</Chip>}
+          {!isLive && !isDone && <Chip tone="ghost">UP NEXT</Chip>}
+        </div>
       </div>
       <TeamLine players={a} score={scoreA} winning={isDone && aWins} live={isLive && aWins} />
       <div className="my-1.5 h-px" style={{ background: 'var(--line)' }} />

@@ -51,6 +51,7 @@ type MatchRow = {
   winner_side: 'a' | 'b' | null;
   completed_at: string | null;
   match_games: { team_a_score: number; team_b_score: number }[] | null;
+  recording_url: string | null;
 };
 
 export default async function TournamentDetailPage({ params, searchParams }: PageProps) {
@@ -75,7 +76,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
     supabase
       .from('matches')
       .select(
-        'id,round_label,court_label,team_a_label,team_b_label,team_a_score,team_b_score,winner_side,completed_at,match_games(team_a_score,team_b_score)',
+        'id,round_label,court_label,team_a_label,team_b_label,team_a_score,team_b_score,winner_side,completed_at,recording_url,match_games(team_a_score,team_b_score)',
       )
       .eq('tournament_id', id)
       .order('created_at', { ascending: true })
@@ -400,9 +401,20 @@ function RealMatchCard({ tournamentId, row }: { tournamentId: string; row: Match
         <div className="text-[11px] font-bold uppercase tracking-[0.06em] text-ink-2">
           {row.court_label ?? 'COURT —'}
         </div>
-        {isLive && <Chip tone="live">LIVE</Chip>}
-        {isDone && <Chip tone="court">FINAL</Chip>}
-        {!isLive && !isDone && <Chip tone="ghost">UP NEXT</Chip>}
+        <div className="flex items-center gap-1.5">
+          {row.recording_url && (
+            <span
+              className="inline-flex h-5 items-center gap-1 rounded-full px-1.5 text-[10px] font-bold text-white"
+              style={{ background: /(?:youtube\.com|youtu\.be)/i.test(row.recording_url) ? '#FF0033' : 'var(--ink)' }}
+              aria-label="Has recording"
+            >
+              ▶
+            </span>
+          )}
+          {isLive && <Chip tone="live">LIVE</Chip>}
+          {isDone && <Chip tone="court">FINAL</Chip>}
+          {!isLive && !isDone && <Chip tone="ghost">UP NEXT</Chip>}
+        </div>
       </div>
       <TeamLineSimple a={a} score={scoreA} winning={isDone && aWins} live={isLive && aWins} />
       <div className="my-1.5 h-px" style={{ background: 'var(--line)' }} />

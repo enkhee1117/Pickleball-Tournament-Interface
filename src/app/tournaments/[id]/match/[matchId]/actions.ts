@@ -54,6 +54,44 @@ export async function saveMatchScore({
   return { ok: true };
 }
 
+export async function setMatchRecording({
+  matchId,
+  url,
+}: {
+  matchId: string;
+  url: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Sign in to add a recording.' };
+
+  const trimmed = url.trim();
+  if (trimmed && !/^https?:\/\//i.test(trimmed)) {
+    return { ok: false, error: 'Link must start with http:// or https://' };
+  }
+
+  const { data: row } = await supabase
+    .from('matches')
+    .select('tournament_id')
+    .eq('id', matchId)
+    .single();
+  const tournamentId = (row as { tournament_id: string } | null)?.tournament_id;
+
+  const { error } = await supabase.rpc('app_set_match_recording', {
+    p_match_id: matchId,
+    p_url: trimmed || null,
+  });
+  if (error) return { ok: false, error: formatPgError(error) };
+
+  if (tournamentId) {
+    revalidatePath(`/tournaments/${tournamentId}`);
+    revalidatePath(`/tournaments/${tournamentId}/match/[matchId]`, 'page');
+  }
+  return { ok: true };
+}
+
 export async function claimMatchPlayer({
   playerId,
   tournamentId,

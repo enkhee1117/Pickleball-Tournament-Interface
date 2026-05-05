@@ -6,7 +6,7 @@ import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { IconBtn } from '@/components/ui/IconBtn';
 import { BigButton } from '@/components/ui/BigButton';
 import { Icons } from '@/components/ui/icons';
-import { claimMatchPlayer, saveMatchScore } from './actions';
+import { claimMatchPlayer, saveMatchScore, setMatchRecording } from './actions';
 
 type Claimable = { id: string; displayName: string };
 
@@ -34,6 +34,7 @@ type Props = {
   // the keypad / End button visibility so spectators don't see UI that
   // silently fails on submit.
   canScore?: boolean;
+  recordingUrl?: string | null;
 };
 
 const KEYPAD: Array<string> = ['1', '2', '3', '+1', '4', '5', '6', '−1', '7', '8', '9', '⌫', 'C', '0', '', '▶'];
@@ -58,6 +59,7 @@ export function MatchScreen({
   total = 0,
   claimables = null,
   canScore = false,
+  recordingUrl = null,
 }: Props) {
   const router = useRouter();
   const returnHref = `/tournaments/${tournamentId}?tab=${returnTab}`;
@@ -343,6 +345,12 @@ export function MatchScreen({
               </div>
             </div>
           </div>
+
+          <RecordingPanel
+            matchId={matchId}
+            initialUrl={recordingUrl}
+            canEdit={canScore}
+          />
           {nextUnscoredMatchId ? (
             <BigButton
               tone="ink"
@@ -465,6 +473,142 @@ function ScorePanel({
 function parseTeam(label: string) {
   const parts = label.split(/\s*&\s*|\s*\/\s*/).filter(Boolean);
   return parts.slice(0, 2).map((s) => playerFromName(s));
+}
+
+function RecordingPanel({
+  matchId,
+  initialUrl,
+  canEdit,
+}: {
+  matchId: string;
+  initialUrl: string | null;
+  canEdit: boolean;
+}) {
+  const [editing, setEditing] = useState(initialUrl == null && canEdit);
+  const [url, setUrl] = useState(initialUrl ?? '');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  // Hide entirely for spectators when no recording exists yet.
+  if (!canEdit && !initialUrl) return null;
+
+  const isYouTube = (href: string) => /(?:youtube\.com|youtu\.be)/i.test(href);
+
+  const onSave = async (next: string) => {
+    setPending(true);
+    setError(null);
+    const res = await setMatchRecording({ matchId, url: next });
+    setPending(false);
+    if (!res.ok) {
+      setError(res.error ?? 'Could not save the link.');
+      return;
+    }
+    setEditing(false);
+    router.refresh();
+  };
+
+  if (initialUrl && !editing) {
+    return (
+      <div
+        className="mb-3 flex items-center gap-3 rounded-2xl bg-white p-3"
+        style={{ border: '1px solid var(--line)' }}
+      >
+        <a
+          href={initialUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-1 items-center gap-2 truncate"
+        >
+          <span
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
+            style={{ background: isYouTube(initialUrl) ? '#FF0033' : 'var(--ink)' }}
+          >
+            ▶
+          </span>
+          <div className="min-w-0">
+            <div className="text-[13px] font-semibold text-ink">
+              {isYouTube(initialUrl) ? 'Watch on YouTube' : 'Watch recording'}
+            </div>
+            <div className="truncate text-[11px] text-ink-3">{initialUrl}</div>
+          </div>
+        </a>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="text-[11px] font-semibold text-ink-3 underline"
+          >
+            Edit
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (!canEdit) return null;
+
+  return (
+    <div
+      className="mb-3 rounded-2xl bg-white p-3"
+      style={{ border: '1px solid var(--line)' }}
+    >
+      <div className="text-[11px] uppercase tracking-[0.06em] text-ink-3">
+        Match recording
+      </div>
+      <div className="mt-0.5 text-[12px] text-ink-2">
+        Paste a YouTube (or any) link so spectators can watch the replay.
+      </div>
+      <input
+        type="url"
+        inputMode="url"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="https://youtu.be/…"
+        className="mt-2 w-full rounded-xl bg-white px-3 py-2 text-sm text-ink outline-none"
+        style={{ border: '1px solid var(--line)' }}
+      />
+      {error && (
+        <div className="mt-1.5 text-[11px]" style={{ color: 'var(--berry)' }}>
+          {error}
+        </div>
+      )}
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={() => onSave(url)}
+          disabled={pending}
+          className="rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-50"
+          style={{ background: 'var(--ink)', color: 'var(--paper)' }}
+        >
+          {pending ? 'Saving…' : 'Save link'}
+        </button>
+        {initialUrl && (
+          <button
+            type="button"
+            onClick={() => onSave('')}
+            disabled={pending}
+            className="rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-50"
+            style={{ color: 'var(--berry)', border: '1px solid var(--berry)' }}
+          >
+            Remove
+          </button>
+        )}
+        {initialUrl && (
+          <button
+            type="button"
+            onClick={() => {
+              setUrl(initialUrl);
+              setEditing(false);
+            }}
+            className="rounded-xl px-3 py-1.5 text-[12px] font-semibold text-ink-2"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function ClaimBanner({
