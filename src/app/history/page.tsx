@@ -8,9 +8,11 @@ import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Icons } from '@/components/ui/icons';
 import { computePlayerStandings, type StandingsMatch } from '@/lib/scoring';
 import { MatchSearch } from './MatchSearch';
+import { dismissSelfLink } from './dismiss-action';
 
 type TournamentMemberRow = {
   role: string;
+  dismissed_self_link: boolean;
   tournaments: Tournament | null;
 };
 
@@ -78,7 +80,7 @@ export default async function HistoryPage() {
       .eq('profile_id', user.id),
     supabase
       .from('tournament_members')
-      .select('role,tournaments(*)')
+      .select('role,dismissed_self_link,tournaments(*)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false }),
   ]);
@@ -112,12 +114,20 @@ export default async function HistoryPage() {
     tournamentsById = new Map(((tournamentRows ?? []) as Tournament[]).map((t) => [t.id, t]));
   }
 
-  const allTournaments = ((memberRows as TournamentMemberRow[] | null) ?? [])
+  const memberRowList = (memberRows as TournamentMemberRow[] | null) ?? [];
+  const dismissedTournamentIds = new Set(
+    memberRowList
+      .filter((r) => r.dismissed_self_link && r.tournaments)
+      .map((r) => r.tournaments!.id),
+  );
+  const allTournaments = memberRowList
     .map((r) => r.tournaments)
     .filter((t): t is Tournament => !!t);
   const past = allTournaments.filter((t) => t.status === 'completed' || t.status === 'archived');
   const unclaimed = allTournaments.filter(
-    (t) => !linked.some((p) => p.tournament_id === t.id),
+    (t) =>
+      !linked.some((p) => p.tournament_id === t.id) &&
+      !dismissedTournamentIds.has(t.id),
   );
 
   const aggregate = aggregateStats(myMatches, linked);
@@ -163,14 +173,30 @@ export default async function HistoryPage() {
             Pick which player you are on each tournament&apos;s roster page to track your matches here.
             <div className="mt-2.5 grid gap-1.5">
               {unclaimed.slice(0, 5).map((t) => (
-                <Link
+                <div
                   key={t.id}
-                  href={`/tournaments/${t.id}/invite`}
-                  className="block rounded-xl px-3 py-2 text-[12px] font-semibold"
-                  style={{ background: 'var(--paper-2)', color: 'var(--ink)' }}
+                  className="flex items-center gap-1.5 rounded-xl"
+                  style={{ background: 'var(--paper-2)' }}
                 >
-                  Pick yourself in {t.name} →
-                </Link>
+                  <Link
+                    href={`/tournaments/${t.id}/invite`}
+                    className="flex-1 truncate px-3 py-2 text-[12px] font-semibold"
+                    style={{ color: 'var(--ink)' }}
+                  >
+                    Pick yourself in {t.name} →
+                  </Link>
+                  <form action={dismissSelfLink}>
+                    <input type="hidden" name="tournament_id" value={t.id} />
+                    <button
+                      type="submit"
+                      aria-label={`Dismiss ${t.name}`}
+                      title="Not playing in this one"
+                      className="px-3 py-2 text-[16px] leading-none text-ink-3"
+                    >
+                      ×
+                    </button>
+                  </form>
+                </div>
               ))}
             </div>
           </div>
