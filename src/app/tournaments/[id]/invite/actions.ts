@@ -104,8 +104,23 @@ export async function claimInvitePlayer(formData: FormData): Promise<void> {
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { error } = await supabase.rpc('app_claim_tournament_player', {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', user.id)
+    .single();
+  const profileName = (profile?.display_name ?? '').trim();
+  if (profileName.length < 2) {
+    redirect(
+      `/tournaments/${tournamentId}/invite?error=${encodeURIComponent(
+        'Set your display name on /profile before claiming a player.',
+      )}`,
+    );
+  }
+
+  const { error } = await supabase.rpc('app_claim_tournament_player_with_name', {
     p_player_id: playerId,
+    p_display_name: profileName,
   });
   if (error) {
     redirect(
@@ -115,8 +130,11 @@ export async function claimInvitePlayer(formData: FormData): Promise<void> {
 
   revalidatePath(`/tournaments/${tournamentId}`);
   revalidatePath(`/tournaments/${tournamentId}/invite`);
+  revalidatePath(`/tournaments/${tournamentId}/match/[matchId]`, 'page');
   revalidatePath('/history');
-  redirect(`/tournaments/${tournamentId}/invite?ok=Linked%20to%20your%20stats`);
+  redirect(
+    `/tournaments/${tournamentId}/invite?ok=${encodeURIComponent(`Linked as ${profileName}`)}`,
+  );
 }
 
 export async function removeInvitePlayer(formData: FormData): Promise<void> {

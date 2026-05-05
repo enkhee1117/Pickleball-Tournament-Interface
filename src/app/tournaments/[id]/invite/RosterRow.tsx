@@ -17,6 +17,9 @@ type Props = {
   // and haven't claimed a slot yet. Drives the "This is me" affordance.
   currentUserId?: string | null;
   userHasClaimedSlot?: boolean;
+  // True when the current user can edit/remove this row (owner + organizer
+  // roles). The "This is me" claim button stays available to any member.
+  canManage?: boolean;
 };
 
 export function RosterRow({
@@ -24,6 +27,7 @@ export function RosterRow({
   player,
   currentUserId = null,
   userHasClaimedSlot = false,
+  canManage = false,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(player.display_name);
@@ -57,14 +61,16 @@ export function RosterRow({
           <div className="truncate text-[11px] text-ink-3">{subtext}</div>
         </div>
         <Chip tone={tone}>{status}</Chip>
-        <button
-          type="button"
-          onClick={() => setEditing((v) => !v)}
-          className="ml-1 rounded-lg px-2 py-1 text-[11px] font-semibold"
-          style={{ color: 'var(--ink-2)', border: '1px solid var(--line)' }}
-        >
-          {editing ? 'Close' : 'Edit'}
-        </button>
+        {canManage && (
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            className="ml-1 rounded-lg px-2 py-1 text-[11px] font-semibold"
+            style={{ color: 'var(--ink-2)', border: '1px solid var(--line)' }}
+          >
+            {editing ? 'Close' : 'Edit'}
+          </button>
+        )}
       </div>
 
       {canClaim && (
@@ -81,7 +87,7 @@ export function RosterRow({
         </form>
       )}
 
-      {editing && (
+      {editing && canManage && (
         <div className="mt-3 grid gap-2 border-t pt-3" style={{ borderColor: 'var(--line)' }}>
           <form action={updateInvitePlayer} className="grid gap-2">
             <input type="hidden" name="tournament_id" value={tournamentId} />

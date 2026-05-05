@@ -53,3 +53,48 @@ export async function saveMatchScore({
   revalidatePath('/history');
   return { ok: true };
 }
+
+export async function claimMatchPlayer({
+  playerId,
+  matchId,
+}: {
+  playerId: string;
+  matchId: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Sign in to claim a slot.' };
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', user.id)
+    .single();
+  const profileName = (profile?.display_name ?? '').trim();
+  if (profileName.length < 2) {
+    return { ok: false, error: 'Set your display name on /profile first.' };
+  }
+
+  const { data: matchRow } = await supabase
+    .from('matches')
+    .select('tournament_id')
+    .eq('id', matchId)
+    .single();
+  const tournamentId = matchRow?.tournament_id as string | undefined;
+
+  const { error } = await supabase.rpc('app_claim_tournament_player_with_name', {
+    p_player_id: playerId,
+    p_display_name: profileName,
+  });
+  if (error) return { ok: false, error: formatPgError(error) };
+
+  if (tournamentId) {
+    revalidatePath(`/tournaments/${tournamentId}`);
+    revalidatePath(`/tournaments/${tournamentId}/invite`);
+    revalidatePath(`/tournaments/${tournamentId}/match/[matchId]`, 'page');
+  }
+  revalidatePath('/history');
+  return { ok: true };
+}

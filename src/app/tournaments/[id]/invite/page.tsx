@@ -7,8 +7,6 @@ import { InviteTopBar } from './InviteTopBar';
 import { WhatsAppToggle } from './WhatsAppToggle';
 import { ShareCodeCard } from './ShareCodeCard';
 import { RosterRow } from './RosterRow';
-import { GenerateMatchesPanel } from './GenerateMatchesPanel';
-import { ManualTeamsPanel } from './ManualTeamsPanel';
 import { formatInviteCode } from '@/lib/invite-codes';
 import { addInvitePlayer, setInviteWhatsApp } from './actions';
 
@@ -24,40 +22,42 @@ export default async function InvitePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ new?: string; manual?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ new?: string; ok?: string; error?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
   const isNew = sp.new === '1';
   const supabase = await createClient();
 
-  const [{ data: tournament }, { data: players }, { count: matchCount }, { data: { user } }] =
-    await Promise.all([
-      supabase
-        .from('tournaments')
-        .select('id,name,format,status,whatsapp_group_url,invite_code')
-        .eq('id', id)
-        .single(),
-      supabase
-        .from('tournament_players')
-        .select('id,display_name,email,profile_id')
-        .eq('tournament_id', id)
-        .order('created_at', { ascending: true }),
-      supabase
-        .from('matches')
-        .select('id', { head: true, count: 'exact' })
-        .eq('tournament_id', id),
-      supabase.auth.getUser(),
-    ]);
+  const [{ data: tournament }, { data: players }, { data: { user } }] = await Promise.all([
+    supabase
+      .from('tournaments')
+      .select('id,name,format,status,whatsapp_group_url,invite_code,owner_user_id')
+      .eq('id', id)
+      .single(),
+    supabase
+      .from('tournament_players')
+      .select('id,display_name,email,profile_id')
+      .eq('tournament_id', id)
+      .order('created_at', { ascending: true }),
+    supabase.auth.getUser(),
+  ]);
   if (!tournament) notFound();
-  const t = tournament as Tournament;
+  const t = tournament as Tournament & { owner_user_id: string };
   const roster = (players ?? []) as PlayerRow[];
   const inviteCode = formatInviteCode(t.invite_code);
-  const hasMatches = (matchCount ?? 0) > 0;
   const userHasClaimedSlot = !!user && roster.some((p) => p.profile_id === user.id);
-  const isFixed = t.format === 'fixed_partners';
-  // Manual mode: explicit ?manual=1, or fixed-partners with no matches yet.
-  const showManual = isFixed && (sp.manual === '1' || !hasMatches);
+  const isOwner = !!user && user.id === t.owner_user_id;
+  let isManager = isOwner;
+  if (user && !isOwner) {
+    const { data: member } = await supabase
+      .from('tournament_members')
+      .select('role')
+      .eq('tournament_id', id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    isManager = member?.role === 'organizer' || member?.role === 'admin';
+  }
 
   return (
     <div className="flex min-h-full flex-col bg-paper">
@@ -112,35 +112,37 @@ export default async function InvitePage({
         <SectionHeader
           title="Roster"
           mute={`${roster.length} confirmed`}
-          action={<span>Add player</span>}
+          action={isManager ? <span>Add player</span> : null}
         />
 
-        <form action={addInvitePlayer} className="mb-3 grid gap-2">
-          <input type="hidden" name="tournament_id" value={t.id} />
-          <input
-            name="display_name"
-            placeholder="Player name"
-            required
-            className="rounded-xl bg-white px-3.5 py-3 text-sm text-ink outline-none"
-            style={{ border: '1px solid var(--line)' }}
-          />
-          <div className="flex gap-2">
+        {isManager && (
+          <form action={addInvitePlayer} className="mb-3 grid gap-2">
+            <input type="hidden" name="tournament_id" value={t.id} />
             <input
-              name="email"
-              type="email"
-              placeholder="Email (optional — links them to history)"
-              className="flex-1 rounded-xl bg-white px-3.5 py-3 text-sm text-ink outline-none"
+              name="display_name"
+              placeholder="Player name"
+              required
+              className="rounded-xl bg-white px-3.5 py-3 text-sm text-ink outline-none"
               style={{ border: '1px solid var(--line)' }}
             />
-            <button
-              type="submit"
-              className="rounded-xl px-4 text-sm font-semibold"
-              style={{ background: 'var(--ink)', color: 'var(--paper)' }}
-            >
-              Add
-            </button>
-          </div>
-        </form>
+            <div className="flex gap-2">
+              <input
+                name="email"
+                type="email"
+                placeholder="Email (optional — links them to history)"
+                className="flex-1 rounded-xl bg-white px-3.5 py-3 text-sm text-ink outline-none"
+                style={{ border: '1px solid var(--line)' }}
+              />
+              <button
+                type="submit"
+                className="rounded-xl px-4 text-sm font-semibold"
+                style={{ background: 'var(--ink)', color: 'var(--paper)' }}
+              >
+                Add
+              </button>
+            </div>
+          </form>
+        )}
 
         <div className="mb-5 grid gap-2">
           {roster.length === 0 ? (
@@ -148,7 +150,7 @@ export default async function InvitePage({
               className="rounded-2xl bg-white p-4 text-center text-sm text-ink-3"
               style={{ border: '1px dashed var(--line)' }}
             >
-              No players yet. Add a few above to get started.
+              {isManager ? 'No players yet. Add a few above to get started.' : 'Roster is empty so far.'}
             </div>
           ) : (
             roster.map((p) => (
@@ -158,31 +160,11 @@ export default async function InvitePage({
                 player={p}
                 currentUserId={user?.id ?? null}
                 userHasClaimedSlot={userHasClaimedSlot}
+                canManage={isManager}
               />
             ))
           )}
         </div>
-
-        {roster.length > 0 && (
-          <SectionHeader title={hasMatches ? 'Schedule' : 'Build the schedule'} />
-        )}
-
-        {showManual && roster.length > 0 ? (
-          <ManualTeamsPanel
-            tournamentId={t.id}
-            roster={roster.map((p) => ({ id: p.id, display_name: p.display_name }))}
-            hasMatches={hasMatches}
-          />
-        ) : (
-          roster.length > 0 && (
-            <GenerateMatchesPanel
-              tournamentId={t.id}
-              format={t.format}
-              rosterCount={roster.length}
-              hasMatches={hasMatches}
-            />
-          )
-        )}
 
         <div className="mt-5">
           <Link
@@ -197,6 +179,11 @@ export default async function InvitePage({
             Open scoreboard →
           </Link>
         </div>
+        {isManager && (
+          <div className="mt-2 text-center text-[11px] text-ink-3">
+            Generating or resetting matches lives in the Settings tab on the scoreboard.
+          </div>
+        )}
       </div>
     </div>
   );

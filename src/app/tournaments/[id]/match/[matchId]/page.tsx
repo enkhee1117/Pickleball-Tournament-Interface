@@ -26,11 +26,17 @@ type SiblingRow = {
   completed_at: string | null;
 };
 
+type RosterPlayer = {
+  id: string;
+  display_name: string;
+  profile_id: string | null;
+};
+
 export default async function MatchPage({ params }: PageProps) {
   const { id, matchId } = await params;
   const supabase = await createClient();
 
-  const [{ data }, { data: siblings }] = await Promise.all([
+  const [{ data }, { data: siblings }, { data: roster }, { data: { user } }] = await Promise.all([
     supabase
       .from('matches')
       .select('id,tournament_id,round_label,court_label,team_a_label,team_b_label,team_a_score,team_b_score,winner_side,completed_at')
@@ -42,9 +48,23 @@ export default async function MatchPage({ params }: PageProps) {
       .select('id,round_label,completed_at')
       .eq('tournament_id', id)
       .order('created_at', { ascending: true }),
+    supabase
+      .from('tournament_players')
+      .select('id,display_name,profile_id')
+      .eq('tournament_id', id),
+    supabase.auth.getUser(),
   ]);
   if (!data) notFound();
   const row = data as MatchRow;
+  const players = (roster ?? []) as RosterPlayer[];
+  const userHasClaimedSlot = !!user && players.some((p) => p.profile_id === user.id);
+  // Map player names to {id, claimable} so MatchScreen can offer "I am
+  // [name]" buttons for unclaimed slots whose label matches a roster row.
+  const claimables = !user || userHasClaimedSlot
+    ? null
+    : players
+        .filter((p) => !p.profile_id)
+        .map((p) => ({ id: p.id, displayName: p.display_name }));
 
   const isPlayoff = (ALL_PLAYOFF_LABELS as readonly string[]).includes(row.round_label ?? '');
   const returnTab: 'matches' | 'bracket' = isPlayoff ? 'bracket' : 'matches';
@@ -98,6 +118,7 @@ export default async function MatchPage({ params }: PageProps) {
       nextUnscoredMatchId={nextUnscoredId}
       position={idx >= 0 ? idx + 1 : 0}
       total={sameSection.length}
+      claimables={claimables}
     />
   );
 }

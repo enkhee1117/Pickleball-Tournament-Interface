@@ -24,6 +24,8 @@ import { refreshTournamentStatus } from '@/lib/tournament-status-server';
 import { GeneratePlayoffsForm } from './GeneratePlayoffsForm';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { deleteTournament, resetTournamentMatches } from './settings-actions';
+import { GenerateMatchesPanel } from './invite/GenerateMatchesPanel';
+import { ManualTeamsPanel } from './invite/ManualTeamsPanel';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -102,6 +104,18 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
   const canGeneratePlayoffs =
     !playoffsExist && rrMatches.length > 0 && rrPending === 0;
   const isOwner = !!user && user.id === t.owner_user_id;
+  let isManager = isOwner;
+  if (user && !isOwner) {
+    const { data: member } = await supabase
+      .from('tournament_members')
+      .select('role')
+      .eq('tournament_id', id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    isManager = member?.role === 'organizer' || member?.role === 'admin';
+  }
+  const playerCount = (players ?? []).length;
+  const hasMatches = m.length > 0;
 
   return (
     <div className="flex min-h-full flex-col bg-paper">
@@ -151,7 +165,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
               ['matches', 'Matches', liveCount],
               ['standings', 'Standings', 0],
               ['bracket', 'Bracket', 0],
-              ...(isOwner
+              ...(isManager
                 ? ([['settings', 'Settings', 0]] as Array<[
                     'matches' | 'standings' | 'bracket' | 'settings',
                     string,
@@ -211,8 +225,19 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
         {tab === 'matches' && (
           <MatchesTab tournamentId={id} matches={rrMatches} showDone={showDone} />
         )}
-        {tab === 'settings' && isOwner && (
-          <SettingsTab tournamentId={id} matchCount={m.length} />
+        {tab === 'settings' && isManager && (
+          <SettingsTab
+            tournamentId={id}
+            tournamentFormat={t.format}
+            matchCount={m.length}
+            playerCount={playerCount}
+            roster={(players ?? []).map((p) => ({
+              id: p.id as string,
+              display_name: p.display_name as string,
+            }))}
+            hasMatches={hasMatches}
+            isOwner={isOwner}
+          />
         )}
         {tab === 'standings' && <StandingsTab matches={m} />}
         {tab === 'bracket' && (
@@ -409,13 +434,51 @@ function playersFromLabel(label: string) {
 
 function SettingsTab({
   tournamentId,
+  tournamentFormat,
   matchCount,
+  playerCount,
+  roster,
+  hasMatches,
+  isOwner,
 }: {
   tournamentId: string;
+  tournamentFormat: string;
   matchCount: number;
+  playerCount: number;
+  roster: { id: string; display_name: string }[];
+  hasMatches: boolean;
+  isOwner: boolean;
 }) {
+  const isFixed = tournamentFormat === 'fixed_partners';
   return (
     <div className="px-[18px] py-[18px] pb-24">
+      <SectionHeader title={hasMatches ? 'Regenerate schedule' : 'Build the schedule'} />
+      {playerCount === 0 ? (
+        <div
+          className="mb-4 rounded-2xl bg-white p-4 text-center text-sm text-ink-3"
+          style={{ border: '1px dashed var(--line)' }}
+        >
+          Add players on the{' '}
+          <Link
+            href={`/tournaments/${tournamentId}/invite`}
+            className="font-semibold underline"
+            style={{ color: 'var(--ink)' }}
+          >
+            roster page
+          </Link>{' '}
+          before generating matches.
+        </div>
+      ) : isFixed ? (
+        <ManualTeamsPanel tournamentId={tournamentId} roster={roster} hasMatches={hasMatches} />
+      ) : (
+        <GenerateMatchesPanel
+          tournamentId={tournamentId}
+          format={tournamentFormat}
+          rosterCount={playerCount}
+          hasMatches={hasMatches}
+        />
+      )}
+
       <SectionHeader title="Danger zone" />
       <div className="grid gap-3">
         <form action={resetTournamentMatches}>
@@ -433,19 +496,21 @@ function SettingsTab({
             </div>
           </button>
         </form>
-        <form action={deleteTournament}>
-          <input type="hidden" name="tournament_id" value={tournamentId} />
-          <button
-            type="submit"
-            className="w-full rounded-2xl p-4 text-left"
-            style={{ border: '1px solid var(--berry)', color: 'var(--berry)', background: '#fff' }}
-          >
-            <div className="text-sm font-semibold">Delete tournament</div>
-            <div className="mt-1 text-xs" style={{ color: 'var(--berry)' }}>
-              Permanently removes the tournament, roster, matches, and scores. This cannot be undone.
-            </div>
-          </button>
-        </form>
+        {isOwner && (
+          <form action={deleteTournament}>
+            <input type="hidden" name="tournament_id" value={tournamentId} />
+            <button
+              type="submit"
+              className="w-full rounded-2xl p-4 text-left"
+              style={{ border: '1px solid var(--berry)', color: 'var(--berry)', background: '#fff' }}
+            >
+              <div className="text-sm font-semibold">Delete tournament</div>
+              <div className="mt-1 text-xs" style={{ color: 'var(--berry)' }}>
+                Permanently removes the tournament, roster, matches, and scores. This cannot be undone.
+              </div>
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

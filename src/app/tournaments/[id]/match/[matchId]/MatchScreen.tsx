@@ -6,7 +6,9 @@ import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { IconBtn } from '@/components/ui/IconBtn';
 import { BigButton } from '@/components/ui/BigButton';
 import { Icons } from '@/components/ui/icons';
-import { saveMatchScore } from './actions';
+import { claimMatchPlayer, saveMatchScore } from './actions';
+
+type Claimable = { id: string; displayName: string };
 
 type Props = {
   tournamentId: string;
@@ -24,6 +26,10 @@ type Props = {
   nextUnscoredMatchId?: string | null;
   position?: number;
   total?: number;
+  // Unclaimed roster rows whose display_name appears in this match's team
+  // labels — null when the user is signed out, or has already claimed a
+  // slot in this tournament.
+  claimables?: Claimable[] | null;
 };
 
 const KEYPAD: Array<string> = ['1', '2', '3', '+1', '4', '5', '6', '−1', '7', '8', '9', '⌫', 'C', '0', '', '▶'];
@@ -46,6 +52,7 @@ export function MatchScreen({
   nextUnscoredMatchId = null,
   position = 0,
   total = 0,
+  claimables = null,
 }: Props) {
   const router = useRouter();
   const returnHref = `/tournaments/${tournamentId}?tab=${returnTab}`;
@@ -200,6 +207,13 @@ export function MatchScreen({
           })}
         </div>
       )}
+
+      <ClaimBanner
+        teamALabel={teamALabel}
+        teamBLabel={teamBLabel}
+        matchId={matchId}
+        claimables={claimables}
+      />
 
       <div className="flex flex-1 flex-col px-3.5 py-2">
         <ScorePanel
@@ -413,4 +427,72 @@ function ScorePanel({
 function parseTeam(label: string) {
   const parts = label.split(/\s*&\s*|\s*\/\s*/).filter(Boolean);
   return parts.slice(0, 2).map((s) => playerFromName(s));
+}
+
+function ClaimBanner({
+  teamALabel,
+  teamBLabel,
+  matchId,
+  claimables,
+}: {
+  teamALabel: string;
+  teamBLabel: string;
+  matchId: string;
+  claimables: Claimable[] | null;
+}) {
+  const [pending, setPending] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  if (!claimables || claimables.length === 0) return null;
+
+  const namesInThisMatch = new Set(
+    [teamALabel, teamBLabel].flatMap((label) =>
+      label.split(/\s*&\s*|\s*\/\s*/).map((s) => s.trim()),
+    ),
+  );
+  const matches = claimables.filter((c) => namesInThisMatch.has(c.displayName));
+  if (matches.length === 0) return null;
+
+  const onClaim = async (player: Claimable) => {
+    setPending(player.id);
+    setError(null);
+    const res = await claimMatchPlayer({ playerId: player.id, matchId });
+    setPending(null);
+    if (!res.ok) {
+      setError(res.error ?? 'Could not claim that slot.');
+      return;
+    }
+    router.refresh();
+  };
+
+  return (
+    <div
+      className="mx-3.5 mt-2 rounded-2xl px-3 py-2.5"
+      style={{ background: 'var(--paper-2)', border: '1px solid var(--line)' }}
+    >
+      <div className="text-[11px] uppercase tracking-[0.06em] text-ink-3">
+        Are you in this match?
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {matches.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => onClaim(c)}
+            disabled={pending !== null}
+            className="rounded-full px-3 py-1.5 text-[12px] font-semibold disabled:opacity-50"
+            style={{ background: 'var(--ink)', color: 'var(--paper)' }}
+          >
+            {pending === c.id ? 'Linking…' : `I'm ${c.displayName}`}
+          </button>
+        ))}
+      </div>
+      {error && (
+        <div className="mt-1.5 text-[11px]" style={{ color: 'var(--berry)' }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
 }
