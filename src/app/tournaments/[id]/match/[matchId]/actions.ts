@@ -89,6 +89,9 @@ export async function setMatchRecording({
     revalidatePath(`/tournaments/${tournamentId}`);
     revalidatePath(`/tournaments/${tournamentId}/match/[matchId]`, 'page');
   }
+  // The fan-out RPC inserts notifications for other players; bust /history
+  // so they see the unread strip on their next visit.
+  revalidatePath('/history');
   return { ok: true };
 }
 

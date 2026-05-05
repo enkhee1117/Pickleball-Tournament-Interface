@@ -9,6 +9,16 @@ import { Icons } from '@/components/ui/icons';
 import { computePlayerStandings, type StandingsMatch } from '@/lib/scoring';
 import { MatchSearch } from './MatchSearch';
 import { dismissSelfLink } from './dismiss-action';
+import { markAllNotificationsRead } from './notification-actions';
+
+type NotificationRow = {
+  id: string;
+  kind: string;
+  body: Record<string, unknown> | null;
+  link_url: string | null;
+  read_at: string | null;
+  created_at: string;
+};
 
 type TournamentMemberRow = {
   role: string;
@@ -73,17 +83,26 @@ export default async function HistoryPage() {
     );
   }
 
-  const [{ data: linkedPlayers }, { data: memberRows }] = await Promise.all([
-    supabase
-      .from('tournament_players')
-      .select('id,tournament_id,display_name')
-      .eq('profile_id', user.id),
-    supabase
-      .from('tournament_members')
-      .select('role,dismissed_self_link,tournaments(*)')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false }),
-  ]);
+  const [{ data: linkedPlayers }, { data: memberRows }, { data: notifications }] =
+    await Promise.all([
+      supabase
+        .from('tournament_players')
+        .select('id,tournament_id,display_name')
+        .eq('profile_id', user.id),
+      supabase
+        .from('tournament_members')
+        .select('role,dismissed_self_link,tournaments(*)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('notifications')
+        .select('id,kind,body,link_url,read_at,created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(20),
+    ]);
+  const notes = (notifications ?? []) as NotificationRow[];
+  const unreadCount = notes.filter((n) => !n.read_at).length;
 
   const linked = (linkedPlayers ?? []) as LinkedPlayer[];
   const tournamentIds = Array.from(new Set(linked.map((p) => p.tournament_id)));
@@ -202,6 +221,78 @@ export default async function HistoryPage() {
           </div>
         )}
 
+        {notes.length > 0 && (
+          <div
+            className="mb-4 rounded-2xl bg-white p-3.5"
+            style={{ border: '1px solid var(--line)' }}
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-[11px] uppercase tracking-[0.06em] text-ink-3">
+                Notifications
+                {unreadCount > 0 && (
+                  <span
+                    className="ml-1.5 inline-flex h-4 items-center rounded-full px-1.5 text-[10px] font-bold text-white"
+                    style={{ background: 'var(--serve)' }}
+                  >
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
+              {unreadCount > 0 && (
+                <form action={markAllNotificationsRead}>
+                  <button
+                    type="submit"
+                    className="text-[11px] font-semibold text-ink-3 underline"
+                  >
+                    Mark all read
+                  </button>
+                </form>
+              )}
+            </div>
+            <div className="grid gap-1.5">
+              {notes.slice(0, 5).map((n) => {
+                const body = (n.body ?? {}) as Record<string, unknown>;
+                const teamA = String(body.team_a_label ?? '');
+                const teamB = String(body.team_b_label ?? '');
+                const round = String(body.round_label ?? '');
+                return (
+                  <Link
+                    key={n.id}
+                    href={n.link_url ?? '/history'}
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-2"
+                    style={{
+                      background: n.read_at ? 'transparent' : 'var(--paper-2)',
+                      border: n.read_at ? '1px solid var(--line)' : '1px solid var(--line)',
+                    }}
+                  >
+                    <span
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white"
+                      style={{ background: '#FF0033' }}
+                    >
+                      ▶
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[12px] font-semibold text-ink">
+                        Recording added
+                        {round ? ` · ${round}` : ''}
+                      </div>
+                      <div className="truncate text-[11px] text-ink-3">
+                        {teamA} vs {teamB}
+                      </div>
+                    </div>
+                    {!n.read_at && (
+                      <span
+                        className="mr-1 inline-block h-2 w-2 rounded-full"
+                        style={{ background: 'var(--serve)' }}
+                      />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <MatchSearch />
 
         {linked.length > 0 && aggregate.matchesPlayed > 0 && (
@@ -214,7 +305,7 @@ export default async function HistoryPage() {
                 return (
                   <Link
                     key={tournamentId}
-                    href={`/tournaments/${tournamentId}?tab=standings`}
+                    href={`/history/tournament/${tournamentId}`}
                     className="block rounded-2xl bg-white p-3.5"
                     style={{ border: '1px solid var(--line)' }}
                   >
