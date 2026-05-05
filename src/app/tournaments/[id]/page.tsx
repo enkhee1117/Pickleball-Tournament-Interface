@@ -18,7 +18,12 @@ import { GeneratePlayoffsForm } from './GeneratePlayoffsForm';
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: 'matches' | 'standings' | 'bracket'; ok?: string; error?: string }>;
+  searchParams: Promise<{
+    tab?: 'matches' | 'standings' | 'bracket';
+    done?: string;
+    ok?: string;
+    error?: string;
+  }>;
 };
 
 type MatchRow = {
@@ -36,6 +41,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
   const { id } = await params;
   const sp = await searchParams;
   const tab = sp.tab ?? 'matches';
+  const showDone = sp.done === '1';
   const supabase = await createClient();
 
   // Self-heal lifecycle status alongside the data fetch — the page does not
@@ -172,7 +178,9 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
           </div>
         )}
 
-        {tab === 'matches' && <MatchesTab tournamentId={id} matches={rrMatches} />}
+        {tab === 'matches' && (
+          <MatchesTab tournamentId={id} matches={rrMatches} showDone={showDone} />
+        )}
         {tab === 'standings' && <StandingsTab />}
         {tab === 'bracket' && (
           <BracketTab
@@ -188,7 +196,15 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
   );
 }
 
-function MatchesTab({ tournamentId, matches }: { tournamentId: string; matches: MatchRow[] }) {
+function MatchesTab({
+  tournamentId,
+  matches,
+  showDone,
+}: {
+  tournamentId: string;
+  matches: MatchRow[];
+  showDone: boolean;
+}) {
   if (matches.length === 0) {
     return (
       <div className="px-[18px] pt-6 pb-24">
@@ -217,12 +233,38 @@ function MatchesTab({ tournamentId, matches }: { tournamentId: string; matches: 
     list.push(row);
     byRound.set(key, list);
   }
-  const rounds = [...byRound.keys()].sort().reverse();
+  // Round 1 first — sort numerically so "Round 10" doesn't beat "Round 2".
+  const rounds = [...byRound.keys()].sort((a, b) => roundNumber(a) - roundNumber(b));
+
+  const totalDone = matches.filter((x) => x.completed_at).length;
+  const totalPending = matches.length - totalDone;
 
   return (
     <div className="py-3.5 pb-24">
+      <div className="mb-1 flex items-center justify-between px-[18px]">
+        <div className="text-[11px] uppercase tracking-[0.06em] text-ink-3">
+          {totalPending} pending · {totalDone} done
+        </div>
+        {totalDone > 0 && (
+          <Link
+            href={`/tournaments/${tournamentId}?tab=matches${showDone ? '' : '&done=1'}`}
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold"
+            style={{
+              background: showDone ? 'var(--ink)' : '#fff',
+              color: showDone ? 'var(--paper)' : 'var(--ink-2)',
+              border: `1px solid ${showDone ? 'var(--ink)' : 'var(--line)'}`,
+            }}
+            aria-label={showDone ? 'Hide completed matches' : 'Show completed matches'}
+          >
+            {showDone ? Icons.eyeOff : Icons.eye}
+            {showDone ? 'Hide done' : 'Show done'}
+          </Link>
+        )}
+      </div>
       {rounds.map((r) => {
         const list = byRound.get(r) ?? [];
+        const visible = showDone ? list : list.filter((x) => !x.completed_at);
+        if (visible.length === 0) return null;
         const done = list.filter((x) => x.completed_at).length;
         return (
           <div key={r} className="mb-[18px]">
@@ -231,7 +273,7 @@ function MatchesTab({ tournamentId, matches }: { tournamentId: string; matches: 
               <div className="text-[11px] tracking-[0.04em] text-ink-3">{done}/{list.length} DONE</div>
             </div>
             <div className="grid gap-2.5 px-[18px]">
-              {list.map((row) => (
+              {visible.map((row) => (
                 <RealMatchCard key={row.id} tournamentId={tournamentId} row={row} />
               ))}
             </div>
@@ -240,6 +282,14 @@ function MatchesTab({ tournamentId, matches }: { tournamentId: string; matches: 
       })}
     </div>
   );
+}
+
+// Extract the trailing integer from labels like "Round 1", "Round 10",
+// "Round 2A". Falls back to Infinity for non-matching labels so they sink
+// to the end of the list.
+function roundNumber(label: string): number {
+  const match = label.match(/(\d+)/);
+  return match ? Number.parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
 }
 
 function RealMatchCard({ tournamentId, row }: { tournamentId: string; row: MatchRow }) {

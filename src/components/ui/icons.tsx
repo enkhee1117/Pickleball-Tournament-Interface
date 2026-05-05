@@ -78,4 +78,15 @@ export const Icons = {
       <path d="M3 14V6M9 14V3M15 14V9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   ),
+  eye: (
+    <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
+      <path d="M1.5 9s2.5-5 7.5-5 7.5 5 7.5 5-2.5 5-7.5 5S1.5 9 1.5 9z" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="9" cy="9" r="2.25" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  ),
+  eyeOff: (
+    <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
+      <path d="M3 3l12 12M5 5.6C2.8 7 1.5 9 1.5 9s2.5 5 7.5 5c1.4 0 2.7-.4 3.8-1M8.4 4.05A7.6 7.6 0 019 4c5 0 7.5 5 7.5 5s-.7 1.3-2.1 2.6M7.5 7.5a2.25 2.25 0 003 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
 };
