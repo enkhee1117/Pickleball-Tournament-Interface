@@ -44,6 +44,10 @@ export async function saveMatchScore({
   await refreshTournamentStatus(supabase, tournamentId);
 
   revalidatePath(`/tournaments/${tournamentId}`);
+  // Sibling match pages cache their own siblings query — invalidate the
+  // whole match subtree so the very next "Score next match" landing sees
+  // this match as completed and skips it.
+  revalidatePath(`/tournaments/${tournamentId}/match/[matchId]`, 'page');
   revalidatePath('/tournaments');
   revalidatePath('/');
   revalidatePath('/history');

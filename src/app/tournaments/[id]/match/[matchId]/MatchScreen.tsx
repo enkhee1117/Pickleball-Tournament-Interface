@@ -17,9 +17,11 @@ type Props = {
   teamBLabel: string;
   initialScoreA: number;
   initialScoreB: number;
+  initialDone?: boolean;
   returnTab?: 'matches' | 'bracket';
   prevMatchId?: string | null;
   nextMatchId?: string | null;
+  nextUnscoredMatchId?: string | null;
   position?: number;
   total?: number;
 };
@@ -37,9 +39,11 @@ export function MatchScreen({
   teamBLabel,
   initialScoreA,
   initialScoreB,
+  initialDone = false,
   returnTab = 'matches',
   prevMatchId = null,
   nextMatchId = null,
+  nextUnscoredMatchId = null,
   position = 0,
   total = 0,
 }: Props) {
@@ -50,20 +54,24 @@ export function MatchScreen({
   const [scoreB, setScoreB] = useState(initialScoreB);
   const [active, setActive] = useState<'A' | 'B'>('A');
   const [serving, setServing] = useState<'A' | 'B'>('A');
-  const [done, setDone] = useState(false);
+  // The match is "done" if it landed here already finished (don't rerun the
+  // confetti) or the user just hit End. Server-finished matches stay locked
+  // behind a Re-open button so a stray tap doesn't blow away saved scores.
+  const [done, setDone] = useState(initialDone);
+  const [justFinished, setJustFinished] = useState(false);
   const [confetti, setConfetti] = useState(false);
   const [isPending, startTransition] = useTransition();
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
 
-  // Reset local state when the user navigates to a sibling match.
   useEffect(() => {
     setScoreA(initialScoreA);
     setScoreB(initialScoreB);
     setActive('A');
     setServing('A');
-    setDone(false);
+    setDone(initialDone);
+    setJustFinished(false);
     setConfetti(false);
-  }, [matchId, initialScoreA, initialScoreB]);
+  }, [matchId, initialScoreA, initialScoreB, initialDone]);
 
   const goPrev = () => {
     if (prevMatchId) router.push(matchHref(prevMatchId));
@@ -108,11 +116,17 @@ export function MatchScreen({
 
   const finish = () => {
     setDone(true);
+    setJustFinished(true);
     setConfetti(true);
     setTimeout(() => setConfetti(false), 3000);
     startTransition(async () => {
       await saveMatchScore({ matchId, scoreA, scoreB });
     });
+  };
+
+  const reopen = () => {
+    setDone(false);
+    setJustFinished(false);
   };
 
   const winner: 'A' | 'B' = scoreA > scoreB ? 'A' : 'B';
@@ -266,21 +280,21 @@ export function MatchScreen({
                 className="text-[13px] font-semibold tracking-[0.04em]"
                 style={{ color: 'oklch(0.3 0.05 140)' }}
               >
-                WINNER
+                {justFinished ? 'WINNER' : 'FINAL'}
               </div>
               <div className="serif text-[22px] leading-[1.1] text-ink">
                 {(winner === 'A' ? teamAPlayers : teamBPlayers).map((p) => p?.name?.split(' ')[0]).join(' & ')}
               </div>
               <div className="mt-0.5 text-xs" style={{ color: 'oklch(0.3 0.05 140)' }}>
                 {Math.max(scoreA, scoreB)}–{Math.min(scoreA, scoreB)}
-                {isPending ? ' · Saving…' : ' · Saved'}
+                {justFinished ? (isPending ? ' · Saving…' : ' · Saved') : ' · Saved'}
               </div>
             </div>
           </div>
-          {nextMatchId ? (
+          {nextUnscoredMatchId ? (
             <BigButton
               tone="ink"
-              onClick={() => router.push(matchHref(nextMatchId))}
+              onClick={() => router.push(matchHref(nextUnscoredMatchId))}
             >
               Score next match →
             </BigButton>
@@ -289,15 +303,25 @@ export function MatchScreen({
               Back to scoreboard
             </BigButton>
           )}
-          {nextMatchId && (
+          <div className="mt-2 grid gap-2">
+            {nextUnscoredMatchId && (
+              <button
+                type="button"
+                onClick={() => router.push(returnHref)}
+                className="w-full rounded-xl py-2.5 text-[12px] font-semibold text-ink-2"
+              >
+                Back to scoreboard
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => router.push(returnHref)}
-              className="mt-2 w-full rounded-xl py-2.5 text-[12px] font-semibold text-ink-2"
+              onClick={reopen}
+              className="w-full rounded-xl py-2.5 text-[12px] font-semibold"
+              style={{ color: 'var(--ink-3)' }}
             >
-              Back to scoreboard
+              Re-open match to edit score
             </button>
-          )}
+          </div>
         </div>
       )}
     </div>
