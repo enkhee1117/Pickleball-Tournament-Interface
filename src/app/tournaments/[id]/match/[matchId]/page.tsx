@@ -18,6 +18,7 @@ type MatchRow = {
   team_b_score: number | null;
   winner_side: 'a' | 'b' | null;
   completed_at: string | null;
+  recording_url: string | null;
 };
 
 type SiblingRow = {
@@ -45,7 +46,7 @@ export default async function MatchPage({ params }: PageProps) {
   ] = await Promise.all([
     supabase
       .from('matches')
-      .select('id,tournament_id,round_label,court_label,team_a_label,team_b_label,team_a_score,team_b_score,winner_side,completed_at')
+      .select('id,tournament_id,round_label,court_label,team_a_label,team_b_label,team_a_score,team_b_score,winner_side,completed_at,recording_url')
       .eq('id', matchId)
       .eq('tournament_id', id)
       .single(),
@@ -158,6 +159,7 @@ export default async function MatchPage({ params }: PageProps) {
       total={sameSection.length}
       claimables={claimables}
       canScore={canScore}
+      recordingUrl={row.recording_url}
     />
   );
 }
