@@ -6,10 +6,18 @@ import { TopBar } from '@/components/ui/TopBar';
 import { IconBtn } from '@/components/ui/IconBtn';
 import { BigButton } from '@/components/ui/BigButton';
 import { Icons } from '@/components/ui/icons';
+import {
+  defaultPairingForFormat,
+  isFixedPartners,
+  isValidPairingForFormat,
+  shouldAutoGenerate,
+  type WizardFormat,
+  type WizardPairing,
+} from '@/lib/tournament-wizard';
 import { createTournamentClient } from './actions';
 
-type FormatId = 'rr-mixed' | 'rr-same' | 'fp-mixed' | 'fp-same';
-type PairingId = 'balanced' | 'random' | 'snake' | 'manual';
+type FormatId = WizardFormat;
+type PairingId = WizardPairing;
 
 type WizardData = {
   name: string;
@@ -42,17 +50,13 @@ export function CreateWizard() {
   const set = <K extends keyof WizardData>(k: K, v: WizardData[K]) =>
     setData((d) => ({ ...d, [k]: v }));
 
-  const isFixed = data.format.startsWith('fp');
-  const manualFp = isFixed && data.pairing === 'manual';
+  const manualFp = !shouldAutoGenerate(data.format, data.pairing);
 
   // Pairing choices vary by format — reset to a sane default whenever the
   // format flips between round-robin and fixed-partners.
   useEffect(() => {
-    if (isFixed && !['manual', 'balanced', 'random'].includes(data.pairing)) {
-      set('pairing', 'manual');
-    }
-    if (!isFixed && !['balanced', 'random', 'snake'].includes(data.pairing)) {
-      set('pairing', 'balanced');
+    if (!isValidPairingForFormat(data.format, data.pairing)) {
+      set('pairing', defaultPairingForFormat(data.format));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.format]);
@@ -240,7 +244,7 @@ function StepFormat({ data, set }: { data: WizardData; set: <K extends keyof Wiz
 }
 
 function StepPairing({ data, set }: { data: WizardData; set: <K extends keyof WizardData>(k: K, v: WizardData[K]) => void }) {
-  const isFixed = data.format.startsWith('fp');
+  const isFixed = isFixedPartners(data.format);
   const opts: Array<{ id: PairingId; title: string; sub: string; emoji: string }> = isFixed
     ? [
         { id: 'manual', title: "I'll set teams", sub: 'Pair people up on the roster screen.', emoji: '✋' },

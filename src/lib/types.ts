@@ -45,6 +45,7 @@ export type Tournament = {
   format: string;
   status: TournamentStatus;
   whatsapp_group_url: string | null;
+  invite_code: string;
   created_at: string;
   updated_at: string;
 };

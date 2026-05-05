@@ -9,6 +9,7 @@ import { SectionHeader } from '@/components/ui/SectionHeader';
 import { InviteTopBar } from './InviteTopBar';
 import { WhatsAppToggle } from './WhatsAppToggle';
 import { ShareCodeCard } from './ShareCodeCard';
+import { formatInviteCode } from '@/lib/invite-codes';
 import { addInvitePlayer, setInviteWhatsApp } from './actions';
 
 type PlayerRow = {
@@ -41,7 +42,7 @@ export default async function InvitePage({
   if (!tournament) notFound();
   const t = tournament as Tournament;
   const roster = (players ?? []) as PlayerRow[];
-  const inviteCode = makeInviteCode(t.id, t.name);
+  const inviteCode = formatInviteCode(t.invite_code);
 
   return (
     <div className="flex min-h-full flex-col bg-paper">
@@ -80,7 +81,12 @@ export default async function InvitePage({
           </div>
         )}
 
-        <ShareCodeCard inviteCode={inviteCode} tournamentId={t.id} tournamentName={t.name} />
+        <ShareCodeCard
+          inviteCode={inviteCode}
+          rawInviteCode={t.invite_code}
+          tournamentId={t.id}
+          tournamentName={t.name}
+        />
 
         <WhatsAppToggle
           tournamentId={t.id}
@@ -178,12 +184,3 @@ export default async function InvitePage({
   );
 }
 
-function makeInviteCode(id: string, name: string): string {
-  const prefix = name
-    .replace(/[^A-Za-z]/g, '')
-    .slice(0, 3)
-    .toUpperCase()
-    .padEnd(3, 'X');
-  const suffix = id.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase().padEnd(4, '0');
-  return `${prefix}-${suffix}`;
-}

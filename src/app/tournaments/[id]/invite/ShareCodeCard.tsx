@@ -5,19 +5,20 @@ import { Icons } from '@/components/ui/icons';
 
 type Props = {
   inviteCode: string;
+  rawInviteCode: string;
   tournamentId: string;
   tournamentName: string;
 };
 
-export function ShareCodeCard({ inviteCode, tournamentId, tournamentName }: Props) {
+export function ShareCodeCard({ inviteCode, rawInviteCode, tournamentId, tournamentName }: Props) {
   const [shareUrl, setShareUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [canNativeShare, setCanNativeShare] = useState(false);
 
   useEffect(() => {
-    setShareUrl(`${window.location.origin}/tournaments/${tournamentId}`);
+    setShareUrl(`${window.location.origin}/join?code=${encodeURIComponent(rawInviteCode)}`);
     setCanNativeShare(typeof navigator !== 'undefined' && 'share' in navigator);
-  }, [tournamentId]);
+  }, [tournamentId, rawInviteCode]);
 
   const onCopy = async () => {
     if (!shareUrl) return;
@@ -26,7 +27,6 @@ export function ShareCodeCard({ inviteCode, tournamentId, tournamentName }: Prop
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Older browsers without clipboard API: fall back to a temporary input.
       const el = document.createElement('input');
       el.value = shareUrl;
       document.body.appendChild(el);
@@ -49,8 +49,7 @@ export function ShareCodeCard({ inviteCode, tournamentId, tournamentName }: Prop
         });
         return;
       } catch {
-        // User cancelled the share sheet, or sharing is blocked. Fall through
-        // to clipboard as a backup.
+        // User cancelled the share sheet or sharing was blocked.
       }
     }
     onCopy();
