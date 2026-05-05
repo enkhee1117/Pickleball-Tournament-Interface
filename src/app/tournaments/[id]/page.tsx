@@ -13,6 +13,13 @@ import {
   SEMI_LOSER_PLACEHOLDERS,
   SEMI_WINNER_PLACEHOLDERS,
 } from '@/lib/playoffs';
+import {
+  computePlayerStandings,
+  computeStandings,
+  isRotatingPartnersData,
+  type StandingRow,
+  type StandingsMatch,
+} from '@/lib/scoring';
 import { refreshTournamentStatus } from '@/lib/tournament-status-server';
 import { GeneratePlayoffsForm } from './GeneratePlayoffsForm';
 
@@ -34,7 +41,9 @@ type MatchRow = {
   team_b_label: string;
   team_a_score: number | null;
   team_b_score: number | null;
+  winner_side: 'a' | 'b' | null;
   completed_at: string | null;
+  match_games: { team_a_score: number; team_b_score: number }[] | null;
 };
 
 export default async function TournamentDetailPage({ params, searchParams }: PageProps) {
@@ -55,10 +64,12 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
       .single(),
     supabase
       .from('matches')
-      .select('id,round_label,court_label,team_a_label,team_b_label,team_a_score,team_b_score,completed_at')
+      .select(
+        'id,round_label,court_label,team_a_label,team_b_label,team_a_score,team_b_score,winner_side,completed_at,match_games(team_a_score,team_b_score)',
+      )
       .eq('tournament_id', id)
-      .order('created_at', { ascending: false })
-      .limit(100),
+      .order('created_at', { ascending: true })
+      .limit(200),
     supabase
       .from('tournament_players')
       .select('id,display_name')
@@ -181,7 +192,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
         {tab === 'matches' && (
           <MatchesTab tournamentId={id} matches={rrMatches} showDone={showDone} />
         )}
-        {tab === 'standings' && <StandingsTab />}
+        {tab === 'standings' && <StandingsTab matches={m} />}
         {tab === 'bracket' && (
           <BracketTab
             tournamentId={id}
@@ -374,47 +385,92 @@ function playersFromLabel(label: string) {
   return parts.slice(0, 2).map(playerFromName);
 }
 
-function StandingsTab() {
-  const sorted = [...SAMPLE_PLAYERS].sort(
-    (a, b) => b.wins / (b.wins + b.losses) - a.wins / (a.wins + a.losses) || b.pd - a.pd,
+function StandingsTab({ matches }: { matches: MatchRow[] }) {
+  const completedRR = matches.filter(
+    (row) =>
+      row.completed_at &&
+      row.winner_side !== null &&
+      !(ALL_PLAYOFF_LABELS as readonly string[]).includes(row.round_label ?? ''),
   );
-  const leader = sorted[0];
+
+  if (completedRR.length === 0) {
+    return (
+      <div className="px-[18px] pt-6 pb-24">
+        <div
+          className="rounded-2xl bg-white p-5 text-center"
+          style={{ border: '1px dashed var(--line)' }}
+        >
+          <div className="text-[15px] font-semibold text-ink">No standings yet</div>
+          <div className="mt-1 text-xs text-ink-3">
+            Play and score at least one round-robin match to populate the leaderboard.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const standingsMatches: StandingsMatch[] = completedRR.map((row) => {
+    const games = row.match_games ?? [];
+    const games_won_a = games.filter((g) => g.team_a_score > g.team_b_score).length;
+    const games_won_b = games.filter((g) => g.team_b_score > g.team_a_score).length;
+    return {
+      id: row.id,
+      team_a_label: row.team_a_label,
+      team_b_label: row.team_b_label,
+      winner_side: row.winner_side,
+      team_a_score: row.team_a_score,
+      team_b_score: row.team_b_score,
+      games_won_a,
+      games_won_b,
+    };
+  });
+
+  const usePlayerStandings = isRotatingPartnersData(standingsMatches);
+  const rows = usePlayerStandings
+    ? computePlayerStandings(standingsMatches)
+    : computeStandings(standingsMatches);
+  const leader = rows[0];
 
   return (
     <div className="py-3.5 pb-24">
-      <div className="px-[18px] pb-[18px]">
-        <div
-          className="relative overflow-hidden rounded-[22px] p-4"
-          style={{ background: 'linear-gradient(135deg, var(--court), oklch(0.85 0.15 145))' }}
-        >
-          <div className="flex items-center gap-3.5">
-            <div className="relative">
-              <Avatar player={leader} size={64} ring />
-              <div
-                className="absolute -bottom-1 -right-1 flex h-[26px] w-[26px] items-center justify-center rounded-full text-[11px] font-bold"
-                style={{ background: 'var(--ink)', color: 'var(--court)', border: '2px solid var(--court)' }}
-              >
-                1
+      {leader && (
+        <div className="px-[18px] pb-[18px]">
+          <div
+            className="relative overflow-hidden rounded-[22px] p-4"
+            style={{ background: 'linear-gradient(135deg, var(--court), oklch(0.85 0.15 145))' }}
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="relative">
+                <Avatar player={playerFromName(leader.team)} size={64} ring />
+                <div
+                  className="absolute -bottom-1 -right-1 flex h-[26px] w-[26px] items-center justify-center rounded-full text-[11px] font-bold"
+                  style={{ background: 'var(--ink)', color: 'var(--court)', border: '2px solid var(--court)' }}
+                >
+                  1
+                </div>
               </div>
-            </div>
-            <div className="flex-1">
-              <div className="text-[11px] tracking-[0.06em]" style={{ color: 'oklch(0.25 0.04 140)' }}>
-                LEADER
-              </div>
-              <div className="serif mt-0.5 text-[22px] leading-[1.1] text-ink">{leader.name}</div>
-              <div className="mt-1.5 flex gap-3 text-[11px]" style={{ color: 'oklch(0.3 0.05 140)' }}>
-                <span className="flex items-center gap-1"><span style={{ color: 'var(--berry)' }}>{Icons.flame}</span> 4 win streak</span>
-                <span>+{leader.pd} pt diff</span>
+              <div className="flex-1">
+                <div className="text-[11px] tracking-[0.06em]" style={{ color: 'oklch(0.25 0.04 140)' }}>
+                  LEADER
+                </div>
+                <div className="serif mt-0.5 text-[22px] leading-[1.1] text-ink">{leader.team}</div>
+                <div className="mt-1.5 flex gap-3 text-[11px]" style={{ color: 'oklch(0.3 0.05 140)' }}>
+                  <span className="flex items-center gap-1">
+                    {leader.matchWins}-{leader.matchLosses} record
+                  </span>
+                  <span>
+                    {leader.pointDiff >= 0 ? '+' : ''}
+                    {leader.pointDiff} pt diff
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="flex gap-2 px-[18px] pb-2">
-        <Chip tone="dark">PLAYERS</Chip>
-        <Chip tone="ghost">TEAMS</Chip>
-        <Chip tone="ghost">DIVISIONS</Chip>
+        <Chip tone="dark">{usePlayerStandings ? 'PLAYERS' : 'TEAMS'}</Chip>
       </div>
 
       <div className="px-[18px]">
@@ -423,43 +479,52 @@ function StandingsTab() {
           style={{ gridTemplateColumns: '24px 1fr 50px 50px 50px', borderBottom: '1px solid var(--line)' }}
         >
           <div>#</div>
-          <div>PLAYER</div>
+          <div>{usePlayerStandings ? 'PLAYER' : 'TEAM'}</div>
           <div className="text-right">W–L</div>
           <div className="text-right">PD</div>
           <div className="text-right">WIN%</div>
         </div>
-        {sorted.map((p, i) => {
-          const winPct = Math.round((p.wins / (p.wins + p.losses)) * 100);
-          return (
-            <div
-              key={p.id}
-              className="grid items-center px-1 py-2.5"
-              style={{ gridTemplateColumns: '24px 1fr 50px 50px 50px', borderBottom: '1px solid var(--line)' }}
-            >
-              <div className="text-[13px] font-semibold text-ink-3">{i + 1}</div>
-              <div className="flex items-center gap-2.5">
-                <Avatar player={p} size={32} />
-                <div className="min-w-0">
-                  <div className="truncate text-[13px] font-semibold text-ink">{p.name}</div>
-                  <div className="text-[10.5px] text-ink-3">DUPR {p.dupr.toFixed(2)}</div>
-                </div>
-              </div>
-              <div className="mono text-right text-[13px] font-semibold text-ink">{p.wins}–{p.losses}</div>
-              <div
-                className="mono text-right text-[13px] font-semibold"
-                style={{ color: p.pd > 0 ? 'var(--court-deep)' : p.pd < 0 ? 'var(--berry)' : 'var(--ink-3)' }}
-              >
-                {p.pd > 0 ? '+' : ''}{p.pd}
-              </div>
-              <div className="mono text-right text-[13px] text-ink-2">{winPct}%</div>
-            </div>
-          );
-        })}
+        {rows.map((row, i) => (
+          <StandingsRow key={row.team} index={i} row={row} />
+        ))}
       </div>
 
       <div className="px-[18px] pt-3.5 text-[11px] leading-[1.5] text-ink-3">
-        Sorted by win % → point differential → head-to-head.
+        Sorted by match wins → head-to-head → point differential → games won.
       </div>
+    </div>
+  );
+}
+
+function StandingsRow({ index, row }: { index: number; row: StandingRow }) {
+  const winPct = Math.round(row.winPct * 100);
+  return (
+    <div
+      className="grid items-center px-1 py-2.5"
+      style={{ gridTemplateColumns: '24px 1fr 50px 50px 50px', borderBottom: '1px solid var(--line)' }}
+    >
+      <div className="text-[13px] font-semibold text-ink-3">{index + 1}</div>
+      <div className="flex items-center gap-2.5">
+        <Avatar player={playerFromName(row.team)} size={32} />
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-semibold text-ink">{row.team}</div>
+          <div className="text-[10.5px] text-ink-3">{row.matchesPlayed} match{row.matchesPlayed === 1 ? '' : 'es'}</div>
+        </div>
+      </div>
+      <div className="mono text-right text-[13px] font-semibold text-ink">
+        {row.matchWins}–{row.matchLosses}
+      </div>
+      <div
+        className="mono text-right text-[13px] font-semibold"
+        style={{
+          color:
+            row.pointDiff > 0 ? 'var(--court-deep)' : row.pointDiff < 0 ? 'var(--berry)' : 'var(--ink-3)',
+        }}
+      >
+        {row.pointDiff > 0 ? '+' : ''}
+        {row.pointDiff}
+      </div>
+      <div className="mono text-right text-[13px] text-ink-2">{winPct}%</div>
     </div>
   );
 }

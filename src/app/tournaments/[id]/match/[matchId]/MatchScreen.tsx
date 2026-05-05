@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { IconBtn } from '@/components/ui/IconBtn';
 import { BigButton } from '@/components/ui/BigButton';
@@ -18,9 +18,15 @@ type Props = {
   initialScoreA: number;
   initialScoreB: number;
   returnTab?: 'matches' | 'bracket';
+  prevMatchId?: string | null;
+  nextMatchId?: string | null;
+  position?: number;
+  total?: number;
 };
 
 const KEYPAD: Array<string> = ['1', '2', '3', '+1', '4', '5', '6', '−1', '7', '8', '9', '⌫', 'C', '0', '', '▶'];
+const SWIPE_MIN_PX = 60;
+const SWIPE_MAX_VERTICAL_RATIO = 0.6;
 
 export function MatchScreen({
   tournamentId,
@@ -32,9 +38,14 @@ export function MatchScreen({
   initialScoreA,
   initialScoreB,
   returnTab = 'matches',
+  prevMatchId = null,
+  nextMatchId = null,
+  position = 0,
+  total = 0,
 }: Props) {
   const router = useRouter();
   const returnHref = `/tournaments/${tournamentId}?tab=${returnTab}`;
+  const matchHref = (id: string) => `/tournaments/${tournamentId}/match/${id}`;
   const [scoreA, setScoreA] = useState(initialScoreA);
   const [scoreB, setScoreB] = useState(initialScoreB);
   const [active, setActive] = useState<'A' | 'B'>('A');
@@ -42,6 +53,41 @@ export function MatchScreen({
   const [done, setDone] = useState(false);
   const [confetti, setConfetti] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+
+  // Reset local state when the user navigates to a sibling match.
+  useEffect(() => {
+    setScoreA(initialScoreA);
+    setScoreB(initialScoreB);
+    setActive('A');
+    setServing('A');
+    setDone(false);
+    setConfetti(false);
+  }, [matchId, initialScoreA, initialScoreB]);
+
+  const goPrev = () => {
+    if (prevMatchId) router.push(matchHref(prevMatchId));
+  };
+  const goNext = () => {
+    if (nextMatchId) router.push(matchHref(nextMatchId));
+  };
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    swipeStart.current = { x: t.clientX, y: t.clientY };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < SWIPE_MIN_PX) return;
+    if (Math.abs(dy) > Math.abs(dx) * SWIPE_MAX_VERTICAL_RATIO) return;
+    if (dx < 0) goNext();
+    else goPrev();
+  };
 
   const teamAPlayers = parseTeam(teamALabel);
   const teamBPlayers = parseTeam(teamBLabel);
@@ -73,18 +119,51 @@ export function MatchScreen({
   const canEnd = scoreA >= 11 || scoreB >= 11;
 
   return (
-    <div className="flex min-h-full flex-col bg-paper">
+    <div
+      className="flex min-h-full flex-col bg-paper"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
       <div className="flex items-center justify-between px-[18px] pt-2 pb-2.5">
         <IconBtn aria-label="Back" onClick={() => router.push(returnHref)}>
           {Icons.back}
         </IconBtn>
-        <div className="text-center">
-          <div className="text-[11px] tracking-[0.06em] text-ink-3">
-            {court.toUpperCase()} · {round.toUpperCase()}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={goPrev}
+            disabled={!prevMatchId}
+            aria-label="Previous match"
+            className="flex h-8 w-8 items-center justify-center rounded-lg disabled:opacity-30"
+            style={{ color: 'var(--ink-2)', border: '1px solid var(--line)', background: '#fff' }}
+          >
+            {Icons.chevronLeft}
+          </button>
+          <div className="text-center">
+            <div className="text-[11px] tracking-[0.06em] text-ink-3">
+              {court.toUpperCase()} · {round.toUpperCase()}
+            </div>
+            <div className="mt-0.5 text-[12px] font-semibold text-ink">
+              Game to 11, win by 2
+              {total > 0 && (
+                <span className="ml-1 text-ink-3">
+                  · {position}/{total}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="mt-0.5 text-[13px] font-semibold text-ink">Game to 11, win by 2</div>
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={!nextMatchId}
+            aria-label="Next match"
+            className="flex h-8 w-8 items-center justify-center rounded-lg disabled:opacity-30"
+            style={{ color: 'var(--ink-2)', border: '1px solid var(--line)', background: '#fff' }}
+          >
+            {Icons.chevronRight}
+          </button>
         </div>
-        <IconBtn aria-label="More">{Icons.more}</IconBtn>
+        <div className="h-10 w-10" />
       </div>
 
       {confetti && (
@@ -172,7 +251,7 @@ export function MatchScreen({
             })}
           </div>
           <div className="mt-2 text-center text-[11px] text-ink-3">
-            Tap a team panel to switch input · long-press to set serve
+            Swipe ← → for prev / next match · tap a team panel to switch input
           </div>
         </div>
       ) : (
@@ -198,9 +277,27 @@ export function MatchScreen({
               </div>
             </div>
           </div>
-          <BigButton tone="ink" onClick={() => router.push(returnHref)}>
-            Back to scoreboard
-          </BigButton>
+          {nextMatchId ? (
+            <BigButton
+              tone="ink"
+              onClick={() => router.push(matchHref(nextMatchId))}
+            >
+              Score next match →
+            </BigButton>
+          ) : (
+            <BigButton tone="ink" onClick={() => router.push(returnHref)}>
+              Back to scoreboard
+            </BigButton>
+          )}
+          {nextMatchId && (
+            <button
+              type="button"
+              onClick={() => router.push(returnHref)}
+              className="mt-2 w-full rounded-xl py-2.5 text-[12px] font-semibold text-ink-2"
+            >
+              Back to scoreboard
+            </button>
+          )}
         </div>
       )}
     </div>

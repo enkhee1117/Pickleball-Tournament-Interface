@@ -89,4 +89,14 @@ export const Icons = {
       <path d="M3 3l12 12M5 5.6C2.8 7 1.5 9 1.5 9s2.5 5 7.5 5c1.4 0 2.7-.4 3.8-1M8.4 4.05A7.6 7.6 0 019 4c5 0 7.5 5 7.5 5s-.7 1.3-2.1 2.6M7.5 7.5a2.25 2.25 0 003 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   ),
+  chevronLeft: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path d="M12 4L6 10l6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  chevronRight: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path d="M8 4l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
 };
