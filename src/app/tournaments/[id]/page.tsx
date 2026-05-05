@@ -151,14 +151,28 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
             </Link>
           }
           right={
-            <Link
-              href={`/tournaments/${id}/invite`}
-              aria-label="Share"
-              className="flex h-10 w-10 items-center justify-center rounded-xl"
-              style={{ color: 'var(--paper)' }}
-            >
-              {Icons.share}
-            </Link>
+            <div className="flex items-center gap-1">
+              {t.whatsapp_group_url && (
+                <a
+                  href={t.whatsapp_group_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open WhatsApp group"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ color: '#25D366' }}
+                >
+                  {Icons.whatsapp}
+                </a>
+              )}
+              <Link
+                href={`/tournaments/${id}/invite`}
+                aria-label="Share"
+                className="flex h-10 w-10 items-center justify-center rounded-xl"
+                style={{ color: 'var(--paper)' }}
+              >
+                {Icons.share}
+              </Link>
+            </div>
           }
         />
         <div className="pl-1">

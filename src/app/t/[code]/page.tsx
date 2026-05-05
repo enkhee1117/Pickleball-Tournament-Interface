@@ -38,6 +38,7 @@ type PublicData = {
     format: string;
     status: 'draft' | 'active' | 'completed' | 'archived';
     invite_code: string;
+    whatsapp_group_url: string | null;
     created_at: string;
   };
   players: { id: string; display_name: string }[];
@@ -103,6 +104,20 @@ export default async function PublicTournamentPage({ params, searchParams }: Pag
             >
               {Icons.back}
             </Link>
+          }
+          right={
+            t.whatsapp_group_url ? (
+              <a
+                href={t.whatsapp_group_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open WhatsApp group"
+                className="flex h-10 w-10 items-center justify-center rounded-xl"
+                style={{ color: '#25D366' }}
+              >
+                {Icons.whatsapp}
+              </a>
+            ) : null
           }
         />
         <div className="pl-1">
