@@ -32,7 +32,11 @@ export default async function InvitePage({
   const supabase = await createClient();
 
   const [{ data: tournament }, { data: players }, { count: matchCount }] = await Promise.all([
-    supabase.from('tournaments').select('*').eq('id', id).single(),
+    supabase
+      .from('tournaments')
+      .select('id,name,format,status,whatsapp_group_url,invite_code')
+      .eq('id', id)
+      .single(),
     supabase
       .from('tournament_players')
       .select('id,display_name,email,profile_id')

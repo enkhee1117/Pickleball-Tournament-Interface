@@ -11,6 +11,9 @@
 // generatePlayoffs) and every match score (scoreMatch / saveMatchScore),
 // so a tournament that gets a new round of matches added drops back to
 // active automatically.
+//
+// The whole transition runs in one Postgres roundtrip via
+// app_refresh_tournament_status — see migrations/0012_perf_rls_and_indexes.sql.
 
 import 'server-only';
 import type { createClient } from '@/lib/supabase/server';
@@ -21,31 +24,7 @@ export async function refreshTournamentStatus(
   supabase: SupabaseClient,
   tournamentId: string,
 ): Promise<void> {
-  const { count: total } = await supabase
-    .from('matches')
-    .select('id', { head: true, count: 'exact' })
-    .eq('tournament_id', tournamentId);
-  const { count: pending } = await supabase
-    .from('matches')
-    .select('id', { head: true, count: 'exact' })
-    .eq('tournament_id', tournamentId)
-    .is('completed_at', null);
-
-  const totalCount = total ?? 0;
-  const pendingCount = pending ?? 0;
-
-  let next: 'draft' | 'active' | 'completed';
-  if (totalCount === 0) next = 'draft';
-  else if (pendingCount === 0) next = 'completed';
-  else next = 'active';
-
-  // Don't churn the row if the status already matches.
-  const { data: current } = await supabase
-    .from('tournaments')
-    .select('status')
-    .eq('id', tournamentId)
-    .single();
-  if (!current || current.status === next) return;
-
-  await supabase.from('tournaments').update({ status: next }).eq('id', tournamentId);
+  await supabase.rpc('app_refresh_tournament_status', {
+    p_tournament_id: tournamentId,
+  });
 }

@@ -19,9 +19,21 @@ export function GenerateMatchesPanel({ tournamentId, format, rosterCount, hasMat
   const oddForFp = isFixed && rosterCount % 2 !== 0;
   const disabled = tooFew || oddForFp;
 
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    if (!hasMatches) return;
+    if (
+      !window.confirm(
+        'This replaces every pending match. Completed matches keep their scores. Continue?',
+      )
+    ) {
+      e.preventDefault();
+    }
+  };
+
   return (
     <form
       action={generateMatchesFromRoster}
+      onSubmit={onSubmit}
       className="mb-4 rounded-[18px] bg-white p-4"
       style={{ border: '1px solid var(--line)' }}
     >

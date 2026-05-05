@@ -69,12 +69,15 @@ export async function createTournamentClient(input: CreateInput): Promise<Create
       .eq('tournament_id', tournamentId)
       .order('created_at', { ascending: true });
     const ids = (rosterRows ?? []).map((r) => (r as { id: string }).id);
-    for (let i = 0; i < cleanedNames.length && i < ids.length; i += 1) {
-      const { error: renameErr } = await supabase.rpc('app_rename_tournament_player', {
-        p_player_id: ids[i],
-        p_display_name: cleanedNames[i],
+    const renames = cleanedNames
+      .slice(0, ids.length)
+      .map((display_name, i) => ({ id: ids[i], display_name }));
+    if (renames.length > 0) {
+      const { error: bulkErr } = await supabase.rpc('app_bulk_rename_tournament_players', {
+        p_tournament_id: tournamentId,
+        p_renames: renames,
       });
-      if (renameErr) {
+      if (bulkErr) {
         revalidatePath('/tournaments');
         return { id: tournamentId, matchesGenerated: 0, manualTeams: false };
       }

@@ -164,20 +164,17 @@ export async function generateMatchesFromRoster(formData: FormData): Promise<voi
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: tournament } = await supabase
-    .from('tournaments')
-    .select('format')
-    .eq('id', tournamentId)
-    .single();
+  const [{ data: tournament }, { data: roster }] = await Promise.all([
+    supabase.from('tournaments').select('format').eq('id', tournamentId).single(),
+    supabase
+      .from('tournament_players')
+      .select('display_name')
+      .eq('tournament_id', tournamentId)
+      .order('created_at', { ascending: true }),
+  ]);
   if (!tournament) {
     redirect(`/tournaments/${tournamentId}/invite?error=Tournament%20not%20found`);
   }
-
-  const { data: roster } = await supabase
-    .from('tournament_players')
-    .select('display_name')
-    .eq('tournament_id', tournamentId)
-    .order('created_at', { ascending: true });
   const players = ((roster ?? []) as { display_name: string }[])
     .map((r) => r.display_name)
     .filter(Boolean);

@@ -38,13 +38,15 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
   const tab = sp.tab ?? 'matches';
   const supabase = await createClient();
 
-  // Self-heal lifecycle status for tournaments that pre-date the auto-update
-  // logic — a single cheap pass on each detail-page load promotes them from
-  // draft to active or completed based on the current match data.
-  await refreshTournamentStatus(supabase, id);
-
+  // Self-heal lifecycle status alongside the data fetch — the page does not
+  // read the new status, so we don't need to await it before the page query
+  // completes. A single Postgres roundtrip via app_refresh_tournament_status.
   const [{ data: tournament }, { data: matches }, { data: players }] = await Promise.all([
-    supabase.from('tournaments').select('*').eq('id', id).single(),
+    supabase
+      .from('tournaments')
+      .select('id,owner_user_id,name,format,status,whatsapp_group_url,invite_code,created_at,updated_at')
+      .eq('id', id)
+      .single(),
     supabase
       .from('matches')
       .select('id,round_label,court_label,team_a_label,team_b_label,team_a_score,team_b_score,completed_at')
@@ -56,6 +58,9 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
       .select('id,display_name')
       .eq('tournament_id', id)
       .order('created_at', { ascending: true }),
+    // Fire-and-forget status refresh in parallel; tab order doesn't depend on
+    // its result and the next page load will see the corrected status.
+    refreshTournamentStatus(supabase, id).then(() => ({ data: null })),
   ]);
 
   if (!tournament) notFound();

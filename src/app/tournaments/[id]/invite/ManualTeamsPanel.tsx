@@ -159,7 +159,19 @@ export function ManualTeamsPanel({ tournamentId, roster, hasMatches }: Props) {
         )}
       </div>
 
-      <form action={generateManualMatchesFromRoster}>
+      <form
+        action={generateManualMatchesFromRoster}
+        onSubmit={(e) => {
+          if (!hasMatches) return;
+          if (
+            !window.confirm(
+              'This replaces every pending match. Completed matches keep their scores. Continue?',
+            )
+          ) {
+            e.preventDefault();
+          }
+        }}
+      >
         <input type="hidden" name="tournament_id" value={tournamentId} />
         <input type="hidden" name="courts" value={courts} />
         {teams.map(([a, b]) => (
