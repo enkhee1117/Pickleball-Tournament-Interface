@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import type { Tournament } from '@/lib/types';
+import { Icons } from '@/components/ui/icons';
 import { InviteTopBar } from './InviteTopBar';
 import { WhatsAppToggle } from './WhatsAppToggle';
 import { ShareCodeCard } from './ShareCodeCard';
@@ -91,11 +92,37 @@ export default async function InvitePage({
           tournamentName={t.name}
         />
 
-        <WhatsAppToggle
-          tournamentId={t.id}
-          initialUrl={t.whatsapp_group_url ?? null}
-          updateAction={setInviteWhatsApp}
-        />
+        {isManager ? (
+          <WhatsAppToggle
+            tournamentId={t.id}
+            initialUrl={t.whatsapp_group_url ?? null}
+            updateAction={setInviteWhatsApp}
+          />
+        ) : (
+          t.whatsapp_group_url && (
+            <a
+              href={t.whatsapp_group_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-[18px] flex items-center gap-3.5 rounded-[18px] bg-white p-4 transition active:scale-[0.99]"
+              style={{ border: '1px solid var(--line)' }}
+            >
+              <div
+                className="flex h-12 w-12 items-center justify-center rounded-[14px] text-white"
+                style={{ background: '#25D366' }}
+              >
+                {Icons.whatsapp}
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-ink">Open WhatsApp group</div>
+                <div className="mt-0.5 text-xs text-ink-3">
+                  Join the chat for live updates and chatter.
+                </div>
+              </div>
+              <span className="text-ink-3">{Icons.arrow}</span>
+            </a>
+          )
+        )}
 
         <div
           className="mt-3 rounded-2xl bg-white p-4 text-[13px]"
