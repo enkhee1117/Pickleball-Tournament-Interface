@@ -19,9 +19,21 @@ export function GenerateMatchesPanel({ tournamentId, format, rosterCount, hasMat
   const oddForFp = isFixed && rosterCount % 2 !== 0;
   const disabled = tooFew || oddForFp;
 
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    if (!hasMatches) return;
+    if (
+      !window.confirm(
+        'This replaces every pending match. Completed matches keep their scores. Continue?',
+      )
+    ) {
+      e.preventDefault();
+    }
+  };
+
   return (
     <form
       action={generateMatchesFromRoster}
+      onSubmit={onSubmit}
       className="mb-4 rounded-[18px] bg-white p-4"
       style={{ border: '1px solid var(--line)' }}
     >
@@ -42,32 +54,54 @@ export function GenerateMatchesPanel({ tournamentId, format, rosterCount, hasMat
           : 'Shuffles the roster into 2v2 games each round. Each round changes partners.'}
       </div>
 
-      <div className="mb-3 grid grid-cols-2 gap-2">
-        <label className="rounded-xl bg-paper-2 px-3 py-2 text-[12px]">
-          <div className="text-[10px] uppercase tracking-[0.06em] text-ink-3">Courts</div>
-          <input
-            type="number"
-            name="courts"
-            min={1}
-            max={6}
-            value={courts}
-            onChange={(e) => setCourts(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
-            className="mono mt-0.5 w-full bg-transparent text-[20px] font-bold tracking-tight text-ink outline-none"
-          />
-        </label>
+      <div className="mb-3">
+        <input type="hidden" name="courts" value={courts} />
+        <input type="hidden" name="rounds" value={rounds} />
+        <div className="text-[10px] uppercase tracking-[0.06em] text-ink-3">Courts</div>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {[1, 2, 3, 4, 5, 6].map((n) => {
+            const on = courts === n;
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setCourts(n)}
+                className="mono w-9 rounded-lg py-1.5 text-[13px] font-bold"
+                style={{
+                  background: on ? 'var(--ink)' : '#fff',
+                  color: on ? 'var(--paper)' : 'var(--ink-2)',
+                  border: `1px solid ${on ? 'var(--ink)' : 'var(--line)'}`,
+                }}
+              >
+                {n}
+              </button>
+            );
+          })}
+        </div>
         {!isFixed && (
-          <label className="rounded-xl bg-paper-2 px-3 py-2 text-[12px]">
-            <div className="text-[10px] uppercase tracking-[0.06em] text-ink-3">Rounds</div>
-            <input
-              type="number"
-              name="rounds"
-              min={1}
-              max={20}
-              value={rounds}
-              onChange={(e) => setRounds(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
-              className="mono mt-0.5 w-full bg-transparent text-[20px] font-bold tracking-tight text-ink outline-none"
-            />
-          </label>
+          <>
+            <div className="mt-3 text-[10px] uppercase tracking-[0.06em] text-ink-3">Rounds</div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {[3, 4, 5, 6, 7, 8, 10, 12].map((n) => {
+                const on = rounds === n;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setRounds(n)}
+                    className="mono w-9 rounded-lg py-1.5 text-[13px] font-bold"
+                    style={{
+                      background: on ? 'var(--ink)' : '#fff',
+                      color: on ? 'var(--paper)' : 'var(--ink-2)',
+                      border: `1px solid ${on ? 'var(--ink)' : 'var(--line)'}`,
+                    }}
+                  >
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 

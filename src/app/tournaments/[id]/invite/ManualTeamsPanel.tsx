@@ -136,30 +136,54 @@ export function ManualTeamsPanel({ tournamentId, roster, hasMatches }: Props) {
         </div>
       )}
 
-      <div className="mb-3 flex items-center justify-between">
-        <label className="text-[12px] text-ink-3">
-          Courts
-          <input
-            type="number"
-            min={1}
-            max={6}
-            value={courts}
-            onChange={(e) => setCourts(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
-            className="mono ml-2 w-12 rounded-lg bg-paper-2 px-2 py-1 text-center text-[14px] font-bold text-ink outline-none"
-          />
-        </label>
-        {teams.length > 0 && (
-          <button
-            type="button"
-            onClick={reset}
-            className="text-[11px] font-semibold text-ink-3 underline"
-          >
-            Reset teams
-          </button>
-        )}
+      <div className="mb-3">
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] uppercase tracking-[0.06em] text-ink-3">Courts</div>
+          {teams.length > 0 && (
+            <button
+              type="button"
+              onClick={reset}
+              className="text-[11px] font-semibold text-ink-3 underline"
+            >
+              Reset teams
+            </button>
+          )}
+        </div>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {[1, 2, 3, 4, 5, 6].map((n) => {
+            const on = courts === n;
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setCourts(n)}
+                className="mono w-9 rounded-lg py-1.5 text-[13px] font-bold"
+                style={{
+                  background: on ? 'var(--ink)' : '#fff',
+                  color: on ? 'var(--paper)' : 'var(--ink-2)',
+                  border: `1px solid ${on ? 'var(--ink)' : 'var(--line)'}`,
+                }}
+              >
+                {n}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <form action={generateManualMatchesFromRoster}>
+      <form
+        action={generateManualMatchesFromRoster}
+        onSubmit={(e) => {
+          if (!hasMatches) return;
+          if (
+            !window.confirm(
+              'This replaces every pending match. Completed matches keep their scores. Continue?',
+            )
+          ) {
+            e.preventDefault();
+          }
+        }}
+      >
         <input type="hidden" name="tournament_id" value={tournamentId} />
         <input type="hidden" name="courts" value={courts} />
         {teams.map(([a, b]) => (

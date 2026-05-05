@@ -63,7 +63,7 @@ const TABS: Tab[] = [
   },
 ];
 
-const HIDDEN_PATH_PREFIXES = ['/login', '/signup', '/onboarding', '/join', '/match'];
+const HIDDEN_PATH_PREFIXES = ['/login', '/signup', '/onboarding', '/join', '/match', '/t'];
 const HIDDEN_EXACT = new Set<string>();
 const HIDDEN_PATTERNS = [/^\/tournaments\/new(\/|$)/, /^\/tournaments\/[^/]+\/(invite|match|create)(\/|$)/];
 

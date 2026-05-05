@@ -91,6 +91,34 @@ export async function updateInvitePlayer(formData: FormData): Promise<void> {
   redirect(`/tournaments/${tournamentId}/invite?ok=Player%20updated`);
 }
 
+export async function claimInvitePlayer(formData: FormData): Promise<void> {
+  const tournamentId = String(formData.get('tournament_id') ?? '').trim();
+  const playerId = String(formData.get('player_id') ?? '').trim();
+  if (!tournamentId || !playerId) {
+    redirect(`/tournaments/${tournamentId}/invite?error=Missing%20identifiers`);
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const { error } = await supabase.rpc('app_claim_tournament_player', {
+    p_player_id: playerId,
+  });
+  if (error) {
+    redirect(
+      `/tournaments/${tournamentId}/invite?error=${encodeURIComponent(formatPgError(error))}`,
+    );
+  }
+
+  revalidatePath(`/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}/invite`);
+  revalidatePath('/history');
+  redirect(`/tournaments/${tournamentId}/invite?ok=Linked%20to%20your%20stats`);
+}
+
 export async function removeInvitePlayer(formData: FormData): Promise<void> {
   const tournamentId = String(formData.get('tournament_id') ?? '').trim();
   const playerId = String(formData.get('player_id') ?? '').trim();
@@ -164,20 +192,17 @@ export async function generateMatchesFromRoster(formData: FormData): Promise<voi
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: tournament } = await supabase
-    .from('tournaments')
-    .select('format')
-    .eq('id', tournamentId)
-    .single();
+  const [{ data: tournament }, { data: roster }] = await Promise.all([
+    supabase.from('tournaments').select('format').eq('id', tournamentId).single(),
+    supabase
+      .from('tournament_players')
+      .select('display_name')
+      .eq('tournament_id', tournamentId)
+      .order('created_at', { ascending: true }),
+  ]);
   if (!tournament) {
     redirect(`/tournaments/${tournamentId}/invite?error=Tournament%20not%20found`);
   }
-
-  const { data: roster } = await supabase
-    .from('tournament_players')
-    .select('display_name')
-    .eq('tournament_id', tournamentId)
-    .order('created_at', { ascending: true });
   const players = ((roster ?? []) as { display_name: string }[])
     .map((r) => r.display_name)
     .filter(Boolean);

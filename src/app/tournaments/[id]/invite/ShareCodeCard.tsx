@@ -16,7 +16,7 @@ export function ShareCodeCard({ inviteCode, rawInviteCode, tournamentId, tournam
   const [canNativeShare, setCanNativeShare] = useState(false);
 
   useEffect(() => {
-    setShareUrl(`${window.location.origin}/join?code=${encodeURIComponent(rawInviteCode)}`);
+    setShareUrl(`${window.location.origin}/t/${encodeURIComponent(rawInviteCode)}`);
     setCanNativeShare(typeof navigator !== 'undefined' && 'share' in navigator);
   }, [tournamentId, rawInviteCode]);
 

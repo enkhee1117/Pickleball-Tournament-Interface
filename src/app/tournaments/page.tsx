@@ -46,7 +46,8 @@ export default async function TournamentsPage({
       if (filter === 'live') return t.status === 'active';
       if (filter === 'drafts') return t.status === 'draft';
       if (filter === 'past') return t.status === 'completed' || t.status === 'archived';
-      return true;
+      // Default "All" hides completed + archived; those live in Past.
+      return t.status !== 'completed' && t.status !== 'archived';
     });
 
   return (

@@ -31,23 +31,30 @@ export default async function InvitePage({
   const isNew = sp.new === '1';
   const supabase = await createClient();
 
-  const [{ data: tournament }, { data: players }, { count: matchCount }] = await Promise.all([
-    supabase.from('tournaments').select('*').eq('id', id).single(),
-    supabase
-      .from('tournament_players')
-      .select('id,display_name,email,profile_id')
-      .eq('tournament_id', id)
-      .order('created_at', { ascending: true }),
-    supabase
-      .from('matches')
-      .select('id', { head: true, count: 'exact' })
-      .eq('tournament_id', id),
-  ]);
+  const [{ data: tournament }, { data: players }, { count: matchCount }, { data: { user } }] =
+    await Promise.all([
+      supabase
+        .from('tournaments')
+        .select('id,name,format,status,whatsapp_group_url,invite_code')
+        .eq('id', id)
+        .single(),
+      supabase
+        .from('tournament_players')
+        .select('id,display_name,email,profile_id')
+        .eq('tournament_id', id)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('matches')
+        .select('id', { head: true, count: 'exact' })
+        .eq('tournament_id', id),
+      supabase.auth.getUser(),
+    ]);
   if (!tournament) notFound();
   const t = tournament as Tournament;
   const roster = (players ?? []) as PlayerRow[];
   const inviteCode = formatInviteCode(t.invite_code);
   const hasMatches = (matchCount ?? 0) > 0;
+  const userHasClaimedSlot = !!user && roster.some((p) => p.profile_id === user.id);
   const isFixed = t.format === 'fixed_partners';
   // Manual mode: explicit ?manual=1, or fixed-partners with no matches yet.
   const showManual = isFixed && (sp.manual === '1' || !hasMatches);
@@ -144,7 +151,15 @@ export default async function InvitePage({
               No players yet. Add a few above to get started.
             </div>
           ) : (
-            roster.map((p) => <RosterRow key={p.id} tournamentId={t.id} player={p} />)
+            roster.map((p) => (
+              <RosterRow
+                key={p.id}
+                tournamentId={t.id}
+                player={p}
+                currentUserId={user?.id ?? null}
+                userHasClaimedSlot={userHasClaimedSlot}
+              />
+            ))
           )}
         </div>
 
