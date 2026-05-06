@@ -6,7 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { fieldString, type FormState } from '@/lib/forms';
 import { validatePassword } from '@/lib/validation';
 import { safeNext } from '@/lib/auth-redirect';
-import { normalizeE164 } from '@/lib/phone';
+import { normalizeE164, phoneToSynthEmail } from '@/lib/phone';
 
 // Phone-only signup. Routed through the service-role admin client because
 // the public auth.signUp endpoint refuses phone payloads when the project's
@@ -28,11 +28,17 @@ export async function signUpWithPassword(_prev: FormState, formData: FormData): 
   const passCheck = validatePassword(password);
   if (!passCheck.ok) return { error: passCheck.error };
 
+  // Pair every account with a synthetic email so signInWithPassword can
+  // route through the email provider (the dashboard's phone-signin toggle
+  // doesn't gate that path).
+  const synthEmail = phoneToSynthEmail(phone);
   const admin = createAdminClient();
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     phone,
+    email: synthEmail,
     password,
     phone_confirm: true,
+    email_confirm: true,
     user_metadata: { display_name },
   });
   if (createErr) {
@@ -46,9 +52,13 @@ export async function signUpWithPassword(_prev: FormState, formData: FormData): 
     return { error: 'Could not create the account. Try again in a moment.' };
   }
 
-  // Sign the new user in so the cookie is set on the redirect.
+  // Sign the new user in via the email-provider path (synth email mapped
+  // to their phone). This sidesteps the project's phone-signin toggle.
   const supabase = await createClient();
-  const { error: signInErr } = await supabase.auth.signInWithPassword({ phone, password });
+  const { error: signInErr } = await supabase.auth.signInWithPassword({
+    email: synthEmail,
+    password,
+  });
   if (signInErr) {
     return { ok: 'Account created. Sign in below.' };
   }

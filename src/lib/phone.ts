@@ -36,3 +36,12 @@ export function formatE164(phone: string | null | undefined): string {
 export function buildSmsUrl(phone: string, body: string): string {
   return `sms:${encodeURIComponent(phone)}?body=${encodeURIComponent(body)}`;
 }
+
+// Workaround for projects that have phone signups/logins disabled in the
+// Supabase dashboard: derive a deterministic synthetic email from the
+// caller's phone, then use email-based auth. The synthetic email is purely
+// internal — users never type it.
+export function phoneToSynthEmail(phone: string): string {
+  const digits = phone.replace(/^\+/, '').replace(/\D/g, '');
+  return `${digits}@phone.local`;
+}

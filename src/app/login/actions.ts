@@ -5,10 +5,12 @@ import { createClient } from '@/lib/supabase/server';
 import { fieldString, type FormState } from '@/lib/forms';
 import { validatePassword } from '@/lib/validation';
 import { safeNext } from '@/lib/auth-redirect';
-import { normalizeE164 } from '@/lib/phone';
+import { normalizeE164, phoneToSynthEmail } from '@/lib/phone';
 
-// Phone-only login. Email login was retired — every account uses E.164
-// phone + password.
+// Phone-only login. Phone IS the username — internally we route through
+// Supabase's email provider using a deterministic synth email
+// (`<digits>@phone.local`) so we don't depend on the project's
+// "Phone signins" toggle being flipped on in the dashboard.
 export async function signInWithPassword(_prev: FormState, formData: FormData): Promise<FormState> {
   const phoneRaw = fieldString(formData, 'phone');
   const phone = normalizeE164(phoneRaw);
@@ -21,8 +23,12 @@ export async function signInWithPassword(_prev: FormState, formData: FormData): 
   const passCheck = validatePassword(password);
   if (!passCheck.ok) return { error: passCheck.error };
 
+  const synthEmail = phoneToSynthEmail(phone);
   const supabase = await createClient();
-  const { data: authData, error } = await supabase.auth.signInWithPassword({ phone, password });
+  const { data: authData, error } = await supabase.auth.signInWithPassword({
+    email: synthEmail,
+    password,
+  });
   if (error) {
     if (error.message.toLowerCase().includes('invalid')) {
       return { error: 'Phone and password did not match.' };
