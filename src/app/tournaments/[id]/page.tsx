@@ -29,6 +29,7 @@ import { ManualTeamsPanel } from './invite/ManualTeamsPanel';
 import { RosterRow } from './invite/RosterRow';
 import { addInvitePlayer } from './invite/actions';
 import { ScoreboardClaimBanner } from './ScoreboardClaimBanner';
+import { RecordingsMenu } from '@/components/RecordingsMenu';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -70,7 +71,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
   const [{ data: tournament }, { data: matches }, { data: players }] = await Promise.all([
     supabase
       .from('tournaments')
-      .select('id,owner_user_id,name,format,status,whatsapp_group_url,invite_code,created_at,updated_at')
+      .select('id,owner_user_id,name,format,status,whatsapp_group_url,invite_code,gender_mode,created_at,updated_at')
       .eq('id', id)
       .single(),
     supabase
@@ -83,7 +84,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
       .limit(200),
     supabase
       .from('tournament_players')
-      .select('id,display_name,email,profile_id')
+      .select('id,display_name,email,profile_id,gender')
       .eq('tournament_id', id)
       .order('created_at', { ascending: true }),
     // Fire-and-forget status refresh in parallel; tab order doesn't depend on
@@ -122,6 +123,17 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
   const isMember = isOwner || memberRole !== null;
   const playerCount = (players ?? []).length;
   const hasMatches = m.length > 0;
+  const recordings = m
+    .filter((row): row is MatchRow & { recording_url: string } => !!row.recording_url)
+    .map((row) => ({
+      matchId: row.id,
+      tournamentId: id,
+      roundLabel: row.round_label,
+      courtLabel: row.court_label,
+      teamALabel: row.team_a_label,
+      teamBLabel: row.team_b_label,
+      url: row.recording_url,
+    }));
   type PlayerLike = { id: string; display_name: string; profile_id?: string | null };
   const rosterPlayers = (players ?? []) as PlayerLike[];
   const userHasClaimedSlot = !!user && rosterPlayers.some((p) => p.profile_id === user.id);
@@ -152,6 +164,9 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
           }
           right={
             <div className="flex items-center gap-1">
+              {recordings.length > 0 && (
+                <RecordingsMenu recordings={recordings} dark />
+              )}
               {t.whatsapp_group_url && (
                 <a
                   href={t.whatsapp_group_url}
@@ -266,6 +281,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
           <SettingsTab
             tournamentId={id}
             tournamentFormat={t.format}
+            genderMode={(t as Tournament & { gender_mode?: 'open' | 'mixed' | 'same' }).gender_mode ?? 'open'}
             matchCount={m.length}
             playerCount={playerCount}
             roster={rosterPlayers.map((p) => ({
@@ -273,6 +289,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
               display_name: p.display_name,
               email: (p as PlayerLike & { email?: string | null }).email ?? null,
               profile_id: p.profile_id ?? null,
+              gender: (p as PlayerLike & { gender?: 'm' | 'f' | 'x' | null }).gender ?? null,
             }))}
             hasMatches={hasMatches}
             isOwner={isOwner}
@@ -487,6 +504,7 @@ function playersFromLabel(label: string) {
 function SettingsTab({
   tournamentId,
   tournamentFormat,
+  genderMode,
   matchCount,
   playerCount,
   roster,
@@ -497,19 +515,37 @@ function SettingsTab({
 }: {
   tournamentId: string;
   tournamentFormat: string;
+  genderMode: 'open' | 'mixed' | 'same';
   matchCount: number;
   playerCount: number;
-  roster: { id: string; display_name: string; email: string | null; profile_id: string | null }[];
+  roster: {
+    id: string;
+    display_name: string;
+    email: string | null;
+    profile_id: string | null;
+    gender: 'm' | 'f' | 'x' | null;
+  }[];
   hasMatches: boolean;
   isOwner: boolean;
   currentUserId: string | null;
   userHasClaimedSlot: boolean;
 }) {
   const isFixed = tournamentFormat === 'fixed_partners';
+  const showGender = genderMode !== 'open';
   const rosterForGeneration = roster.map((p) => ({ id: p.id, display_name: p.display_name }));
+  const males = roster.filter((p) => p.gender === 'm').length;
+  const females = roster.filter((p) => p.gender === 'f').length;
+  const untagged = roster.filter((p) => !p.gender).length;
   return (
     <div className="px-[18px] py-[18px] pb-24">
-      <SectionHeader title="Roster" mute={`${roster.length} confirmed`} />
+      <SectionHeader
+        title="Roster"
+        mute={
+          showGender
+            ? `${roster.length} confirmed · M ${males} · F ${females}${untagged ? ` · ${untagged} untagged` : ''}`
+            : `${roster.length} confirmed`
+        }
+      />
 
       <form action={addInvitePlayer} className="mb-3 grid gap-2">
         <input type="hidden" name="tournament_id" value={tournamentId} />
@@ -555,6 +591,7 @@ function SettingsTab({
               currentUserId={currentUserId}
               userHasClaimedSlot={userHasClaimedSlot}
               canManage
+              showGender={showGender}
             />
           ))
         )}

@@ -11,6 +11,7 @@ import {
   isRotatingPartnersData,
   type StandingsMatch,
 } from '@/lib/scoring';
+import { RecordingsMenu } from '@/components/RecordingsMenu';
 
 type PageProps = {
   params: Promise<{ code: string }>;
@@ -86,6 +87,17 @@ export default async function PublicTournamentPage({ params, searchParams }: Pag
     (row) => !row.completed_at && (row.team_a_score || row.team_b_score),
   ).length;
   const formatLabel = formatLabelFor(t.format);
+  const recordings = matches
+    .filter((row): row is PublicMatch & { recording_url: string } => !!row.recording_url)
+    .map((row) => ({
+      matchId: row.id,
+      tournamentId: t.id,
+      roundLabel: row.round_label,
+      courtLabel: row.court_label,
+      teamALabel: row.team_a_label,
+      teamBLabel: row.team_b_label,
+      url: row.recording_url,
+    }));
 
   return (
     <div className="flex min-h-full flex-col bg-paper">
@@ -106,18 +118,23 @@ export default async function PublicTournamentPage({ params, searchParams }: Pag
             </Link>
           }
           right={
-            t.whatsapp_group_url ? (
-              <a
-                href={t.whatsapp_group_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Open WhatsApp group"
-                className="flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{ color: '#25D366' }}
-              >
-                {Icons.whatsapp}
-              </a>
-            ) : null
+            <div className="flex items-center gap-1">
+              {recordings.length > 0 && (
+                <RecordingsMenu recordings={recordings} dark />
+              )}
+              {t.whatsapp_group_url && (
+                <a
+                  href={t.whatsapp_group_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open WhatsApp group"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ color: '#25D366' }}
+                >
+                  {Icons.whatsapp}
+                </a>
+              )}
+            </div>
           }
         />
         <div className="pl-1">

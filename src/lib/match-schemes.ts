@@ -20,11 +20,21 @@ const courtLabelFor = (idx: number, courts: number) =>
 // For K rounds, shuffle players, group 4 at a time, pair (1,2) vs (3,4).
 // Players not in a complete group-of-4 sit out that round.
 // Deterministic when given an rng — pass a seeded rng for testing.
+//
+// genderMode = 'mixed' enforces 1M+1F per team — the shuffle pulls from
+// male and female pools separately and zips them so each team is one of
+// each. genderMode = 'same' enforces same-gender per team. 'open' falls
+// back to the original blind shuffle.
 // ---------------------------------------------------------------------------
+export type GenderTag = 'm' | 'f' | 'x';
 export type RotatingPartnersOptions = {
   rounds: number;
   courts: number;
   rng?: () => number;
+  genderMode?: 'open' | 'mixed' | 'same';
+  // Optional parallel array — entry i is the gender of the player at
+  // players[i]. Required when genderMode is 'mixed' or 'same'.
+  genders?: (GenderTag | null | undefined)[];
 };
 
 export function generateRotatingPartners(
@@ -34,8 +44,18 @@ export function generateRotatingPartners(
   const rounds = Math.max(1, Math.min(50, options.rounds));
   const courts = Math.max(1, Math.min(16, options.courts));
   const rng = options.rng ?? Math.random;
+  const mode = options.genderMode ?? 'open';
   const cleaned = players.map((p) => p.trim()).filter(Boolean);
   if (cleaned.length < 4) return [];
+
+  if (mode === 'mixed' || mode === 'same') {
+    return generateGenderedRotatingPartners(cleaned, options.genders ?? [], {
+      rounds,
+      courts,
+      rng,
+      mode,
+    });
+  }
 
   const drafts: MatchDraft[] = [];
   for (let r = 0; r < rounds; r += 1) {
@@ -49,6 +69,55 @@ export function generateRotatingPartners(
         team_a_label: `${slice[0]} & ${slice[1]}`,
         team_b_label: `${slice[2]} & ${slice[3]}`,
       });
+    }
+  }
+  return drafts;
+}
+
+// Mixed-doubles random partner schedule. Builds a pool of M and F players,
+// then for each round shuffles each pool independently, zips the first
+// min(M,F) into mixed teams (Male & Female), and pairs adjacent teams into
+// games. Players in the surplus gender (or marked 'x' / unset) sit out the
+// round.
+//
+// Same-gender mode: shuffles each pool separately and pairs adjacent
+// players in the SAME pool into teams. Plays MM vs MM and FF vs FF; the
+// pools never mix.
+function generateGenderedRotatingPartners(
+  players: string[],
+  genders: (GenderTag | null | undefined)[],
+  opts: { rounds: number; courts: number; rng: () => number; mode: 'mixed' | 'same' },
+): MatchDraft[] {
+  const males = players.filter((_, i) => genders[i] === 'm');
+  const females = players.filter((_, i) => genders[i] === 'f');
+  const drafts: MatchDraft[] = [];
+
+  for (let r = 0; r < opts.rounds; r += 1) {
+    const teams: string[] = [];
+    if (opts.mode === 'mixed') {
+      const m = shuffle(males, opts.rng);
+      const f = shuffle(females, opts.rng);
+      const pairCount = Math.min(m.length, f.length);
+      for (let i = 0; i < pairCount; i += 1) {
+        teams.push(`${m[i]} & ${f[i]}`);
+      }
+    } else {
+      // 'same': MM teams from male pool, FF teams from female pool.
+      const m = shuffle(males, opts.rng);
+      const f = shuffle(females, opts.rng);
+      for (let i = 0; i + 1 < m.length; i += 2) teams.push(`${m[i]} & ${m[i + 1]}`);
+      for (let i = 0; i + 1 < f.length; i += 2) teams.push(`${f[i]} & ${f[i + 1]}`);
+    }
+    // Pair adjacent teams into games. Surplus team (odd team count) sits out.
+    let courtIdx = 0;
+    for (let i = 0; i + 1 < teams.length; i += 2) {
+      drafts.push({
+        round_label: `Round ${r + 1}`,
+        court_label: courtLabelFor(courtIdx, opts.courts),
+        team_a_label: teams[i],
+        team_b_label: teams[i + 1],
+      });
+      courtIdx += 1;
     }
   }
   return drafts;
@@ -195,6 +264,8 @@ export type GenerateMatchesInput =
       rounds: number;
       courts: number;
       rng?: () => number;
+      genderMode?: 'open' | 'mixed' | 'same';
+      genders?: (GenderTag | null | undefined)[];
     }
   | { scheme: 'fixed_partners'; players: string[]; courts: number }
   | { scheme: 'single_elimination'; players: string[]; courts: number };
@@ -206,6 +277,8 @@ export function generateMatchDrafts(input: GenerateMatchesInput): MatchDraft[] {
         rounds: input.rounds,
         courts: input.courts,
         rng: input.rng,
+        genderMode: input.genderMode,
+        genders: input.genders,
       });
     case 'fixed_partners':
       return generateFixedPartners(input.players, { courts: input.courts });

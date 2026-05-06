@@ -55,6 +55,8 @@ export async function updateInvitePlayer(formData: FormData): Promise<void> {
   const playerId = String(formData.get('player_id') ?? '').trim();
   const displayName = String(formData.get('display_name') ?? '').trim();
   const emailRaw = String(formData.get('email') ?? '').trim();
+  const genderRaw = String(formData.get('gender') ?? '').trim().toLowerCase();
+  const gender = genderRaw === 'm' || genderRaw === 'f' || genderRaw === 'x' ? genderRaw : null;
   if (!tournamentId || !playerId) {
     redirect(`/tournaments/${tournamentId}/invite?error=Missing%20player%20id`);
   }
@@ -79,6 +81,7 @@ export async function updateInvitePlayer(formData: FormData): Promise<void> {
     p_player_id: playerId,
     p_display_name: displayName,
     p_email: emailRaw || null,
+    p_gender: gender,
   });
   if (error) {
     redirect(
@@ -211,19 +214,36 @@ export async function generateMatchesFromRoster(formData: FormData): Promise<voi
   if (!user) redirect('/login');
 
   const [{ data: tournament }, { data: roster }] = await Promise.all([
-    supabase.from('tournaments').select('format').eq('id', tournamentId).single(),
+    supabase
+      .from('tournaments')
+      .select('format,gender_mode')
+      .eq('id', tournamentId)
+      .single(),
     supabase
       .from('tournament_players')
-      .select('display_name')
+      .select('display_name,gender')
       .eq('tournament_id', tournamentId)
       .order('created_at', { ascending: true }),
   ]);
   if (!tournament) {
     redirect(`/tournaments/${tournamentId}/invite?error=Tournament%20not%20found`);
   }
-  const players = ((roster ?? []) as { display_name: string }[])
-    .map((r) => r.display_name)
-    .filter(Boolean);
+  const rosterRows = (roster ?? []) as { display_name: string; gender: 'm' | 'f' | 'x' | null }[];
+  const players = rosterRows.map((r) => r.display_name).filter(Boolean);
+  const genders = rosterRows.map((r) => r.gender ?? null);
+  const genderMode = (tournament as { gender_mode?: 'open' | 'mixed' | 'same' }).gender_mode ?? 'open';
+
+  if (genderMode === 'mixed' || genderMode === 'same') {
+    const males = rosterRows.filter((r) => r.gender === 'm').length;
+    const females = rosterRows.filter((r) => r.gender === 'f').length;
+    if (males < 2 && females < 2) {
+      redirect(
+        `/tournaments/${tournamentId}/invite?error=${encodeURIComponent(
+          'Mark each player as M or F in the roster (Settings tab) before generating mixed-doubles matches.',
+        )}`,
+      );
+    }
+  }
 
   if (!canGenerateMatches(tournament!.format, players.length)) {
     redirect(
@@ -236,7 +256,7 @@ export async function generateMatchesFromRoster(formData: FormData): Promise<voi
   const scheme = pickScheme(tournament!.format);
   const drafts: MatchDraft[] =
     scheme === 'rotating_partners'
-      ? generateMatchDrafts({ scheme, players, rounds, courts })
+      ? generateMatchDrafts({ scheme, players, rounds, courts, genderMode, genders })
       : generateMatchDrafts({ scheme, players, courts });
 
   if (drafts.length === 0) {

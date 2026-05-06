@@ -8,6 +8,7 @@ import { generateMatchDrafts } from '@/lib/match-schemes';
 import {
   canGenerateMatches,
   dbFormat,
+  genderModeFor,
   pickScheme,
   shouldAutoGenerate,
   type WizardFormat,
@@ -55,6 +56,7 @@ export async function createTournamentClient(input: CreateInput): Promise<Create
     p_format: dbFmt,
     p_whatsapp_group_url: null,
     p_player_count: seedCount,
+    p_gender_mode: genderModeFor(input.format),
   });
 
   if (error || !newId) {

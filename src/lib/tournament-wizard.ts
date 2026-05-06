@@ -36,6 +36,16 @@ export function isFixedPartners(format: WizardFormat | DbFormat | string): boole
   return dbFormat(format) === 'fixed_partners';
 }
 
+// Maps the wizard's "rr-mixed / fp-same / etc" format into a gender mode
+// the DB and generator understand. Plain DB formats default to 'open'.
+export type GenderMode = 'open' | 'mixed' | 'same';
+
+export function genderModeFor(format: WizardFormat | DbFormat | string): GenderMode {
+  if (format === 'rr-mixed' || format === 'fp-mixed') return 'mixed';
+  if (format === 'rr-same' || format === 'fp-same') return 'same';
+  return 'open';
+}
+
 // Which generation scheme to feed into generateMatchDrafts.
 export function pickScheme(format: WizardFormat | DbFormat | string): MatchScheme {
   if (dbFormat(format) === 'fixed_partners') return 'fixed_partners';

@@ -5,6 +5,8 @@ import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Chip } from '@/components/ui/Chip';
 import { claimInvitePlayer, removeInvitePlayer, updateInvitePlayer } from './actions';
 
+type Gender = 'm' | 'f' | 'x' | null;
+
 type Props = {
   tournamentId: string;
   player: {
@@ -12,6 +14,7 @@ type Props = {
     display_name: string;
     email: string | null;
     profile_id: string | null;
+    gender?: Gender;
   };
   // The signed-in user's user_id, when they're a member of this tournament
   // and haven't claimed a slot yet. Drives the "This is me" affordance.
@@ -20,6 +23,9 @@ type Props = {
   // True when the current user can edit/remove this row (owner + organizer
   // roles). The "This is me" claim button stays available to any member.
   canManage?: boolean;
+  // When true, surface the gender picker in the edit panel; on for
+  // tournaments with gender_mode = 'mixed' or 'same'.
+  showGender?: boolean;
 };
 
 export function RosterRow({
@@ -28,10 +34,12 @@ export function RosterRow({
   currentUserId = null,
   userHasClaimedSlot = false,
   canManage = false,
+  showGender = false,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(player.display_name);
   const [email, setEmail] = useState(player.email ?? '');
+  const [gender, setGender] = useState<Gender>(player.gender ?? null);
 
   const linked = !!player.profile_id;
   const invited = !linked && !!player.email;
@@ -112,6 +120,38 @@ export function RosterRow({
               style={{ border: '1px solid var(--line)' }}
               placeholder="Email (optional)"
             />
+            <input type="hidden" name="gender" value={gender ?? ''} />
+            {showGender && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-[0.06em] text-ink-3">
+                  Gender
+                </span>
+                <div className="flex flex-1 gap-1.5">
+                  {([
+                    ['m', 'M'],
+                    ['f', 'F'],
+                    ['x', 'X'],
+                  ] as Array<['m' | 'f' | 'x', string]>).map(([value, label]) => {
+                    const on = gender === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setGender(on ? null : value)}
+                        className="flex-1 rounded-lg py-1.5 text-[12px] font-bold"
+                        style={{
+                          background: on ? 'var(--ink)' : '#fff',
+                          color: on ? 'var(--paper)' : 'var(--ink-2)',
+                          border: `1px solid ${on ? 'var(--ink)' : 'var(--line)'}`,
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <button
               type="submit"
               className="rounded-xl px-3 py-2 text-[13px] font-semibold"
