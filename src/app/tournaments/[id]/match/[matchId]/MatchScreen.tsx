@@ -76,6 +76,15 @@ export function MatchScreen({
   const [confetti, setConfetti] = useState(false);
   const [isPending, startTransition] = useTransition();
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const confettiTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cancel any in-flight confetti timeout when the component unmounts so a
+  // navigation away doesn't try to setState on a dead component.
+  useEffect(() => {
+    return () => {
+      if (confettiTimer.current) clearTimeout(confettiTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     setScoreA(initialScoreA);
@@ -139,7 +148,8 @@ export function MatchScreen({
     setDone(true);
     setJustFinished(true);
     setConfetti(true);
-    setTimeout(() => setConfetti(false), 3000);
+    if (confettiTimer.current) clearTimeout(confettiTimer.current);
+    confettiTimer.current = setTimeout(() => setConfetti(false), 3000);
     startTransition(async () => {
       const res = await saveMatchScore({ matchId, scoreA, scoreB });
       if (!res.ok) {

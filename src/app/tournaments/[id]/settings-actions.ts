@@ -15,6 +15,29 @@ export async function resetTournamentMatches(formData: FormData): Promise<void> 
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
+  // Defense-in-depth: the RPC enforces manager-only via
+  // app_require_tournament_manager, but checking here too means a future
+  // RPC regression doesn't silently leak destructive access.
+  const [{ data: tour }, { data: member }] = await Promise.all([
+    supabase
+      .from('tournaments')
+      .select('owner_user_id')
+      .eq('id', tournamentId)
+      .maybeSingle(),
+    supabase
+      .from('tournament_members')
+      .select('role')
+      .eq('tournament_id', tournamentId)
+      .eq('user_id', user.id)
+      .maybeSingle(),
+  ]);
+  const isOwner = tour?.owner_user_id === user.id;
+  const isManager =
+    isOwner || member?.role === 'organizer' || member?.role === 'admin';
+  if (!isManager) {
+    redirect(`/tournaments/${tournamentId}?error=Only%20organizers%20can%20do%20that`);
+  }
+
   const { data, error } = await supabase.rpc('app_reset_tournament_matches', {
     p_tournament_id: tournamentId,
   });
@@ -41,6 +64,18 @@ export async function deleteTournament(formData: FormData): Promise<void> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
+
+  // Defense-in-depth: the RPC checks owner_user_id but verifying here too
+  // means a non-owner clicking a crafted form gets a clean redirect rather
+  // than relying entirely on the RPC's permission error.
+  const { data: tour } = await supabase
+    .from('tournaments')
+    .select('owner_user_id')
+    .eq('id', tournamentId)
+    .maybeSingle();
+  if (!tour || tour.owner_user_id !== user.id) {
+    redirect(`/tournaments/${tournamentId}?error=Only%20the%20owner%20can%20delete%20the%20tournament`);
+  }
 
   const { error } = await supabase.rpc('app_delete_tournament', {
     p_tournament_id: tournamentId,
