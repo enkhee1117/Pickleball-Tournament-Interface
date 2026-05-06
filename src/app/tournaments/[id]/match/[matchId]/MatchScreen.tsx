@@ -37,7 +37,12 @@ type Props = {
   recordingUrl?: string | null;
 };
 
-const KEYPAD: Array<string> = ['1', '2', '3', '+1', '4', '5', '6', '−1', '7', '8', '9', '⌫', 'C', '0', '', '▶'];
+// Keypad layout: digits left-aligned, op column on the right. The two
+// arrows let the user jump between the team A and team B score fields
+// without taking their hand off the keypad — typical flow is "type,
+// arrow-down, type, End". Pickleball scores never need three digits, so
+// pushing a second digit auto-advances to the other team automatically.
+const KEYPAD: Array<string> = ['1', '2', '3', '↑', '4', '5', '6', '↓', '7', '8', '9', '⌫', 'C', '0', '', '▶'];
 const SWIPE_MIN_PX = 60;
 const SWIPE_MAX_VERTICAL_RATIO = 0.6;
 
@@ -125,15 +130,42 @@ export function MatchScreen({
 
   const press = (key: string) => {
     if (done) return;
+    if (key === '↑') {
+      setActive('A');
+      return;
+    }
+    if (key === '↓') {
+      setActive('B');
+      return;
+    }
     const cur = active === 'A' ? scoreA : scoreB;
     const setS = active === 'A' ? setScoreA : setScoreB;
-    if (key === 'C') setS(0);
-    else if (key === '⌫') setS(Math.floor(cur / 10));
-    else if (key === '+1') setS(Math.min(99, cur + 1));
-    else if (key === '−1') setS(Math.max(0, cur - 1));
-    else if (/^[0-9]$/.test(key)) {
-      const next = cur === 0 ? Number(key) : Math.min(99, cur * 10 + Number(key));
-      setS(next);
+    if (key === 'C') {
+      setS(0);
+      return;
+    }
+    if (key === '⌫') {
+      setS(Math.floor(cur / 10));
+      return;
+    }
+    if (/^[0-9]$/.test(key)) {
+      // If the field already has two digits, treat the next digit as the
+      // start of the OTHER team's score — no three-digit pickleball scores
+      // and we want the user's typing to flow naturally.
+      if (cur >= 10) {
+        const other = active === 'A' ? 'B' : 'A';
+        setActive(other);
+        if (other === 'A') setScoreA(Number(key));
+        else setScoreB(Number(key));
+        return;
+      }
+      const next = cur === 0 ? Number(key) : cur * 10 + Number(key);
+      setS(Math.min(99, next));
+      // Two-digit score reached → auto-advance focus so the user can keep
+      // typing without finding the down arrow.
+      if (next >= 10) {
+        setActive(active === 'A' ? 'B' : 'A');
+      }
     }
   };
 
@@ -309,17 +341,25 @@ export function MatchScreen({
                   </button>
                 );
               }
-              const isOp = ['+1', '−1', '⌫', 'C'].includes(k);
+              const isOp = ['↑', '↓', '⌫', 'C'].includes(k);
+              const isArrow = k === '↑' || k === '↓';
+              const arrowActive = (k === '↑' && active === 'A') || (k === '↓' && active === 'B');
               return (
                 <button
                   key={i}
                   onClick={() => press(k)}
-                  className="h-14 rounded-2xl text-ink transition active:scale-95"
+                  aria-label={k === '↑' ? 'Focus team A' : k === '↓' ? 'Focus team B' : undefined}
+                  className="h-14 rounded-2xl transition active:scale-95"
                   style={{
-                    background: isOp ? 'var(--paper-2)' : '#fff',
+                    background: isArrow && arrowActive
+                      ? 'var(--ink)'
+                      : isOp
+                        ? 'var(--paper-2)'
+                        : '#fff',
+                    color: isArrow && arrowActive ? 'var(--paper)' : 'var(--ink)',
                     border: '1px solid var(--line)',
                     fontFamily: isOp ? 'inherit' : 'var(--font-jetbrains-mono), JetBrains Mono, monospace',
-                    fontSize: isOp ? 14 : 22,
+                    fontSize: isArrow ? 20 : isOp ? 14 : 22,
                     fontWeight: 600,
                   }}
                 >
@@ -329,7 +369,8 @@ export function MatchScreen({
             })}
           </div>
           <div className="mt-2 text-center text-[11px] text-ink-3">
-            Swipe ← → for prev / next match · tap a team panel to switch input
+            Swipe ← → for prev / next match · ↑ ↓ to switch team · two-digit
+            score auto-advances
           </div>
         </div>
       ) : (
