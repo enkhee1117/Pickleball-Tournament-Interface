@@ -4,11 +4,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { fieldString, type FormState } from '@/lib/forms';
 import { validateEmail, validatePassword } from '@/lib/validation';
-
-function safeNext(raw: string): string {
-  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/';
-  return raw;
-}
+import { safeNext } from '@/lib/auth-redirect';
 
 export async function signInWithPassword(_prev: FormState, formData: FormData): Promise<FormState> {
   const email = fieldString(formData, 'email').toLowerCase();

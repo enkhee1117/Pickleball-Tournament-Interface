@@ -2,6 +2,7 @@ import { type EmailOtpType } from '@supabase/supabase-js';
 import { type NextRequest } from 'next/server';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { safeNext } from '@/lib/auth-redirect';
 
 // Magic link / invite / password-recovery confirmation handler.
 // Uses redirect() from next/navigation so that auth cookies written by
@@ -11,7 +12,9 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const token_hash = searchParams.get('token_hash');
   const type = searchParams.get('type') as EmailOtpType | null;
-  const next = searchParams.get('next') ?? '/';
+  // safeNext rejects protocol-relative ("//evil.com") and absolute URLs so a
+  // crafted magic link can't bounce a freshly-authenticated user offsite.
+  const next = safeNext(searchParams.get('next'));
 
   if (token_hash && type) {
     const supabase = await createClient();
