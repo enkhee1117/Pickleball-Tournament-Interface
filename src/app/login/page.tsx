@@ -60,10 +60,7 @@ export default async function LoginPage({
           I have an invite code →
         </Link>
 
-        <div className="mt-2 flex items-center justify-between text-[11px] opacity-60">
-          <Link href="/forgot-password" className="hover:opacity-100">
-            Forgot password?
-          </Link>
+        <div className="mt-2 flex items-center justify-end text-[11px] opacity-60">
           <Link
             href={`/signup${sp.next && sp.next !== '/' ? `?next=${encodeURIComponent(sp.next)}` : ''}`}
             className="hover:opacity-100"
