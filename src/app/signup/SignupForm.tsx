@@ -50,6 +50,15 @@ export function SignupForm({ next }: { next: string }) {
           {state.error}
         </div>
       )}
+      {state.ok && (
+        <div
+          role="status"
+          className="rounded-2xl px-3.5 py-2.5 text-sm"
+          style={{ background: 'oklch(0.28 0.04 140)', color: 'var(--court)' }}
+        >
+          {state.ok}
+        </div>
+      )}
       <button
         type="submit"
         disabled={pending}

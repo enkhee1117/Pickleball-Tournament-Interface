@@ -53,5 +53,9 @@ export async function signUpWithPassword(_prev: FormState, formData: FormData): 
     return { ok: 'Account created. Sign in below.' };
   }
 
-  redirect(next);
+  // Land them somewhere that visibly proves they're signed in. The
+  // default-empty-tournaments page now shows a welcome banner via the
+  // ?welcome=1 query param.
+  const target = next === '/' ? '/tournaments?welcome=1' : next;
+  redirect(target);
 }

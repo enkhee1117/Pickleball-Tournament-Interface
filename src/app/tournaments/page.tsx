@@ -20,7 +20,7 @@ const FILTERS: Array<{ id: string; label: string }> = [
 export default async function TournamentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ filter?: string; ok?: string; error?: string; welcome?: string }>;
 }) {
   const sp = await searchParams;
   const filter = sp.filter ?? 'all';
@@ -95,6 +95,17 @@ export default async function TournamentsPage({
             style={{ borderColor: 'var(--court-deep)', color: 'var(--court-deep)', background: 'oklch(0.96 0.04 140)' }}
           >
             {sp.ok}
+          </div>
+        )}
+        {sp.welcome === '1' && (
+          <div
+            className="mb-3 rounded-2xl px-4 py-3.5"
+            style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}
+          >
+            <div className="text-sm font-semibold">🎉 Account created — welcome aboard.</div>
+            <div className="mt-0.5 text-[12px]">
+              Spin up your first tournament or join one with a code.
+            </div>
           </div>
         )}
 
