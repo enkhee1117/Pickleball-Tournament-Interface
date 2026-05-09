@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Chip } from '@/components/ui/Chip';
 import { Icons } from '@/components/ui/icons';
-import { claimInvitePlayer, removeInvitePlayer, updateInvitePlayer } from './actions';
+import { claimInvitePlayer, removeInvitePlayer, unclaimSelfPlayer, updateInvitePlayer } from './actions';
 import { buildSmsUrl, formatE164, normalizeE164 } from '@/lib/phone';
 import { ConfirmForm } from '@/components/ui/ConfirmForm';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -256,6 +256,20 @@ export function RosterRow({
             style={{ background: 'var(--paper-2)', color: 'var(--ink)' }}
           >
             This is me — link to my stats
+          </SubmitButton>
+        </form>
+      )}
+
+      {isMe && (
+        <form action={unclaimSelfPlayer} className="mt-2.5">
+          <input type="hidden" name="tournament_id" value={tournamentId} />
+          <input type="hidden" name="player_id" value={player.id} />
+          <SubmitButton
+            pendingLabel="Releasing…"
+            className="w-full rounded-xl px-3 py-2 text-[11px] font-semibold"
+            style={{ color: 'var(--ink-3)', border: '1px solid var(--line)', background: '#fff' }}
+          >
+            Not actually me — release this slot
           </SubmitButton>
         </form>
       )}
