@@ -125,6 +125,7 @@ export function CreateWizard() {
                 gender: p.gender,
                 phone: p.phone.trim() || null,
                 dupr: p.dupr,
+                profileId: p.profileId,
               }))
             : undefined,
         courts: data.courts,
@@ -473,19 +474,28 @@ function StepRoster({
               Tag every player as <strong>M</strong> or <strong>F</strong> before continuing — {ungendered} still untagged. M {males} · F {females} so far. {genderMode === 'mixed' ? 'Mixed-doubles pairing' : 'Same-gender matchmaking'} relies on this.
             </div>
           )}
-          {Array.from({ length: data.playerCount }).map((_, i) => (
-            <PlayerRow
-              key={i}
-              index={i}
-              player={data.players[i] ?? { ...EMPTY_PLAYER }}
-              showGender={showGender}
-              registerRef={(el) => {
-                nameRefs.current[i] = el;
-              }}
-              onPatch={(patch) => updatePlayer(i, patch)}
-              onSubmitName={() => focusNextName(i)}
-            />
-          ))}
+          {Array.from({ length: data.playerCount }).map((_, i) => {
+            // Profile IDs picked in OTHER rows — typeahead suggestions
+            // matching one are dropped so the same registered user can't
+            // be slotted into two rows of the same wizard.
+            const otherPickedIds = data.players
+              .slice(0, data.playerCount)
+              .flatMap((p, j) => (j !== i && p.profileId ? [p.profileId] : []));
+            return (
+              <PlayerRow
+                key={i}
+                index={i}
+                player={data.players[i] ?? { ...EMPTY_PLAYER }}
+                showGender={showGender}
+                excludedProfileIds={otherPickedIds}
+                registerRef={(el) => {
+                  nameRefs.current[i] = el;
+                }}
+                onPatch={(patch) => updatePlayer(i, patch)}
+                onSubmitName={() => focusNextName(i)}
+              />
+            );
+          })}
           <div className="text-[11px] text-ink-3">
             Names need at least 2 characters. Enter jumps to the next row. You can edit everything from the roster screen.
           </div>
@@ -499,6 +509,7 @@ function PlayerRow({
   index,
   player,
   showGender,
+  excludedProfileIds,
   registerRef,
   onPatch,
   onSubmitName,
@@ -506,6 +517,7 @@ function PlayerRow({
   index: number;
   player: WizardPlayer;
   showGender: boolean;
+  excludedProfileIds: string[];
   registerRef: (el: HTMLInputElement | null) => void;
   onPatch: (patch: Partial<WizardPlayer>) => void;
   onSubmitName: () => void;
@@ -545,6 +557,13 @@ function PlayerRow({
     }, 220);
     return () => clearTimeout(t);
   }, [player.name, player.phone, player.profileId]);
+
+  // Filter at render time so when another row picks a profile mid-typing
+  // here, the suggestion disappears from this row's dropdown immediately.
+  const visibleMatches = (() => {
+    const excluded = new Set(excludedProfileIds);
+    return matches.filter((m) => !excluded.has(m.user_id));
+  })();
 
   const onPick = (m: InviteeMatch) => {
     onPatch({
@@ -588,7 +607,7 @@ function PlayerRow({
           className="w-full rounded-lg bg-white px-3 py-2.5 text-sm text-ink outline-none"
           style={{ border: '1px solid var(--line)' }}
         />
-        {open && matches.length > 0 && !player.profileId && (
+        {open && visibleMatches.length > 0 && !player.profileId && (
           <div
             className="absolute left-0 right-0 top-11 z-10 overflow-hidden rounded-xl bg-white shadow-md"
             style={{ border: '1px solid var(--line)' }}
@@ -599,7 +618,7 @@ function PlayerRow({
             >
               {searching ? 'Searching…' : 'Registered players'}
             </div>
-            {matches.map((m) => (
+            {visibleMatches.map((m) => (
               <button
                 key={m.user_id}
                 type="button"

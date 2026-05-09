@@ -3,11 +3,17 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { addInvitePlayer, searchInvitees, type InviteeMatch } from './actions';
 import { buildSmsUrl, formatE164, normalizeE164 } from '@/lib/phone';
+import { ContactPickerButton } from '@/components/ui/ContactPickerButton';
 
 type Props = {
   tournamentId: string;
   tournamentName: string;
   inviteCode: string;
+  // Profile IDs already on the roster — typeahead suggestions matching one
+  // of these are dropped so an organizer can't pick the same registered
+  // user twice (the DB unique index would reject it anyway, but the UX
+  // should never offer the option).
+  existingProfileIds?: string[];
 };
 
 // Add Player form with two new affordances:
@@ -21,7 +27,8 @@ type Props = {
 //      tournament_player row with the phone so a future signup using the
 //      same number auto-links.
 
-export function AddPlayerForm({ tournamentId, tournamentName, inviteCode }: Props) {
+export function AddPlayerForm({ tournamentId, tournamentName, inviteCode, existingProfileIds }: Props) {
+  const excluded = new Set(existingProfileIds ?? []);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [dupr, setDupr] = useState('');
@@ -78,6 +85,9 @@ export function AddPlayerForm({ tournamentId, tournamentName, inviteCode }: Prop
 
   const phoneClean = normalizeE164(phone);
   const isUnregisteredWithPhone = !pickedRegistered && !!phoneClean && name.trim().length >= 2;
+  // Drop suggestions that are already on the roster so the organizer can't
+  // pick the same registered user twice.
+  const visibleMatches = matches.filter((m) => !excluded.has(m.user_id));
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -87,6 +97,8 @@ export function AddPlayerForm({ tournamentId, tournamentName, inviteCode }: Prop
     const dupr_clean = dupr.trim();
     if (dupr_clean) fd.set('dupr', dupr_clean);
     else fd.delete('dupr');
+    if (pickedRegistered) fd.set('user_id', pickedRegistered.user_id);
+    else fd.delete('user_id');
     startSubmitting(async () => {
       await addInvitePlayer(fd);
       setName('');
@@ -125,7 +137,7 @@ export function AddPlayerForm({ tournamentId, tournamentName, inviteCode }: Prop
           className="w-full rounded-xl bg-white px-3.5 py-3 text-sm text-ink outline-none"
           style={{ border: '1px solid var(--line)' }}
         />
-        {open && matches.length > 0 && !pickedRegistered && (
+        {open && visibleMatches.length > 0 && !pickedRegistered && (
           <div
             className="absolute left-0 right-0 top-12 z-10 overflow-hidden rounded-xl bg-white shadow-md"
             style={{ border: '1px solid var(--line)' }}
@@ -136,7 +148,7 @@ export function AddPlayerForm({ tournamentId, tournamentName, inviteCode }: Prop
             >
               {searching ? 'Searching…' : 'Registered players'}
             </div>
-            {matches.map((m) => (
+            {visibleMatches.map((m) => (
               <button
                 key={m.user_id}
                 type="button"
@@ -182,6 +194,15 @@ export function AddPlayerForm({ tournamentId, tournamentName, inviteCode }: Prop
           }}
           className="flex-1 rounded-xl bg-white px-3.5 py-3 text-sm text-ink outline-none"
           style={{ border: '1px solid var(--line)' }}
+        />
+        <ContactPickerButton
+          label="Contacts"
+          className="rounded-xl px-3 py-3 text-[12px] font-semibold"
+          onPick={({ name: pickedName, phone: pickedPhone }) => {
+            if (pickedName) setName(pickedName);
+            if (pickedPhone) setPhone(pickedPhone);
+            setPickedRegistered(null);
+          }}
         />
       </div>
       <div className="flex items-center gap-2">

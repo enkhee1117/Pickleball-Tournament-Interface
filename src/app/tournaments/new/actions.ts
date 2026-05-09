@@ -6,6 +6,7 @@ import { formatPgError } from '@/lib/forms';
 import { validateTournamentFormat, validateTournamentName } from '@/lib/validation';
 import { generateMatchDrafts } from '@/lib/match-schemes';
 import { normalizeE164 } from '@/lib/phone';
+import { titleCaseName } from '@/lib/text';
 import {
   canGenerateMatches,
   dbFormat,
@@ -21,6 +22,10 @@ export type WizardPlayerInput = {
   gender?: 'm' | 'f' | 'x' | null;
   phone?: string | null;
   dupr?: number | null;
+  // When the user picked a registered profile via typeahead, this is set
+  // so the server can stamp profile_id directly instead of relying on the
+  // phone-match heuristic — which fails when the profile has no phone.
+  profileId?: string | null;
 };
 
 type CreateInput = {
@@ -45,13 +50,14 @@ type CleanPlayer = {
   gender: 'm' | 'f' | 'x' | null;
   phone: string | null;
   dupr: number | null;
+  profileId: string | null;
 };
 
 function cleanPlayers(input: CreateInput): CleanPlayer[] {
   if (input.players && input.players.length > 0) {
     return input.players
       .map((p) => {
-        const name = (p.name ?? '').trim();
+        const name = titleCaseName((p.name ?? '').trim());
         if (!name) return null;
         const phoneRaw = (p.phone ?? '').trim();
         const phone = phoneRaw ? normalizeE164(phoneRaw) : null;
@@ -60,16 +66,17 @@ function cleanPlayers(input: CreateInput): CleanPlayer[] {
           typeof p.dupr === 'number' && Number.isFinite(p.dupr) && p.dupr >= 2 && p.dupr <= 8
             ? Math.round(p.dupr * 100) / 100
             : null;
-        return { name, gender, phone, dupr };
+        const profileId = typeof p.profileId === 'string' && p.profileId.length > 0 ? p.profileId : null;
+        return { name, gender, phone, dupr, profileId };
       })
       .filter((p): p is CleanPlayer => p !== null)
       .slice(0, 64);
   }
   return (input.playerNames ?? [])
-    .map((n) => n.trim())
+    .map((n) => titleCaseName(n.trim()))
     .filter((n) => n.length > 0)
     .slice(0, 64)
-    .map((name) => ({ name, gender: null, phone: null, dupr: null }));
+    .map((name) => ({ name, gender: null, phone: null, dupr: null, profileId: null }));
 }
 
 export async function createTournamentClient(input: CreateInput): Promise<CreateResult> {
@@ -144,6 +151,18 @@ export async function createTournamentClient(input: CreateInput): Promise<Create
       });
     });
     await Promise.all(writes.filter((w): w is NonNullable<typeof w> => w !== null));
+
+    // Stamp profile_id directly for any row that came from a typeahead
+    // pick — phone matching alone misses profiles that don't have a phone
+    // on file, so this is the authoritative link.
+    const links = players.slice(0, ids.length).map((p, i) => {
+      if (!p.profileId) return null;
+      return supabase.rpc('app_link_tournament_player_to_profile', {
+        p_player_id: ids[i],
+        p_profile_id: p.profileId,
+      });
+    });
+    await Promise.all(links.filter((l): l is NonNullable<typeof l> => l !== null));
   }
 
   const manualTeams = !shouldAutoGenerate(input.format, input.pairing);

@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Chip } from '@/components/ui/Chip';
+import { Icons } from '@/components/ui/icons';
 import { claimInvitePlayer, removeInvitePlayer, updateInvitePlayer } from './actions';
 import { buildSmsUrl, formatE164, normalizeE164 } from '@/lib/phone';
 import { ConfirmForm } from '@/components/ui/ConfirmForm';
 import { SubmitButton } from '@/components/ui/SubmitButton';
+import { ContactPickerButton } from '@/components/ui/ContactPickerButton';
 
 type Gender = 'm' | 'f' | 'x' | null;
 
@@ -51,12 +53,20 @@ export function RosterRow({
   const [phone, setPhone] = useState(player.phone ?? '');
   const [gender, setGender] = useState<Gender>(player.gender ?? null);
   const [dupr, setDupr] = useState(player.dupr != null ? String(player.dupr) : '');
+  // Inline phone-prompt for the SMS icon when we don't yet have a number.
+  const [smsPromptOpen, setSmsPromptOpen] = useState(false);
+  const [smsPromptPhone, setSmsPromptPhone] = useState('');
+  const [smsPromptError, setSmsPromptError] = useState<string | null>(null);
+  const [savingPhone, startSavingPhone] = useTransition();
 
   const linked = !!player.profile_id;
-  const invited = !linked && (!!player.email || !!player.phone);
   const isMe = !!currentUserId && player.profile_id === currentUserId;
-  const status = isMe ? 'YOU' : linked ? 'IN' : invited ? 'INVITED' : 'PLACEHOLDER';
-  const tone: 'court' | 'default' | 'ghost' = isMe || linked ? 'court' : invited ? 'default' : 'ghost';
+  // We don't actually track "invite sent" state, so labelling a row INVITED
+  // just because it has a phone number was misleading. Anything not yet
+  // linked to a profile is PENDING — the subtext + the SMS button convey
+  // whether we already have contact info to invite them with.
+  const status = isMe ? 'YOU' : linked ? 'IN' : 'PENDING';
+  const tone: 'court' | 'default' | 'ghost' = isMe || linked ? 'court' : 'ghost';
 
   const subtext = isMe
     ? 'Linked to your stats'
@@ -64,13 +74,61 @@ export function RosterRow({
       ? 'Signed up · results post to their history'
       : player.phone
         ? `${formatE164(player.phone)} · will link when they sign up`
-        : invited
+        : player.email
           ? `${player.email} · will link when they sign up`
           : 'Placeholder · tap edit to add an email or phone';
 
   const phoneClean = normalizeE164(phone);
   const canTextInvite =
     canManage && !linked && !!phoneClean && !!tournamentName && !!inviteCode;
+
+  // Origin is needed to build absolute /t/<code> links in the SMS body.
+  // window may be undefined during SSR — guard so the component doesn't
+  // explode if rendered server-side.
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const smsBody = (toName: string) =>
+    `Hey ${toName} — you're in the ${tournamentName ?? ''} pickleball tournament. Track your matches: ${origin}/t/${inviteCode ?? ''}`;
+
+  // The inline SMS button next to the player name. With a phone, it just
+  // opens the device's messaging app. Without one, it expands a small
+  // phone-entry pill so the manager can fix that in one flow instead of
+  // hunting through the edit panel.
+  const showSmsButton = canManage && !linked && !!tournamentName && !!inviteCode;
+  const onSmsButtonClick = () => {
+    if (phoneClean) {
+      window.open(buildSmsUrl(phoneClean, smsBody(player.display_name)), '_blank');
+      return;
+    }
+    setSmsPromptError(null);
+    setSmsPromptOpen((v) => !v);
+  };
+
+  const onPhonePromptSubmit = () => {
+    const cleaned = normalizeE164(smsPromptPhone);
+    if (!cleaned) {
+      setSmsPromptError('Enter a phone in international format, e.g. +15551234567.');
+      return;
+    }
+    startSavingPhone(async () => {
+      const fd = new FormData();
+      fd.set('tournament_id', tournamentId);
+      fd.set('player_id', player.id);
+      fd.set('display_name', player.display_name);
+      fd.set('email', player.email ?? '');
+      fd.set('phone', cleaned);
+      fd.set('gender', player.gender ?? '');
+      if (player.dupr != null) fd.set('dupr', String(player.dupr));
+      try {
+        await updateInvitePlayer(fd);
+        setPhone(cleaned);
+        setSmsPromptOpen(false);
+        setSmsPromptPhone('');
+        window.open(buildSmsUrl(cleaned, smsBody(player.display_name)), '_blank');
+      } catch {
+        setSmsPromptError('Could not save the phone — try again.');
+      }
+    });
+  };
 
   const canClaim = !!currentUserId && !linked && !userHasClaimedSlot;
 
@@ -93,6 +151,18 @@ export function RosterRow({
           <div className="truncate text-[11px] text-ink-3">{subtext}</div>
         </div>
         <Chip tone={tone}>{status}</Chip>
+        {showSmsButton && (
+          <button
+            type="button"
+            onClick={onSmsButtonClick}
+            aria-label={phoneClean ? `Text invite to ${player.display_name}` : `Add phone and text invite ${player.display_name}`}
+            title={phoneClean ? 'Text invite' : 'Add phone & text invite'}
+            className="ml-1 flex h-8 w-8 items-center justify-center rounded-lg"
+            style={{ color: '#fff', background: '#25D366' }}
+          >
+            {Icons.message}
+          </button>
+        )}
         {canManage && (
           <button
             type="button"
@@ -104,6 +174,75 @@ export function RosterRow({
           </button>
         )}
       </div>
+
+      {smsPromptOpen && !phoneClean && (
+        <div
+          className="mt-2.5 grid gap-2 rounded-xl px-2.5 py-2"
+          style={{ background: 'var(--paper-2)', border: '1px solid var(--line)' }}
+        >
+          <div className="text-[11px] text-ink-3">
+            No phone on file for {player.display_name}. Add one to send the invite.
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="off"
+              autoFocus
+              placeholder="+15551234567"
+              value={smsPromptPhone}
+              onChange={(e) => setSmsPromptPhone(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onPhonePromptSubmit();
+                }
+              }}
+              className="flex-1 rounded-lg bg-white px-3 py-2 text-sm text-ink outline-none"
+              style={{ border: '1px solid var(--line)' }}
+            />
+            <ContactPickerButton
+              label="Pick"
+              className="rounded-lg px-3 py-2 text-[12px] font-semibold"
+              onPick={({ name: contactName, phone: contactPhone }) => {
+                if (contactPhone) setSmsPromptPhone(contactPhone);
+                if (contactName && !player.display_name) {
+                  // Don't overwrite an existing name silently — only
+                  // back-fill when the row was anonymous.
+                }
+              }}
+            />
+          </div>
+          {smsPromptError && (
+            <div className="text-[11px]" style={{ color: 'var(--berry)' }}>
+              {smsPromptError}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onPhonePromptSubmit}
+              disabled={savingPhone || !smsPromptPhone.trim()}
+              className="flex-1 rounded-lg px-3 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
+              style={{ background: '#25D366' }}
+            >
+              {savingPhone ? 'Saving…' : 'Save & text invite'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSmsPromptOpen(false);
+                setSmsPromptPhone('');
+                setSmsPromptError(null);
+              }}
+              className="rounded-lg px-3 py-2 text-[12px] font-semibold"
+              style={{ color: 'var(--ink-2)', border: '1px solid var(--line)' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {canClaim && (
         <form action={claimInvitePlayer} className="mt-2.5">

@@ -99,4 +99,16 @@ export const Icons = {
       <path d="M8 4l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  message: (
+    <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+      <path d="M3 4h14a1 1 0 011 1v9a1 1 0 01-1 1H8l-4 3v-3a1 1 0 01-1-1V5a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  contacts: (
+    <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+      <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="10" cy="9" r="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M6 14c.8-1.5 2.3-2.5 4-2.5s3.2 1 4 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  ),
 };

@@ -588,6 +588,7 @@ function SettingsTab({
         tournamentId={tournamentId}
         tournamentName={tournamentName}
         inviteCode={tournamentInviteCode}
+        existingProfileIds={roster.flatMap((p) => (p.profile_id ? [p.profile_id] : []))}
       />
 
       <div className="mb-5 grid gap-2">
