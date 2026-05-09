@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Chip } from '@/components/ui/Chip';
 import { Icons } from '@/components/ui/icons';
@@ -8,6 +8,8 @@ import {
   claimInvitePlayer,
   reinstatePlayer,
   removeInvitePlayer,
+  searchInvitees,
+  type InviteeMatch,
   unclaimSelfPlayer,
   updateInvitePlayer,
   withdrawPlayer,
@@ -66,6 +68,58 @@ export function RosterRow({
   const [smsPromptPhone, setSmsPromptPhone] = useState('');
   const [smsPromptError, setSmsPromptError] = useState<string | null>(null);
   const [savingPhone, startSavingPhone] = useTransition();
+  // Typeahead state for the edit-panel name input — picks a registered
+  // profile so the manager can convert a placeholder row into a linked one
+  // without deleting + re-adding.
+  const [editPicked, setEditPicked] = useState<InviteeMatch | null>(null);
+  const [editMatches, setEditMatches] = useState<InviteeMatch[]>([]);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSearching, startEditSearching] = useTransition();
+  const editContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (!editContainerRef.current?.contains(e.target as Node)) setEditOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  // Debounced search — only when the row is still unlinked, the user
+  // is editing, and they haven't already picked.
+  useEffect(() => {
+    if (!editing || linked || editPicked) {
+      setEditMatches([]);
+      return;
+    }
+    const phoneClean = normalizeE164(phone);
+    const query = phoneClean ?? name.trim();
+    if (query.length < 2 || query === player.display_name) {
+      setEditMatches([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      startEditSearching(async () => {
+        const result = await searchInvitees(query);
+        setEditMatches(result);
+      });
+    }, 220);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, name, phone, editPicked]);
+
+  const onEditPick = (m: InviteeMatch) => {
+    setName(m.display_name ?? '');
+    setPhone(m.phone ?? '');
+    if (m.dupr != null) setDupr(String(m.dupr));
+    if (m.gender === 'm' || m.gender === 'f' || m.gender === 'x') setGender(m.gender);
+    setEditPicked(m);
+    setEditOpen(false);
+  };
+
+  const onEditClearPick = () => {
+    setEditPicked(null);
+  };
 
   const linked = !!player.profile_id;
   const isMe = !!currentUserId && player.profile_id === currentUserId;
@@ -305,16 +359,76 @@ export function RosterRow({
           <form action={updateInvitePlayer} className="grid gap-2">
             <input type="hidden" name="tournament_id" value={tournamentId} />
             <input type="hidden" name="player_id" value={player.id} />
-            <input
-              name="display_name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="rounded-xl bg-white px-3 py-2.5 text-sm text-ink outline-none"
-              style={{ border: '1px solid var(--line)' }}
-              placeholder="Player name"
-              maxLength={120}
-            />
+            {editPicked && <input type="hidden" name="user_id" value={editPicked.user_id} />}
+            <div ref={editContainerRef} className="relative">
+              <input
+                name="display_name"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setEditOpen(true);
+                  // Don't auto-clear editPicked — the explicit Unlink chip
+                  // below handles detach. Aggressive clearing wiped the
+                  // pick on every keystroke.
+                }}
+                onFocus={() => setEditOpen(true)}
+                required
+                className="w-full rounded-xl bg-white px-3 py-2.5 text-sm text-ink outline-none"
+                style={{ border: '1px solid var(--line)' }}
+                placeholder="Player name"
+                maxLength={120}
+                autoComplete="off"
+              />
+              {editOpen && editMatches.length > 0 && !editPicked && !linked && (
+                <div
+                  className="absolute left-0 right-0 top-12 z-10 overflow-hidden rounded-xl bg-white shadow-md"
+                  style={{ border: '1px solid var(--line)' }}
+                >
+                  <div
+                    className="px-3 py-1.5 text-[10px] uppercase tracking-[0.06em] text-ink-3"
+                    style={{ borderBottom: '1px solid var(--line)' }}
+                  >
+                    {editSearching ? 'Searching…' : 'Link to a registered player'}
+                  </div>
+                  {editMatches.map((m) => (
+                    <button
+                      key={m.user_id}
+                      type="button"
+                      onClick={() => onEditPick(m)}
+                      className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-paper-2"
+                    >
+                      <div>
+                        <div className="text-[13px] font-semibold text-ink">{m.display_name}</div>
+                        {m.phone && (
+                          <div className="mono text-[11px] text-ink-3">{formatE164(m.phone)}</div>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-ink-3">
+                        Pick
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {editPicked && (
+              <div
+                className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12px]"
+                style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}
+              >
+                <span>
+                  Linking to <strong>{editPicked.display_name}</strong>
+                  {editPicked.phone ? ` · ${formatE164(editPicked.phone)}` : ''}
+                </span>
+                <button
+                  type="button"
+                  onClick={onEditClearPick}
+                  className="ml-auto text-[11px] font-semibold underline"
+                >
+                  Unlink
+                </button>
+              </div>
+            )}
             <input
               name="email"
               value={email}

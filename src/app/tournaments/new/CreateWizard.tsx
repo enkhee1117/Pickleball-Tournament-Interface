@@ -591,7 +591,10 @@ function PlayerRow({
           ref={registerRef}
           value={player.name}
           onChange={(e) => {
-            onPatch({ name: e.target.value, profileId: null });
+            // Keep profileId across edits — clearing on every keystroke
+            // wiped the pick the moment a manager tweaked the name. Use
+            // the explicit Unlink button on the linked pill instead.
+            onPatch({ name: e.target.value });
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
@@ -684,7 +687,7 @@ function PlayerRow({
         )}
         <input
           value={player.phone}
-          onChange={(e) => onPatch({ phone: e.target.value, profileId: null })}
+          onChange={(e) => onPatch({ phone: e.target.value })}
           type="tel"
           inputMode="tel"
           autoComplete="off"

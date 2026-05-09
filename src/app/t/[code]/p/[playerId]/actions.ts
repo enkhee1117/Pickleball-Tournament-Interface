@@ -48,6 +48,19 @@ export async function claimViaPersonalInvite(formData: FormData): Promise<void> 
     redirect(`/profile?next=${encodeURIComponent(`/t/${code.toLowerCase()}/p/${playerId}`)}`);
   }
 
+  // The claim RPC requires the user to already be a tournament_member, but
+  // a fresh signup arriving via a personal-invite link isn't one yet. Join
+  // first (idempotent — ON CONFLICT DO NOTHING) so the claim doesn't fail
+  // with "join the tournament first" and leave the row showing PENDING.
+  const { error: joinErr } = await supabase.rpc('app_join_tournament_by_code', {
+    p_code: code,
+  });
+  if (joinErr) {
+    redirect(
+      `/t/${code.toLowerCase()}?error=${encodeURIComponent(formatPgError(joinErr))}`,
+    );
+  }
+
   const { error } = await supabase.rpc('app_claim_tournament_player_with_name', {
     p_player_id: playerId,
     p_display_name: profileName,

@@ -139,6 +139,7 @@ export async function updateInvitePlayer(formData: FormData): Promise<void> {
       `/tournaments/${tournamentId}/invite?error=${encodeURIComponent("Phone doesn't look right — try +15551234567.")}`,
     );
   }
+  const profileIdRaw = String(formData.get('user_id') ?? '').trim();
 
   const supabase = await createClient();
   const {
@@ -158,6 +159,21 @@ export async function updateInvitePlayer(formData: FormData): Promise<void> {
     redirect(
       `/tournaments/${tournamentId}/invite?error=${encodeURIComponent(formatPgError(error))}`,
     );
+  }
+
+  // Editor picked a registered profile via typeahead → stamp profile_id
+  // directly so a manager can convert a placeholder row into a linked one
+  // without having to delete + re-add.
+  if (profileIdRaw) {
+    const { error: linkErr } = await supabase.rpc('app_link_tournament_player_to_profile', {
+      p_player_id: playerId,
+      p_profile_id: profileIdRaw,
+    });
+    if (linkErr) {
+      redirect(
+        `/tournaments/${tournamentId}/invite?error=${encodeURIComponent(formatPgError(linkErr))}`,
+      );
+    }
   }
 
   revalidatePath(`/tournaments/${tournamentId}`);
