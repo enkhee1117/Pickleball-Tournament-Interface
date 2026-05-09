@@ -4,7 +4,14 @@ import { useState, useTransition } from 'react';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Chip } from '@/components/ui/Chip';
 import { Icons } from '@/components/ui/icons';
-import { claimInvitePlayer, removeInvitePlayer, unclaimSelfPlayer, updateInvitePlayer } from './actions';
+import {
+  claimInvitePlayer,
+  reinstatePlayer,
+  removeInvitePlayer,
+  unclaimSelfPlayer,
+  updateInvitePlayer,
+  withdrawPlayer,
+} from './actions';
 import { buildSmsUrl, formatE164, normalizeE164 } from '@/lib/phone';
 import { ConfirmForm } from '@/components/ui/ConfirmForm';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -24,6 +31,7 @@ type Props = {
     gender?: Gender;
     phone?: string | null;
     dupr?: number | null;
+    withdrawn_at?: string | null;
   };
   // The signed-in user's user_id, when they're a member of this tournament
   // and haven't claimed a slot yet. Drives the "This is me" affordance.
@@ -61,22 +69,35 @@ export function RosterRow({
 
   const linked = !!player.profile_id;
   const isMe = !!currentUserId && player.profile_id === currentUserId;
-  // We don't actually track "invite sent" state, so labelling a row INVITED
-  // just because it has a phone number was misleading. Anything not yet
-  // linked to a profile is PENDING — the subtext + the SMS button convey
-  // whether we already have contact info to invite them with.
-  const status = isMe ? 'YOU' : linked ? 'IN' : 'PENDING';
-  const tone: 'court' | 'default' | 'ghost' = isMe || linked ? 'court' : 'ghost';
+  const isWithdrawn = !!player.withdrawn_at;
+  // Withdrawn beats every other state so the manager can see at a glance
+  // who's still in the tournament. We don't actually track "invite sent"
+  // state, so labelling a row INVITED just because it has a phone number
+  // was misleading — anything not yet linked says PENDING instead.
+  const status = isWithdrawn
+    ? 'WITHDRAWN'
+    : isMe
+      ? 'YOU'
+      : linked
+        ? 'IN'
+        : 'PENDING';
+  const tone: 'court' | 'default' | 'ghost' = isWithdrawn
+    ? 'ghost'
+    : isMe || linked
+      ? 'court'
+      : 'ghost';
 
-  const subtext = isMe
-    ? 'Linked to your stats'
-    : linked
-      ? 'Signed up · results post to their history'
-      : player.phone
-        ? `${formatE164(player.phone)} · will link when they sign up`
-        : player.email
-          ? `${player.email} · will link when they sign up`
-          : 'Placeholder · tap edit to add an email or phone';
+  const subtext = isWithdrawn
+    ? 'Withdrawn — pending matches were forfeited'
+    : isMe
+      ? 'Linked to your stats'
+      : linked
+        ? 'Signed up · results post to their history'
+        : player.phone
+          ? `${formatE164(player.phone)} · will link when they sign up`
+          : player.email
+            ? `${player.email} · will link when they sign up`
+            : 'Placeholder · tap edit to add an email or phone';
 
   const phoneClean = normalizeE164(phone);
   const canTextInvite =
@@ -137,7 +158,12 @@ export function RosterRow({
   return (
     <div
       className="rounded-[14px] bg-white px-3.5 py-2.5"
-      style={{ border: `1px solid ${isMe ? 'var(--court-deep)' : 'var(--line)'}` }}
+      style={{
+        border: `1px solid ${isMe ? 'var(--court-deep)' : 'var(--line)'}`,
+        // Withdrawn rows fade so the manager can scan the active roster
+        // without filtering them out manually.
+        opacity: isWithdrawn ? 0.55 : 1,
+      }}
     >
       <div className="flex items-center gap-3">
         <Avatar player={playerFromName(player.display_name)} size={40} />
@@ -377,6 +403,37 @@ export function RosterRow({
             >
               Text invite via SMS
             </a>
+          )}
+          {isWithdrawn ? (
+            <ConfirmForm
+              action={reinstatePlayer}
+              confirm={`Reinstate ${player.display_name}? Already-forfeited matches stay forfeited — re-score them in the scoreboard if needed.`}
+            >
+              <input type="hidden" name="tournament_id" value={tournamentId} />
+              <input type="hidden" name="player_id" value={player.id} />
+              <SubmitButton
+                pendingLabel="Reinstating…"
+                className="w-full rounded-xl px-3 py-2 text-[13px] font-semibold"
+                style={{ color: 'var(--ink-2)', border: '1px solid var(--line)', background: '#fff' }}
+              >
+                Reinstate player
+              </SubmitButton>
+            </ConfirmForm>
+          ) : (
+            <ConfirmForm
+              action={withdrawPlayer}
+              confirm={`Withdraw ${player.display_name}? Their pending matches will be auto-forfeited (11-0 to the other side). Completed matches stay as scored.`}
+            >
+              <input type="hidden" name="tournament_id" value={tournamentId} />
+              <input type="hidden" name="player_id" value={player.id} />
+              <SubmitButton
+                pendingLabel="Withdrawing…"
+                className="w-full rounded-xl px-3 py-2 text-[13px] font-semibold"
+                style={{ color: 'var(--ink-2)', border: '1px solid var(--line)', background: '#fff' }}
+              >
+                Withdraw from tournament
+              </SubmitButton>
+            </ConfirmForm>
           )}
           <ConfirmForm
             action={removeInvitePlayer}

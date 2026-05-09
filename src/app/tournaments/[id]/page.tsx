@@ -57,6 +57,7 @@ type MatchRow = {
   completed_at: string | null;
   match_games: { team_a_score: number; team_b_score: number }[] | null;
   recording_url: string | null;
+  forfeited_by: string | null;
 };
 
 export default async function TournamentDetailPage({ params, searchParams }: PageProps) {
@@ -99,14 +100,14 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
     supabase
       .from('matches')
       .select(
-        'id,round_label,court_label,team_a_label,team_b_label,team_a_score,team_b_score,winner_side,completed_at,recording_url,match_games(team_a_score,team_b_score)',
+        'id,round_label,court_label,team_a_label,team_b_label,team_a_score,team_b_score,winner_side,completed_at,recording_url,forfeited_by,match_games(team_a_score,team_b_score)',
       )
       .eq('tournament_id', id)
       .order('created_at', { ascending: true })
       .limit(200),
     supabase
       .from('tournament_players')
-      .select('id,display_name,email,profile_id,gender,phone,dupr')
+      .select('id,display_name,email,profile_id,gender,phone,dupr,withdrawn_at')
       .eq('tournament_id', id)
       .order('created_at', { ascending: true }),
     // Fire-and-forget status refresh in parallel; the page never reads its
@@ -310,6 +311,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
                 gender?: 'm' | 'f' | 'x' | null;
                 phone?: string | null;
                 dupr?: number | null;
+                withdrawn_at?: string | null;
               };
               return {
                 id: p.id,
@@ -319,6 +321,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
                 gender: ext.gender ?? null,
                 phone: ext.phone ?? null,
                 dupr: ext.dupr != null ? Number(ext.dupr) : null,
+                withdrawn_at: ext.withdrawn_at ?? null,
               };
             })}
             hasMatches={hasMatches}
@@ -336,14 +339,19 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
             rrPending={rrPending}
             hasRoundRobin={rrMatches.length > 0}
             rrMatches={rrMatches}
-            roster={rosterPlayers.map((p) => {
-              const ext = p as PlayerLike & { gender?: 'm' | 'f' | 'x' | null };
-              return {
-                id: p.id,
-                display_name: p.display_name,
-                gender: ext.gender ?? null,
-              };
-            })}
+            roster={rosterPlayers
+              // Withdrawn players don't get pulled into a fresh playoff
+              // bracket — the organizer-choice picker only sees who's
+              // still in the tournament.
+              .filter((p) => !(p as PlayerLike & { withdrawn_at?: string | null }).withdrawn_at)
+              .map((p) => {
+                const ext = p as PlayerLike & { gender?: 'm' | 'f' | 'x' | null };
+                return {
+                  id: p.id,
+                  display_name: p.display_name,
+                  gender: ext.gender ?? null,
+                };
+              })}
             genderMode={
               (t as Tournament & { gender_mode?: 'open' | 'mixed' | 'same' }).gender_mode ?? 'open'
             }
@@ -486,7 +494,8 @@ function RealMatchCard({ tournamentId, row }: { tournamentId: string; row: Match
             </span>
           )}
           {isLive && <Chip tone="live">LIVE</Chip>}
-          {isDone && <Chip tone="court">FINAL</Chip>}
+          {isDone && row.forfeited_by && <Chip tone="ghost">W/O</Chip>}
+          {isDone && !row.forfeited_by && <Chip tone="court">FINAL</Chip>}
           {!isLive && !isDone && <Chip tone="ghost">UP NEXT</Chip>}
         </div>
       </div>
@@ -573,6 +582,7 @@ function SettingsTab({
     gender: 'm' | 'f' | 'x' | null;
     phone: string | null;
     dupr: number | null;
+    withdrawn_at: string | null;
   }[];
   hasMatches: boolean;
   isOwner: boolean;
@@ -581,7 +591,12 @@ function SettingsTab({
 }) {
   const isFixed = tournamentFormat === 'fixed_partners';
   const showGender = genderMode !== 'open';
-  const rosterForGeneration = roster.map((p) => ({ id: p.id, display_name: p.display_name }));
+  // Withdrawn players sit out new match generation — keep them in the
+  // roster (so completed matches still resolve their names) but stop
+  // putting them on courts.
+  const rosterForGeneration = roster
+    .filter((p) => !p.withdrawn_at)
+    .map((p) => ({ id: p.id, display_name: p.display_name }));
   const males = roster.filter((p) => p.gender === 'm').length;
   const females = roster.filter((p) => p.gender === 'f').length;
   const untagged = roster.filter((p) => !p.gender).length;
@@ -646,7 +661,7 @@ function SettingsTab({
         <GenerateMatchesPanel
           tournamentId={tournamentId}
           format={tournamentFormat}
-          rosterCount={playerCount}
+          rosterCount={rosterForGeneration.length}
           hasMatches={hasMatches}
         />
       )}

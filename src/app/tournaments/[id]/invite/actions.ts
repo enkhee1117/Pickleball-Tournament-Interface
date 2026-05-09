@@ -197,6 +197,74 @@ export async function unclaimSelfPlayer(formData: FormData): Promise<void> {
   );
 }
 
+// Mid-tournament withdrawal. Manager flips the player to withdrawn and
+// pending matches mentioning them auto-forfeit (11-0 to the other side).
+// Idempotent on subsequent calls — re-running just no-ops.
+export async function withdrawPlayer(formData: FormData): Promise<void> {
+  const tournamentId = String(formData.get('tournament_id') ?? '').trim();
+  const playerId = String(formData.get('player_id') ?? '').trim();
+  if (!tournamentId || !playerId) {
+    redirect(`/tournaments/${tournamentId}?error=Missing%20identifiers`);
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const { data, error } = await supabase.rpc('app_withdraw_player', {
+    p_player_id: playerId,
+  });
+  if (error) {
+    redirect(
+      `/tournaments/${tournamentId}?error=${encodeURIComponent(formatPgError(error))}`,
+    );
+  }
+
+  const forfeitCount = typeof data === 'number' ? data : 0;
+  revalidatePath(`/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}/invite`);
+  revalidatePath('/history');
+  const msg =
+    forfeitCount === 0
+      ? 'Player withdrawn. No pending matches to forfeit.'
+      : `Player withdrawn. ${forfeitCount} pending match${forfeitCount === 1 ? '' : 'es'} forfeited.`;
+  redirect(`/tournaments/${tournamentId}?ok=${encodeURIComponent(msg)}`);
+}
+
+// Undo a withdrawal. Only flips the flag — already-forfeited matches stay
+// forfeited; manager can re-score them through the normal UI if the player
+// actually came back.
+export async function reinstatePlayer(formData: FormData): Promise<void> {
+  const tournamentId = String(formData.get('tournament_id') ?? '').trim();
+  const playerId = String(formData.get('player_id') ?? '').trim();
+  if (!tournamentId || !playerId) {
+    redirect(`/tournaments/${tournamentId}?error=Missing%20identifiers`);
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  const { error } = await supabase.rpc('app_reinstate_player', {
+    p_player_id: playerId,
+  });
+  if (error) {
+    redirect(
+      `/tournaments/${tournamentId}?error=${encodeURIComponent(formatPgError(error))}`,
+    );
+  }
+
+  revalidatePath(`/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}/invite`);
+  redirect(
+    `/tournaments/${tournamentId}?ok=${encodeURIComponent('Player reinstated. Re-score forfeited matches in the scoreboard if needed.')}`,
+  );
+}
+
 export async function claimInvitePlayer(formData: FormData): Promise<void> {
   const tournamentId = String(formData.get('tournament_id') ?? '').trim();
   const playerId = String(formData.get('player_id') ?? '').trim();
@@ -324,8 +392,9 @@ export async function generateMatchesFromRoster(formData: FormData): Promise<voi
       .single(),
     supabase
       .from('tournament_players')
-      .select('display_name,gender,dupr')
+      .select('display_name,gender,dupr,withdrawn_at')
       .eq('tournament_id', tournamentId)
+      .is('withdrawn_at', null)
       .order('created_at', { ascending: true }),
   ]);
   if (!tournament) {
@@ -335,6 +404,7 @@ export async function generateMatchesFromRoster(formData: FormData): Promise<voi
     display_name: string;
     gender: 'm' | 'f' | 'x' | null;
     dupr: number | null;
+    withdrawn_at: string | null;
   }[];
   const players = rosterRows.map((r) => r.display_name).filter(Boolean);
   const genders = rosterRows.map((r) => r.gender ?? null);
