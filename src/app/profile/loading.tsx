@@ -1,0 +1,22 @@
+export default function Loading() {
+  return (
+    <div className="flex min-h-full flex-col bg-paper">
+      <div className="flex items-center justify-end px-[18px] pt-[18px]">
+        <div className="h-10 w-10 animate-pulse rounded-xl bg-paper-2" />
+      </div>
+      <div className="flex-1 px-[18px] pb-24 pt-3">
+        <div className="flex flex-col items-center pb-4 pt-1">
+          <div className="h-[110px] w-[110px] animate-pulse rounded-full bg-paper-2" />
+          <div className="mt-3 h-7 w-40 animate-pulse rounded bg-paper-2" />
+          <div className="mt-2 h-3 w-56 animate-pulse rounded bg-paper-2" />
+        </div>
+        <div className="h-32 animate-pulse rounded-[18px] bg-paper-2" />
+        <div className="mt-5 space-y-px overflow-hidden rounded-2xl bg-white" style={{ border: '1px solid var(--line)' }}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-12 animate-pulse bg-paper-2" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

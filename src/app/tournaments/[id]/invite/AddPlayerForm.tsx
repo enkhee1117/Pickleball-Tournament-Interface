@@ -29,6 +29,7 @@ export function AddPlayerForm({ tournamentId, tournamentName, inviteCode }: Prop
   const [searching, startSearching] = useTransition();
   const [submitting, startSubmitting] = useTransition();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const phoneRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState(false);
   const [pickedRegistered, setPickedRegistered] = useState<InviteeMatch | null>(null);
 
@@ -110,6 +111,13 @@ export function AddPlayerForm({ tournamentId, tournamentName, inviteCode }: Prop
             setPickedRegistered(null);
           }}
           onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              setOpen(false);
+              phoneRef.current?.focus();
+            }
+          }}
           required
           placeholder="Player name"
           maxLength={120}
@@ -160,6 +168,7 @@ export function AddPlayerForm({ tournamentId, tournamentName, inviteCode }: Prop
           style={{ border: '1px solid var(--line)' }}
         />
         <input
+          ref={phoneRef}
           name="phone"
           type="tel"
           inputMode="tel"

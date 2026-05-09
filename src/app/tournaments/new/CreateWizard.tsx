@@ -1,23 +1,37 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { TopBar } from '@/components/ui/TopBar';
 import { IconBtn } from '@/components/ui/IconBtn';
 import { BigButton } from '@/components/ui/BigButton';
 import { Icons } from '@/components/ui/icons';
 import {
   defaultPairingForFormat,
+  genderModeFor,
   isFixedPartners,
   isValidPairingForFormat,
   shouldAutoGenerate,
+  type GenderMode,
   type WizardFormat,
   type WizardPairing,
 } from '@/lib/tournament-wizard';
+import { searchInvitees, type InviteeMatch } from '@/app/tournaments/[id]/invite/actions';
+import { formatE164, normalizeE164 } from '@/lib/phone';
 import { createTournamentClient } from './actions';
 
 type FormatId = WizardFormat;
 type PairingId = WizardPairing;
+
+type WizardPlayer = {
+  name: string;
+  gender: 'm' | 'f' | null;
+  phone: string;
+  // Captured when the user picks a registered profile from the typeahead so
+  // we can display "linked" feedback and skip re-fetching their phone.
+  profileId: string | null;
+  dupr: number | null;
+};
 
 type WizardData = {
   name: string;
@@ -27,8 +41,24 @@ type WizardData = {
   courts: number;
   rounds: number;
   rosterMode: 'placeholders' | 'names';
-  playerNames: string[];
+  players: WizardPlayer[];
 };
+
+const EMPTY_PLAYER: WizardPlayer = {
+  name: '',
+  gender: null,
+  phone: '',
+  profileId: null,
+  dupr: null,
+};
+
+function makePlayers(n: number, existing: WizardPlayer[] = []): WizardPlayer[] {
+  const out: WizardPlayer[] = [];
+  for (let i = 0; i < n; i += 1) {
+    out.push(existing[i] ?? { ...EMPTY_PLAYER });
+  }
+  return out;
+}
 
 const STEP_LABELS = ['Name', 'Format', 'Pairing', 'Roster', 'Schedule', 'Review'];
 
@@ -45,12 +75,13 @@ export function CreateWizard() {
     courts: 2,
     rounds: 5,
     rosterMode: 'placeholders',
-    playerNames: ['', '', '', '', '', '', '', ''],
+    players: makePlayers(8),
   });
   const set = <K extends keyof WizardData>(k: K, v: WizardData[K]) =>
     setData((d) => ({ ...d, [k]: v }));
 
   const manualFp = !shouldAutoGenerate(data.format, data.pairing);
+  const genderMode = genderModeFor(data.format);
 
   // Pairing choices vary by format — reset to a sane default whenever the
   // format flips between round-robin and fixed-partners.
@@ -61,14 +92,21 @@ export function CreateWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.format]);
 
+  const visiblePlayers = data.players.slice(0, data.playerCount);
   const namesValid =
     data.rosterMode !== 'names' ||
-    data.playerNames.slice(0, data.playerCount).filter((n) => n.trim().length >= 2).length ===
-      data.playerCount;
+    visiblePlayers.filter((p) => p.name.trim().length >= 2).length === data.playerCount;
+  // For mixed / same-gender tournaments the auto-generator can't balance
+  // teams without a tag on every player, so the wizard now blocks Continue
+  // until each named row has M or F set.
+  const requireGender =
+    data.rosterMode === 'names' && (genderMode === 'mixed' || genderMode === 'same');
+  const gendersValid =
+    !requireGender || visiblePlayers.every((p) => p.name.trim().length < 2 || p.gender !== null);
 
   const canNext = (() => {
     if (step === 0) return data.name.trim().length > 0;
-    if (step === 3 && data.rosterMode === 'names') return namesValid;
+    if (step === 3 && data.rosterMode === 'names') return namesValid && gendersValid;
     return true;
   })();
 
@@ -80,9 +118,14 @@ export function CreateWizard() {
         format: data.format,
         pairing: data.pairing,
         playerCount: data.playerCount,
-        playerNames:
+        players:
           data.rosterMode === 'names'
-            ? data.playerNames.slice(0, data.playerCount).map((n) => n.trim())
+            ? visiblePlayers.map((p) => ({
+                name: p.name.trim(),
+                gender: p.gender,
+                phone: p.phone.trim() || null,
+                dupr: p.dupr,
+              }))
             : undefined,
         courts: data.courts,
         rounds: data.rounds,
@@ -140,9 +183,9 @@ export function CreateWizard() {
         {step === 0 && <StepName data={data} set={set} />}
         {step === 1 && <StepFormat data={data} set={set} />}
         {step === 2 && <StepPairing data={data} set={set} />}
-        {step === 3 && <StepRoster data={data} set={set} />}
+        {step === 3 && <StepRoster data={data} set={set} genderMode={genderMode} />}
         {step === 4 && <StepSchedule data={data} set={set} />}
-        {step === 5 && <StepReview data={data} manualTeams={manualFp} />}
+        {step === 5 && <StepReview data={data} manualTeams={manualFp} genderMode={genderMode} />}
 
         {error && (
           <div
@@ -296,23 +339,52 @@ function StepPairing({ data, set }: { data: WizardData; set: <K extends keyof Wi
   );
 }
 
-function StepRoster({ data, set }: { data: WizardData; set: <K extends keyof WizardData>(k: K, v: WizardData[K]) => void }) {
-  const setName = (idx: number, value: string) => {
-    const next = data.playerNames.slice();
-    while (next.length <= idx) next.push('');
-    next[idx] = value;
-    set('playerNames', next);
+function StepRoster({
+  data,
+  set,
+  genderMode,
+}: {
+  data: WizardData;
+  set: <K extends keyof WizardData>(k: K, v: WizardData[K]) => void;
+  genderMode: GenderMode;
+}) {
+  const updatePlayer = (idx: number, patch: Partial<WizardPlayer>) => {
+    const next = data.players.slice();
+    while (next.length <= idx) next.push({ ...EMPTY_PLAYER });
+    next[idx] = { ...next[idx], ...patch };
+    set('players', next);
   };
 
   const setCount = (n: number) => {
     const clamped = Math.max(4, Math.min(32, n));
-    if (data.playerNames.length < clamped) {
-      const padded = data.playerNames.slice();
-      while (padded.length < clamped) padded.push('');
-      set('playerNames', padded);
+    if (data.players.length < clamped) {
+      set('players', makePlayers(clamped, data.players));
     }
     set('playerCount', clamped);
   };
+
+  // Refs let us focus the next row when the user presses Enter on a name
+  // input — much faster than tabbing through.
+  const nameRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const focusNextName = (idx: number) => {
+    for (let i = idx + 1; i < data.playerCount; i += 1) {
+      const el = nameRefs.current[i];
+      if (el) {
+        el.focus();
+        return;
+      }
+    }
+    nameRefs.current[idx]?.blur();
+  };
+
+  const showGender = genderMode === 'mixed' || genderMode === 'same';
+  const visible = data.players.slice(0, data.playerCount);
+  const namedPlayers = visible.filter((p) => p.name.trim().length >= 2);
+  const ungendered = showGender
+    ? namedPlayers.filter((p) => !p.gender).length
+    : 0;
+  const males = namedPlayers.filter((p) => p.gender === 'm').length;
+  const females = namedPlayers.filter((p) => p.gender === 'f').length;
 
   return (
     <div>
@@ -393,21 +465,215 @@ function StepRoster({ data, set }: { data: WizardData; set: <K extends keyof Wiz
 
       {data.rosterMode === 'names' && (
         <div className="grid gap-2">
+          {showGender && namedPlayers.length > 0 && ungendered > 0 && (
+            <div
+              className="rounded-xl px-3 py-2 text-[12px]"
+              style={{ background: 'oklch(0.96 0.06 75)', color: 'oklch(0.32 0.08 75)', border: '1px solid oklch(0.85 0.08 75)' }}
+            >
+              Tag every player as <strong>M</strong> or <strong>F</strong> before continuing — {ungendered} still untagged. M {males} · F {females} so far. {genderMode === 'mixed' ? 'Mixed-doubles pairing' : 'Same-gender matchmaking'} relies on this.
+            </div>
+          )}
           {Array.from({ length: data.playerCount }).map((_, i) => (
-            <input
+            <PlayerRow
               key={i}
-              value={data.playerNames[i] ?? ''}
-              onChange={(e) => setName(i, e.target.value)}
-              placeholder={`Player ${i + 1}`}
-              className="rounded-xl bg-white px-3.5 py-3 text-sm text-ink outline-none"
-              style={{ border: '1px solid var(--line)' }}
+              index={i}
+              player={data.players[i] ?? { ...EMPTY_PLAYER }}
+              showGender={showGender}
+              registerRef={(el) => {
+                nameRefs.current[i] = el;
+              }}
+              onPatch={(patch) => updatePlayer(i, patch)}
+              onSubmitName={() => focusNextName(i)}
             />
           ))}
           <div className="text-[11px] text-ink-3">
-            Names need at least 2 characters. You can edit them anytime from the roster screen.
+            Names need at least 2 characters. Enter jumps to the next row. You can edit everything from the roster screen.
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PlayerRow({
+  index,
+  player,
+  showGender,
+  registerRef,
+  onPatch,
+  onSubmitName,
+}: {
+  index: number;
+  player: WizardPlayer;
+  showGender: boolean;
+  registerRef: (el: HTMLInputElement | null) => void;
+  onPatch: (patch: Partial<WizardPlayer>) => void;
+  onSubmitName: () => void;
+}) {
+  const [matches, setMatches] = useState<InviteeMatch[]>([]);
+  const [open, setOpen] = useState(false);
+  const [searching, startSearching] = useTransition();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  // Debounced lookup against existing app users by name or phone. Picking
+  // a result prefills name + phone (+ gender + DUPR if known) so the
+  // organizer doesn't retype it.
+  useEffect(() => {
+    if (player.profileId) {
+      setMatches([]);
+      return;
+    }
+    const phoneClean = normalizeE164(player.phone);
+    const query = phoneClean ?? player.name.trim();
+    if (query.length < 2) {
+      setMatches([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      startSearching(async () => {
+        const result = await searchInvitees(query);
+        setMatches(result);
+      });
+    }, 220);
+    return () => clearTimeout(t);
+  }, [player.name, player.phone, player.profileId]);
+
+  const onPick = (m: InviteeMatch) => {
+    onPatch({
+      name: m.display_name ?? '',
+      phone: m.phone ?? '',
+      gender: m.gender === 'm' || m.gender === 'f' ? m.gender : null,
+      dupr: m.dupr ?? null,
+      profileId: m.user_id,
+    });
+    setMatches([]);
+    setOpen(false);
+  };
+
+  const onClearLink = () => {
+    onPatch({ profileId: null });
+  };
+
+  return (
+    <div
+      className="rounded-xl bg-white p-2.5"
+      style={{ border: `1px solid ${player.profileId ? 'var(--court-deep)' : 'var(--line)'}` }}
+    >
+      <div ref={containerRef} className="relative">
+        <input
+          ref={registerRef}
+          value={player.name}
+          onChange={(e) => {
+            onPatch({ name: e.target.value, profileId: null });
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              setOpen(false);
+              onSubmitName();
+            }
+          }}
+          placeholder={`Player ${index + 1}`}
+          autoComplete="off"
+          className="w-full rounded-lg bg-white px-3 py-2.5 text-sm text-ink outline-none"
+          style={{ border: '1px solid var(--line)' }}
+        />
+        {open && matches.length > 0 && !player.profileId && (
+          <div
+            className="absolute left-0 right-0 top-11 z-10 overflow-hidden rounded-xl bg-white shadow-md"
+            style={{ border: '1px solid var(--line)' }}
+          >
+            <div
+              className="px-3 py-1.5 text-[10px] uppercase tracking-[0.06em] text-ink-3"
+              style={{ borderBottom: '1px solid var(--line)' }}
+            >
+              {searching ? 'Searching…' : 'Registered players'}
+            </div>
+            {matches.map((m) => (
+              <button
+                key={m.user_id}
+                type="button"
+                onClick={() => onPick(m)}
+                className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-paper-2"
+              >
+                <div>
+                  <div className="text-[13px] font-semibold text-ink">{m.display_name}</div>
+                  {m.phone && (
+                    <div className="mono text-[11px] text-ink-3">{formatE164(m.phone)}</div>
+                  )}
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-ink-3">
+                  Pick
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {player.profileId && (
+        <div
+          className="mt-2 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px]"
+          style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}
+        >
+          <span>Linked to registered player</span>
+          <button
+            type="button"
+            onClick={onClearLink}
+            className="text-[11px] font-semibold underline"
+          >
+            Unlink
+          </button>
+        </div>
+      )}
+
+      <div className="mt-2 flex items-center gap-2">
+        {showGender && (
+          <div className="flex gap-1">
+            {([
+              ['m', 'M'],
+              ['f', 'F'],
+            ] as Array<['m' | 'f', string]>).map(([value, label]) => {
+              const on = player.gender === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onPatch({ gender: on ? null : value })}
+                  className="h-9 w-9 rounded-lg text-[12px] font-bold"
+                  style={{
+                    background: on ? 'var(--ink)' : '#fff',
+                    color: on ? 'var(--paper)' : 'var(--ink-2)',
+                    border: `1px solid ${on ? 'var(--ink)' : 'var(--line)'}`,
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <input
+          value={player.phone}
+          onChange={(e) => onPatch({ phone: e.target.value, profileId: null })}
+          type="tel"
+          inputMode="tel"
+          autoComplete="off"
+          placeholder="Phone (optional)"
+          className="flex-1 rounded-lg bg-white px-3 py-2 text-[13px] text-ink outline-none"
+          style={{ border: '1px solid var(--line)' }}
+        />
+      </div>
     </div>
   );
 }
@@ -480,13 +746,36 @@ const PAIRING_LABEL: Record<PairingId, string> = {
   manual: 'Manual',
 };
 
-function StepReview({ data, manualTeams }: { data: WizardData; manualTeams: boolean }) {
+function StepReview({
+  data,
+  manualTeams,
+  genderMode,
+}: {
+  data: WizardData;
+  manualTeams: boolean;
+  genderMode: GenderMode;
+}) {
   const games = Math.floor(data.playerCount / 4) * data.rounds;
+  const visible = data.players.slice(0, data.playerCount);
+  const named = visible.filter((p) => p.name.trim().length >= 2);
+  const males = named.filter((p) => p.gender === 'm').length;
+  const females = named.filter((p) => p.gender === 'f').length;
+  const linked = named.filter((p) => p.profileId).length;
+  const ungendered = named.length - males - females;
+  const showGenderRow = (genderMode === 'mixed' || genderMode === 'same') && data.rosterMode === 'names';
   const rows: Array<[string, string]> = [
     ['Name', data.name || '—'],
     ['Format', FORMAT_LABEL[data.format]],
     ['Pairing', PAIRING_LABEL[data.pairing]],
     ['Players', `${data.playerCount}${data.rosterMode === 'names' ? ' (named)' : ''}`],
+    ...(showGenderRow
+      ? ([['Gender split', `M ${males} · F ${females}${ungendered ? ` · ${ungendered} untagged` : ''}`]] as Array<
+          [string, string]
+        >)
+      : []),
+    ...(linked > 0
+      ? ([['Linked players', `${linked} from existing accounts`]] as Array<[string, string]>)
+      : []),
     ['Courts', `${data.courts}`],
     ['Rounds', `${data.rounds}`],
     ['Total games', manualTeams ? '—' : `~${games}`],
@@ -506,6 +795,14 @@ function StepReview({ data, manualTeams }: { data: WizardData; manualTeams: bool
           </div>
         ))}
       </div>
+      {showGenderRow && ungendered > 0 && (
+        <div
+          className="mt-3 rounded-2xl px-3.5 py-3 text-[12.5px]"
+          style={{ background: 'oklch(0.96 0.06 75)', color: 'oklch(0.32 0.08 75)', border: '1px solid oklch(0.85 0.08 75)' }}
+        >
+          <strong>{ungendered} player{ungendered === 1 ? '' : 's'}</strong> still need a gender tag for {genderMode === 'mixed' ? 'mixed-doubles balancing' : 'same-gender matchmaking'}. We&rsquo;ll create the tournament now — finish tagging on the roster screen before you generate Round 1.
+        </div>
+      )}
       <div
         className="mt-3.5 flex items-start gap-2.5 rounded-2xl p-3.5 text-[13px]"
         style={{

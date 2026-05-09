@@ -7,6 +7,8 @@ import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Chip } from '@/components/ui/Chip';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Icons } from '@/components/ui/icons';
+import { ConfirmForm } from '@/components/ui/ConfirmForm';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 import type { Invite, Profile } from '@/lib/types';
 
 export default async function AdminPage({
@@ -118,13 +120,13 @@ export default async function AdminPage({
               <option value="organizer">organizer</option>
               {isAdmin && <option value="admin">admin</option>}
             </select>
-            <button
-              type="submit"
+            <SubmitButton
+              pendingLabel="Creating…"
               className="rounded-xl px-4 py-2.5 text-sm font-semibold"
               style={{ background: 'var(--ink)', color: 'var(--paper)' }}
             >
               Create invite
-            </button>
+            </SubmitButton>
           </div>
         </form>
 
@@ -173,16 +175,19 @@ export default async function AdminPage({
                       <span className="text-[11px] text-ink-3">—</span>
                     )}
                     {isAdmin && (
-                      <form action={deleteInvite}>
+                      <ConfirmForm
+                        action={deleteInvite}
+                        confirm={`Delete the invite for ${inv.email}?`}
+                      >
                         <input type="hidden" name="id" value={inv.id} />
-                        <button
-                          type="submit"
+                        <SubmitButton
+                          pendingLabel="Deleting…"
                           className="text-[12px] font-semibold"
                           style={{ color: 'var(--berry)' }}
                         >
                           Delete
-                        </button>
-                      </form>
+                        </SubmitButton>
+                      </ConfirmForm>
                     )}
                   </div>
                 </div>
@@ -225,13 +230,13 @@ export default async function AdminPage({
                         <option value="organizer">organizer</option>
                         <option value="admin">admin</option>
                       </select>
-                      <button
-                        type="submit"
+                      <SubmitButton
+                        pendingLabel="Saving…"
                         className="rounded-xl px-2.5 py-1.5 text-xs font-semibold"
                         style={{ background: 'var(--paper-2)', color: 'var(--ink)' }}
                       >
                         Save
-                      </button>
+                      </SubmitButton>
                     </form>
                   </div>
                 );

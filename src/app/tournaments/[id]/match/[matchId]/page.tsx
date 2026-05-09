@@ -37,12 +37,19 @@ export default async function MatchPage({ params }: PageProps) {
   const { id, matchId } = await params;
   const supabase = await createClient();
 
+  // Fetch the user first so we can decide whether to issue the membership
+  // query in parallel with everything else. Auth lookups are cookie-local so
+  // they don't add a network roundtrip.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const [
     { data },
     { data: siblings },
     { data: roster },
     { data: tournament },
-    { data: { user } },
+    memberRes,
   ] = await Promise.all([
     supabase
       .from('matches')
@@ -60,7 +67,14 @@ export default async function MatchPage({ params }: PageProps) {
       .select('id,display_name,profile_id')
       .eq('tournament_id', id),
     supabase.from('tournaments').select('owner_user_id').eq('id', id).single(),
-    supabase.auth.getUser(),
+    user
+      ? supabase
+          .from('tournament_members')
+          .select('role')
+          .eq('tournament_id', id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   if (!data) notFound();
   const row = data as MatchRow;
@@ -77,13 +91,7 @@ export default async function MatchPage({ params }: PageProps) {
     if (user.id === ownerId) {
       canScore = true;
     } else {
-      const { data: member } = await supabase
-        .from('tournament_members')
-        .select('role')
-        .eq('tournament_id', id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      const role = member?.role ?? null;
+      const role = (memberRes.data as { role: string } | null)?.role ?? null;
       if (role === 'organizer' || role === 'admin') {
         canScore = true;
       } else if (role !== null) {

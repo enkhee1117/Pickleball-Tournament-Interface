@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { generateMatchesFromRoster } from './actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 type Props = {
   tournamentId: string;
@@ -105,9 +106,9 @@ export function GenerateMatchesPanel({ tournamentId, format, rosterCount, hasMat
         )}
       </div>
 
-      <button
-        type="submit"
+      <SubmitButton
         disabled={disabled}
+        pendingLabel="Generating…"
         className="w-full rounded-xl px-3 py-3 text-[13px] font-semibold disabled:opacity-50"
         style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}
       >
@@ -118,7 +119,7 @@ export function GenerateMatchesPanel({ tournamentId, format, rosterCount, hasMat
             : hasMatches
               ? 'Regenerate matches'
               : 'Generate matches →'}
-      </button>
+      </SubmitButton>
     </form>
   );
 }
