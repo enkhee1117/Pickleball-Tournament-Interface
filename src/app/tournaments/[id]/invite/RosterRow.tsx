@@ -5,6 +5,8 @@ import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Chip } from '@/components/ui/Chip';
 import { claimInvitePlayer, removeInvitePlayer, updateInvitePlayer } from './actions';
 import { buildSmsUrl, formatE164, normalizeE164 } from '@/lib/phone';
+import { ConfirmForm } from '@/components/ui/ConfirmForm';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 type Gender = 'm' | 'f' | 'x' | null;
 
@@ -107,13 +109,13 @@ export function RosterRow({
         <form action={claimInvitePlayer} className="mt-2.5">
           <input type="hidden" name="tournament_id" value={tournamentId} />
           <input type="hidden" name="player_id" value={player.id} />
-          <button
-            type="submit"
+          <SubmitButton
+            pendingLabel="Linking…"
             className="w-full rounded-xl px-3 py-2 text-[12px] font-semibold"
             style={{ background: 'var(--paper-2)', color: 'var(--ink)' }}
           >
             This is me — link to my stats
-          </button>
+          </SubmitButton>
         </form>
       )}
 
@@ -204,13 +206,13 @@ export function RosterRow({
                 </div>
               </div>
             )}
-            <button
-              type="submit"
+            <SubmitButton
+              pendingLabel="Saving…"
               className="rounded-xl px-3 py-2 text-[13px] font-semibold"
               style={{ background: 'var(--ink)', color: 'var(--paper)' }}
             >
               Save
-            </button>
+            </SubmitButton>
           </form>
           {canTextInvite && phoneClean && tournamentName && inviteCode && (
             <a
@@ -224,17 +226,20 @@ export function RosterRow({
               Text invite via SMS
             </a>
           )}
-          <form action={removeInvitePlayer}>
+          <ConfirmForm
+            action={removeInvitePlayer}
+            confirm={`Remove ${player.display_name} from the roster?`}
+          >
             <input type="hidden" name="tournament_id" value={tournamentId} />
             <input type="hidden" name="player_id" value={player.id} />
-            <button
-              type="submit"
+            <SubmitButton
+              pendingLabel="Removing…"
               className="w-full rounded-xl px-3 py-2 text-[13px] font-semibold"
               style={{ color: 'var(--berry)', border: '1px solid var(--berry)', background: 'transparent' }}
             >
               Remove from roster
-            </button>
-          </form>
+            </SubmitButton>
+          </ConfirmForm>
         </div>
       )}
     </div>

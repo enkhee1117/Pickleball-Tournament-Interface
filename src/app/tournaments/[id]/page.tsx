@@ -30,6 +30,8 @@ import { RosterRow } from './invite/RosterRow';
 import { AddPlayerForm } from './invite/AddPlayerForm';
 import { ScoreboardClaimBanner } from './ScoreboardClaimBanner';
 import { RecordingsMenu } from '@/components/RecordingsMenu';
+import { ConfirmForm } from '@/components/ui/ConfirmForm';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -65,10 +67,17 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Self-heal lifecycle status alongside the data fetch — the page does not
-  // read the new status, so we don't need to await it before the page query
-  // completes. A single Postgres roundtrip via app_refresh_tournament_status.
-  const [{ data: tournament }, { data: matches }, { data: players }] = await Promise.all([
+  // Fan out every query in parallel — tournament + matches + roster always,
+  // plus member role and viewer profile when signed in. Status refresh fires
+  // alongside but the page never reads it (next load sees the corrected
+  // value).
+  const [
+    { data: tournament },
+    { data: matches },
+    { data: players },
+    memberRes,
+    profileRes,
+  ] = await Promise.all([
     supabase
       .from('tournaments')
       .select('id,owner_user_id,name,format,status,whatsapp_group_url,invite_code,gender_mode,pairing_mode,created_at,updated_at')
@@ -87,8 +96,21 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
       .select('id,display_name,email,profile_id,gender,phone,dupr')
       .eq('tournament_id', id)
       .order('created_at', { ascending: true }),
-    // Fire-and-forget status refresh in parallel; tab order doesn't depend on
-    // its result and the next page load will see the corrected status.
+    user
+      ? supabase
+          .from('tournament_members')
+          .select('role')
+          .eq('tournament_id', id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    user
+      ? supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('id', user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     refreshTournamentStatus(supabase, id).then(() => ({ data: null })),
   ]);
 
@@ -109,25 +131,12 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
   const canGeneratePlayoffs =
     !playoffsExist && rrMatches.length > 0 && rrPending === 0;
   const isOwner = !!user && user.id === t.owner_user_id;
-  let memberRole: string | null = null;
-  let viewerDisplayName: string | null = null;
-  if (user) {
-    if (!isOwner) {
-      const { data: member } = await supabase
-        .from('tournament_members')
-        .select('role')
-        .eq('tournament_id', id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      memberRole = member?.role ?? null;
-    }
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('display_name')
-      .eq('id', user.id)
-      .maybeSingle();
-    viewerDisplayName = (profile?.display_name ?? '').trim() || null;
-  }
+  const memberRole = !isOwner
+    ? ((memberRes.data as { role: string } | null)?.role ?? null)
+    : null;
+  const viewerDisplayName = user
+    ? ((profileRes.data as { display_name: string | null } | null)?.display_name ?? '').trim() || null
+    : null;
   const isManager = isOwner || memberRole === 'organizer' || memberRole === 'admin';
   const isMember = isOwner || memberRole !== null;
   const playerCount = (players ?? []).length;
@@ -631,10 +640,13 @@ function SettingsTab({
 
       <SectionHeader title="Danger zone" />
       <div className="grid gap-3">
-        <form action={resetTournamentMatches}>
+        <ConfirmForm
+          action={resetTournamentMatches}
+          confirm={`Reset all ${matchCount} match${matchCount === 1 ? '' : 'es'}? Pending and completed matches will be wiped. The roster stays. This cannot be undone.`}
+        >
           <input type="hidden" name="tournament_id" value={tournamentId} />
-          <button
-            type="submit"
+          <SubmitButton
+            overlay
             disabled={matchCount === 0}
             className="w-full rounded-2xl bg-white p-4 text-left disabled:opacity-50"
             style={{ border: '1px solid var(--line)' }}
@@ -644,13 +656,16 @@ function SettingsTab({
               Wipes all {matchCount} match{matchCount === 1 ? '' : 'es'} (pending and completed) and
               returns the tournament to draft. The roster stays.
             </div>
-          </button>
-        </form>
+          </SubmitButton>
+        </ConfirmForm>
         {isOwner && (
-          <form action={deleteTournament}>
+          <ConfirmForm
+            action={deleteTournament}
+            confirm={`Delete "${tournamentName}"? This permanently removes the tournament, roster, matches, and scores. This cannot be undone.`}
+          >
             <input type="hidden" name="tournament_id" value={tournamentId} />
-            <button
-              type="submit"
+            <SubmitButton
+              overlay
               className="w-full rounded-2xl p-4 text-left"
               style={{ border: '1px solid var(--berry)', color: 'var(--berry)', background: '#fff' }}
             >
@@ -658,8 +673,8 @@ function SettingsTab({
               <div className="mt-1 text-xs" style={{ color: 'var(--berry)' }}>
                 Permanently removes the tournament, roster, matches, and scores. This cannot be undone.
               </div>
-            </button>
-          </form>
+            </SubmitButton>
+          </ConfirmForm>
         )}
       </div>
     </div>

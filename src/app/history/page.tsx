@@ -10,6 +10,7 @@ import { computePlayerStandings, type StandingsMatch } from '@/lib/scoring';
 import { MatchSearch } from './MatchSearch';
 import { dismissSelfLink } from './dismiss-action';
 import { markAllNotificationsRead } from './notification-actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 type NotificationRow = {
   id: string;
@@ -206,14 +207,13 @@ export default async function HistoryPage() {
                   </Link>
                   <form action={dismissSelfLink}>
                     <input type="hidden" name="tournament_id" value={t.id} />
-                    <button
-                      type="submit"
+                    <SubmitButton
                       aria-label={`Dismiss ${t.name}`}
                       title="Not playing in this one"
                       className="px-3 py-2 text-[16px] leading-none text-ink-3"
                     >
                       ×
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
               ))}
@@ -240,12 +240,12 @@ export default async function HistoryPage() {
               </div>
               {unreadCount > 0 && (
                 <form action={markAllNotificationsRead}>
-                  <button
-                    type="submit"
+                  <SubmitButton
+                    pendingLabel="Marking…"
                     className="text-[11px] font-semibold text-ink-3 underline"
                   >
                     Mark all read
-                  </button>
+                  </SubmitButton>
                 </form>
               )}
             </div>

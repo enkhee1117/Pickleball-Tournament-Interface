@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { generateManualMatchesFromRoster } from './actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 type RosterPlayer = {
   id: string;
@@ -189,9 +190,9 @@ export function ManualTeamsPanel({ tournamentId, roster, hasMatches }: Props) {
         {teams.map(([a, b]) => (
           <input key={`${a}-${b}`} type="hidden" name="pairs" value={`${a},${b}`} />
         ))}
-        <button
-          type="submit"
+        <SubmitButton
           disabled={!allPaired || teams.length < 2}
+          pendingLabel="Generating…"
           className="w-full rounded-xl px-3 py-3 text-[13px] font-semibold disabled:opacity-50"
           style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}
         >
@@ -202,7 +203,7 @@ export function ManualTeamsPanel({ tournamentId, roster, hasMatches }: Props) {
               : hasMatches
                 ? 'Regenerate matches'
                 : 'Generate matches →'}
-        </button>
+        </SubmitButton>
       </form>
     </div>
   );
