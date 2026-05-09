@@ -155,11 +155,34 @@ export async function createTournamentClient(input: CreateInput): Promise<Create
     // Stamp profile_id directly for any row that came from a typeahead
     // pick — phone matching alone misses profiles that don't have a phone
     // on file, so this is the authoritative link.
+    //
+    // For rows the user *typed* a phone for without picking from
+    // typeahead, fall back to a phone-match lookup against profiles. The
+    // wizard's app_update_tournament_player doesn't auto-link by phone
+    // (only app_add_tournament_player does), so without this step a row
+    // entered with a registered phone stays PENDING.
+    const phoneLookups = players
+      .map((p, i) => ({ idx: i, phone: p.phone, profileId: p.profileId }))
+      .filter((p) => !p.profileId && p.phone);
+    let phoneToProfile = new Map<string, string>();
+    if (phoneLookups.length > 0) {
+      const { data: phoneRows } = await supabase
+        .from('profiles')
+        .select('id,phone')
+        .in('phone', phoneLookups.map((p) => p.phone as string));
+      const rows = (phoneRows ?? []) as { id: string; phone: string | null }[];
+      phoneToProfile = new Map(
+        rows.filter((r) => r.phone).map((r) => [r.phone as string, r.id]),
+      );
+    }
     const links = players.slice(0, ids.length).map((p, i) => {
-      if (!p.profileId) return null;
+      const fromPick = p.profileId;
+      const fromPhone = !fromPick && p.phone ? phoneToProfile.get(p.phone) : undefined;
+      const profileId = fromPick ?? fromPhone;
+      if (!profileId) return null;
       return supabase.rpc('app_link_tournament_player_to_profile', {
         p_player_id: ids[i],
-        p_profile_id: p.profileId,
+        p_profile_id: profileId,
       });
     });
     await Promise.all(links.filter((l): l is NonNullable<typeof l> => l !== null));

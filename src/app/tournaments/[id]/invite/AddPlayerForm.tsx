@@ -118,15 +118,13 @@ export function AddPlayerForm({ tournamentId, tournamentName, inviteCode, existi
           name="display_name"
           value={name}
           onChange={(e) => {
+            // Keep the pick attached when the user just tweaks the name —
+            // the explicit Unlink button on the linked pill is the way to
+            // detach. Clearing on every keystroke meant a single typo
+            // turned a registered profile back into an anonymous row and
+            // submitted as PENDING.
             setName(e.target.value);
             setOpen(true);
-            // When the user starts editing after picking a registered
-            // profile, clear the auto-prefilled DUPR too — otherwise the
-            // new name is paired with a previous person's score.
-            if (pickedRegistered) {
-              setPickedRegistered(null);
-              setDupr('');
-            }
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => {
@@ -194,12 +192,12 @@ export function AddPlayerForm({ tournamentId, tournamentName, inviteCode, existi
           placeholder="+1 555 123 4567"
           value={phone}
           onChange={(e) => {
+            // Don't drop the pick when adding/correcting a phone — it's a
+            // common reason to edit (the registered profile didn't have
+            // one yet). Use the Unlink button on the linked pill if the
+            // manager is genuinely picking someone different.
             setPhone(e.target.value);
             setOpen(true);
-            if (pickedRegistered) {
-              setPickedRegistered(null);
-              setDupr('');
-            }
           }}
           className="flex-1 rounded-xl bg-white px-3.5 py-3 text-sm text-ink outline-none"
           style={{ border: '1px solid var(--line)' }}
