@@ -82,12 +82,14 @@ export function RosterRow({
   const canTextInvite =
     canManage && !linked && !!phoneClean && !!tournamentName && !!inviteCode;
 
-  // Origin is needed to build absolute /t/<code> links in the SMS body.
-  // window may be undefined during SSR — guard so the component doesn't
-  // explode if rendered server-side.
+  // Origin is needed to build absolute /t/<code>/p/<id> links in the SMS
+  // body. window may be undefined during SSR — guard so the component
+  // doesn't explode if rendered server-side. The personal-invite URL
+  // lands on a confirmation card that links the recipient's account to
+  // this exact roster slot once they sign up.
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const smsBody = (toName: string) =>
-    `Hey ${toName} — you're in the ${tournamentName ?? ''} pickleball tournament. Track your matches: ${origin}/t/${inviteCode ?? ''}`;
+    `Hey ${toName} — you're in the ${tournamentName ?? ''} pickleball tournament. Tap to confirm your spot: ${origin}/t/${(inviteCode ?? '').toLowerCase()}/p/${player.id}`;
 
   // The inline SMS button next to the player name. With a phone, it just
   // opens the device's messaging app. Without one, it expands a small
@@ -355,10 +357,7 @@ export function RosterRow({
           </form>
           {canTextInvite && phoneClean && tournamentName && inviteCode && (
             <a
-              href={buildSmsUrl(
-                phoneClean,
-                `Hey ${player.display_name} — you're in the ${tournamentName} pickleball tournament. Track your matches: ${typeof window !== 'undefined' ? window.location.origin : ''}/t/${inviteCode}`,
-              )}
+              href={buildSmsUrl(phoneClean, smsBody(player.display_name))}
               className="block w-full rounded-xl px-3 py-2 text-center text-[13px] font-semibold text-white"
               style={{ background: '#25D366' }}
             >
