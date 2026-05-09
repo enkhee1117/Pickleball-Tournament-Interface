@@ -145,6 +145,22 @@ function buildDrafts(matchups: [string, string, string, string], opts: PlayoffOp
   ];
 }
 
+// Build the bracket from an explicit 4-team seed. Used when the organizer
+// hand-picks teams (typically for mixed RR where the auto-seeder can't tell
+// who should partner whom). Caller passes teams in ranked order — matchups
+// follow the standard 1v4, 2v3 split.
+export function seedPlayoffsFromCustomTeams(
+  teams: [string, string, string, string],
+  opts: PlayoffOptions = {},
+): PlayoffSeedResult {
+  return {
+    ok: true,
+    mode: 'fixed_one_pool',
+    teams,
+    drafts: buildDrafts(toMatchupOrder(teams), opts),
+  };
+}
+
 // Single-pool seeder. Picks fixed-partners or rotating mode by inspecting
 // the data unless the caller pins it via opts.mode.
 export function seedSinglePoolPlayoffs(

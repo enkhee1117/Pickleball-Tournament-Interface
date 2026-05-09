@@ -16,6 +16,7 @@ import {
 import { generateMatchDrafts, type MatchScheme } from '@/lib/match-schemes';
 import {
   ALL_PLAYOFF_LABELS,
+  seedPlayoffsFromCustomTeams,
   seedSinglePoolPlayoffs,
   seedTwoPoolPlayoffs,
 } from '@/lib/playoffs';
@@ -375,6 +376,89 @@ export async function generatePlayoffs(_prev: FormState, formData: FormData): Pr
   const { error } = await supabase.rpc('app_replace_pending_matches', {
     p_tournament_id: tournamentId,
     p_division_id: divisionId,
+    p_matches: seed.drafts,
+  });
+  if (error) return { error: formatPgError(error) };
+
+  await refreshTournamentStatus(supabase, tournamentId);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  revalidatePath('/tournaments');
+  revalidatePath('/history');
+  return { ok: 'Playoff bracket created.' };
+}
+
+// Organizer-built playoff bracket. Mixed RR's auto-seeder doesn't know who
+// should partner whom, so this lets the organizer pick the four teams by
+// hand. Form payload: tournament_id + teams JSON of [[name1, name2], ...].
+// Teams are submitted in ranked order — semis follow the standard 1v4, 2v3.
+export async function generatePlayoffsFromOrganizerSeed(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  const teamsRaw = fieldString(formData, 'teams');
+  const courtA = fieldString(formData, 'court_a') || 'Court 1';
+  const courtB = fieldString(formData, 'court_b') || 'Court 2';
+
+  if (!tournamentId) return { error: 'Missing tournament id.' };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(teamsRaw);
+  } catch {
+    return { error: 'Could not parse the team selection.' };
+  }
+  if (
+    !Array.isArray(parsed) ||
+    parsed.length !== 4 ||
+    !parsed.every(
+      (t) =>
+        Array.isArray(t) &&
+        t.length === 2 &&
+        t.every((s) => typeof s === 'string' && s.trim().length > 0),
+    )
+  ) {
+    return { error: 'Pick four teams of two before generating the bracket.' };
+  }
+  const teamLabels = (parsed as [string, string][]).map(
+    ([a, b]) => `${a.trim()} & ${b.trim()}`,
+  ) as [string, string, string, string];
+
+  const { supabase, user } = await getAuthedClient();
+  if (!user) return { error: 'Please sign in.' };
+
+  // Refuse to overwrite an existing bracket.
+  const { count: existingCount } = await supabase
+    .from('matches')
+    .select('id', { head: true, count: 'exact' })
+    .eq('tournament_id', tournamentId)
+    .in('round_label', ALL_PLAYOFF_LABELS)
+    .is('division_id', null);
+  if ((existingCount ?? 0) > 0) {
+    return { error: 'Playoffs are already seeded for this pool.' };
+  }
+
+  // RR must be done before seeding so the bracket isn't built on incomplete
+  // data. Mirrors the gate on the regular generatePlayoffs.
+  const { count: pendingCount } = await supabase
+    .from('matches')
+    .select('id', { head: true, count: 'exact' })
+    .eq('tournament_id', tournamentId)
+    .is('completed_at', null)
+    .is('division_id', null)
+    .not('round_label', 'in', `(${ALL_PLAYOFF_LABELS.map((l) => `"${l}"`).join(',')})`);
+  if ((pendingCount ?? 0) > 0) {
+    return {
+      error: `Finish all round-robin matches first — ${pendingCount} still pending.`,
+    };
+  }
+
+  const seed = seedPlayoffsFromCustomTeams(teamLabels, { courtA, courtB });
+  if (!seed.ok) return { error: seed.error };
+
+  const { error } = await supabase.rpc('app_replace_pending_matches', {
+    p_tournament_id: tournamentId,
+    p_division_id: null,
     p_matches: seed.drafts,
   });
   if (error) return { error: formatPgError(error) };

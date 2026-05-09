@@ -202,7 +202,13 @@ export async function createTournamentClient(input: CreateInput): Promise<Create
               pairingMode,
               duprs,
             })
-          : generateMatchDrafts({ scheme, players: playerNames, courts });
+          : generateMatchDrafts({
+              scheme,
+              players: playerNames,
+              courts,
+              genderMode,
+              genders,
+            });
 
       if (drafts.length > 0) {
         const { data: count, error: genErr } = await supabase.rpc('app_replace_pending_matches', {

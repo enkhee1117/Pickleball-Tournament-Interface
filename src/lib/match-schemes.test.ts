@@ -5,6 +5,7 @@ import {
   generateRotatingPartners,
   generateSingleElimination,
   generateMatchDrafts,
+  pairFixedPartnersTeams,
   type MatchDraft,
 } from '@/lib/match-schemes';
 
@@ -55,6 +56,49 @@ describe('generateRotatingPartners', () => {
     const r1players = drafts.flatMap((d) => [...named(d.team_a_label), ...named(d.team_b_label)]);
     expect(new Set(r1players).size).toBe(8);
   });
+
+  // Regression coverage: mixed RR rotating partners must never produce
+  // M+M / F+F teams. The auto-generator picks fresh partners every round
+  // so any stale "two same gender" pairing is a real bug.
+  it('mixed mode produces only M+F teams across many rounds', () => {
+    const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    const genders: ('m' | 'f')[] = ['m', 'm', 'm', 'm', 'f', 'f', 'f', 'f'];
+    const drafts = generateRotatingPartners(names, {
+      rounds: 5,
+      courts: 2,
+      rng: seedRng(7),
+      genderMode: 'mixed',
+      genders,
+    });
+    expect(drafts.length).toBeGreaterThan(0);
+    for (const d of drafts) {
+      for (const team of [d.team_a_label, d.team_b_label]) {
+        const [a, b] = team.split(' & ');
+        const gA = genders[names.indexOf(a)];
+        const gB = genders[names.indexOf(b)];
+        expect(new Set([gA, gB])).toEqual(new Set(['m', 'f']));
+      }
+    }
+  });
+
+  // Same-gender mode: every team must be all-male or all-female.
+  it('same mode produces only M+M and F+F teams', () => {
+    const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    const genders: ('m' | 'f')[] = ['m', 'm', 'm', 'm', 'f', 'f', 'f', 'f'];
+    const drafts = generateRotatingPartners(names, {
+      rounds: 4,
+      courts: 2,
+      rng: seedRng(11),
+      genderMode: 'same',
+      genders,
+    });
+    for (const d of drafts) {
+      for (const team of [d.team_a_label, d.team_b_label]) {
+        const [a, b] = team.split(' & ');
+        expect(genders[names.indexOf(a)]).toBe(genders[names.indexOf(b)]);
+      }
+    }
+  });
 });
 
 describe('generateFixedPartners', () => {
@@ -97,6 +141,89 @@ describe('generateFixedPartners', () => {
       expect(d.team_a_label).toMatch(/ & /);
       expect(d.team_b_label).toMatch(/ & /);
     }
+  });
+
+  // Regression: legacy generateFixedPartners just paired adjacent players in
+  // roster order, so a fp-mixed tournament could end up with M+M / F+F
+  // teams whenever the roster happened to list two of the same gender in a
+  // row. Lock in the M/F invariant for the mixed mode.
+  describe('mixed-gender pairing', () => {
+    const names = ['M1', 'M2', 'F1', 'F2', 'M3', 'F3', 'F4', 'M4'];
+    const genders: ('m' | 'f')[] = ['m', 'm', 'f', 'f', 'm', 'f', 'f', 'm'];
+
+    it('every team has exactly one M and one F', () => {
+      const teams = pairFixedPartnersTeams(names, 'mixed', genders);
+      expect(teams).toHaveLength(4);
+      for (const t of teams) {
+        const [a, b] = t.split(' & ');
+        const ga = genders[names.indexOf(a)];
+        const gb = genders[names.indexOf(b)];
+        expect(new Set([ga, gb])).toEqual(new Set(['m', 'f']));
+      }
+    });
+
+    it('uses each player exactly once across the team list', () => {
+      const teams = pairFixedPartnersTeams(names, 'mixed', genders);
+      const used = teams.flatMap((t) => t.split(' & '));
+      expect(new Set(used).size).toBe(used.length);
+      expect(used.sort()).toEqual([...names].sort());
+    });
+
+    it('drops the surplus gender when the roster is imbalanced (3M + 5F → 3 teams)', () => {
+      const ns = ['M1', 'M2', 'M3', 'F1', 'F2', 'F3', 'F4', 'F5'];
+      const gs: ('m' | 'f')[] = ['m', 'm', 'm', 'f', 'f', 'f', 'f', 'f'];
+      const teams = pairFixedPartnersTeams(ns, 'mixed', gs);
+      expect(teams).toHaveLength(3);
+      for (const t of teams) {
+        const [a, b] = t.split(' & ');
+        expect(new Set([gs[ns.indexOf(a)], gs[ns.indexOf(b)]])).toEqual(new Set(['m', 'f']));
+      }
+    });
+
+    it('flows through generateFixedPartners with genderMode=mixed', () => {
+      const drafts = generateFixedPartners(names, { courts: 2, genderMode: 'mixed', genders });
+      // 4 teams → 6 unique matchups
+      expect(drafts).toHaveLength(6);
+      // Every team label must be M+F
+      const allTeams = new Set(drafts.flatMap((d) => [d.team_a_label, d.team_b_label]));
+      for (const t of allTeams) {
+        const [a, b] = t.split(' & ');
+        expect(new Set([genders[names.indexOf(a)], genders[names.indexOf(b)]])).toEqual(
+          new Set(['m', 'f']),
+        );
+      }
+    });
+  });
+
+  describe('same-gender pairing', () => {
+    const names = ['M1', 'M2', 'F1', 'F2', 'M3', 'M4', 'F3', 'F4'];
+    const genders: ('m' | 'f')[] = ['m', 'm', 'f', 'f', 'm', 'm', 'f', 'f'];
+
+    it('only produces M+M and F+F teams', () => {
+      const teams = pairFixedPartnersTeams(names, 'same', genders);
+      for (const t of teams) {
+        const [a, b] = t.split(' & ');
+        const ga = genders[names.indexOf(a)];
+        const gb = genders[names.indexOf(b)];
+        expect(ga).toBe(gb);
+      }
+    });
+
+    it('flows through generateFixedPartners with genderMode=same', () => {
+      const drafts = generateFixedPartners(names, { courts: 2, genderMode: 'same', genders });
+      const allTeams = new Set(drafts.flatMap((d) => [d.team_a_label, d.team_b_label]));
+      for (const t of allTeams) {
+        const [a, b] = t.split(' & ');
+        expect(genders[names.indexOf(a)]).toBe(genders[names.indexOf(b)]);
+      }
+    });
+  });
+
+  describe('open mode (legacy adjacent pairing)', () => {
+    it('preserves the historical adjacent-pair ordering', () => {
+      const teams = pairFixedPartnersTeams(['A', 'B', 'C', 'D'], 'open', []);
+      expect(teams).toEqual(['A & B', 'C & D']);
+    });
   });
 });
 

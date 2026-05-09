@@ -232,17 +232,93 @@ function generateGenderedRotatingPartners(
 // ---------------------------------------------------------------------------
 export function generateFixedPartners(
   players: string[],
-  options: { courts: number },
+  options: {
+    courts: number;
+    // When set to 'mixed' the pairer zips males with females so every team
+    // is M+F. 'same' produces M+M / F+F teams. 'open' / undefined keeps the
+    // legacy "pair adjacent in the input order" behaviour.
+    genderMode?: 'open' | 'mixed' | 'same';
+    genders?: (GenderTag | null | undefined)[];
+  },
 ): MatchDraft[] {
   const courts = Math.max(1, Math.min(16, options.courts));
   const cleaned = players.map((p) => p.trim()).filter(Boolean);
   if (cleaned.length < 4) return [];
 
-  const teams: string[] = [];
-  for (let i = 0; i + 1 < cleaned.length; i += 2) {
-    teams.push(`${cleaned[i]} & ${cleaned[i + 1]}`);
-  }
+  const teams = pairFixedPartnersTeams(cleaned, options.genderMode ?? 'open', options.genders ?? []);
   return circleMethodSchedule(teams, courts);
+}
+
+// Build the fixed-partners team list. Exported so unit tests can lock in
+// the M/F invariant without having to call the full circleMethodSchedule.
+//
+// 'mixed': zip M list with F list. Surplus of either gender is dropped
+//          (or paired same-sex at the tail end if the caller's roster is
+//          imbalanced) so we can't silently produce M+M / F+F teams.
+// 'same':  pair within each gender bucket — M+M, F+F. Mismatched leftovers
+//          drop out.
+// 'open' / unset: legacy adjacent-pair (preserves existing behaviour for
+//          gender-agnostic tournaments).
+export function pairFixedPartnersTeams(
+  players: string[],
+  genderMode: 'open' | 'mixed' | 'same',
+  genders: (GenderTag | null | undefined)[],
+): string[] {
+  if (genderMode === 'mixed') {
+    const males: string[] = [];
+    const females: string[] = [];
+    const ungendered: string[] = [];
+    players.forEach((name, i) => {
+      const g = genders[i];
+      if (g === 'm') males.push(name);
+      else if (g === 'f') females.push(name);
+      else ungendered.push(name);
+    });
+    // Distribute ungendered players to whichever bucket needs them. This
+    // is a best-effort recovery so the team count doesn't collapse when
+    // someone forgot to tag a row — but it'll bias the assignment.
+    while (ungendered.length > 0 && males.length < females.length) {
+      males.push(ungendered.shift()!);
+    }
+    while (ungendered.length > 0 && females.length < males.length) {
+      females.push(ungendered.shift()!);
+    }
+    while (ungendered.length >= 2) {
+      males.push(ungendered.shift()!);
+      females.push(ungendered.shift()!);
+    }
+    const teamCount = Math.min(males.length, females.length);
+    const teams: string[] = [];
+    for (let i = 0; i < teamCount; i += 1) {
+      teams.push(`${males[i]} & ${females[i]}`);
+    }
+    return teams;
+  }
+
+  if (genderMode === 'same') {
+    const males: string[] = [];
+    const females: string[] = [];
+    players.forEach((name, i) => {
+      const g = genders[i];
+      if (g === 'm') males.push(name);
+      else if (g === 'f') females.push(name);
+    });
+    const teams: string[] = [];
+    for (let i = 0; i + 1 < males.length; i += 2) {
+      teams.push(`${males[i]} & ${males[i + 1]}`);
+    }
+    for (let i = 0; i + 1 < females.length; i += 2) {
+      teams.push(`${females[i]} & ${females[i + 1]}`);
+    }
+    return teams;
+  }
+
+  // Open: pair adjacent (preserves legacy behaviour).
+  const teams: string[] = [];
+  for (let i = 0; i + 1 < players.length; i += 2) {
+    teams.push(`${players[i]} & ${players[i + 1]}`);
+  }
+  return teams;
 }
 
 // ---------------------------------------------------------------------------
@@ -370,7 +446,13 @@ export type GenerateMatchesInput =
       pairingMode?: PairingMode;
       duprs?: (number | null | undefined)[];
     }
-  | { scheme: 'fixed_partners'; players: string[]; courts: number }
+  | {
+      scheme: 'fixed_partners';
+      players: string[];
+      courts: number;
+      genderMode?: 'open' | 'mixed' | 'same';
+      genders?: (GenderTag | null | undefined)[];
+    }
   | { scheme: 'single_elimination'; players: string[]; courts: number };
 
 export function generateMatchDrafts(input: GenerateMatchesInput): MatchDraft[] {
@@ -386,7 +468,11 @@ export function generateMatchDrafts(input: GenerateMatchesInput): MatchDraft[] {
         duprs: input.duprs,
       });
     case 'fixed_partners':
-      return generateFixedPartners(input.players, { courts: input.courts });
+      return generateFixedPartners(input.players, {
+        courts: input.courts,
+        genderMode: input.genderMode,
+        genders: input.genders,
+      });
     case 'single_elimination':
       return generateSingleElimination(input.players, { courts: input.courts });
   }
