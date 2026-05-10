@@ -23,7 +23,7 @@ import {
 } from '@/lib/scoring';
 import { refreshTournamentStatus } from '@/lib/tournament-status-server';
 import { GeneratePlayoffsForm } from './GeneratePlayoffsForm';
-import { OrganizerBracketBuilder } from './OrganizerBracketBuilder';
+import { BracketSeedingChoice } from './BracketSeedingChoice';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { deleteTournament, resetTournamentMatches } from './settings-actions';
 import { GenerateMatchesPanel } from './invite/GenerateMatchesPanel';
@@ -949,15 +949,15 @@ function BracketTab({
               </div>
             </div>
           ) : showManualBuilder ? (
-            <div className="grid gap-4">
-              <OrganizerBracketBuilder
-                tournamentId={tournamentId}
-                players={rankedRoster}
-                genderMode={genderMode}
-              />
-              <div className="text-center text-[11px] text-ink-3">or</div>
-              <GeneratePlayoffsForm tournamentId={tournamentId} />
-            </div>
+            // Mixed RR with RR done + manager: offer both seed paths but
+            // default to the simple auto-button. The manual builder is
+            // tucked behind a toggle so the bracket page stays clean for
+            // organizers who just want to hit Generate.
+            <BracketSeedingChoice
+              tournamentId={tournamentId}
+              players={rankedRoster}
+              genderMode={genderMode}
+            />
           ) : (
             <GeneratePlayoffsForm tournamentId={tournamentId} />
           )}
