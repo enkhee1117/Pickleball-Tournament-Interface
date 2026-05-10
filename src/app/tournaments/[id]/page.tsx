@@ -963,6 +963,13 @@ function BracketTab({
                 {rrPending} match{rrPending === 1 ? '' : 'es'} still pending. Once
                 they&rsquo;re all scored, you can seed the bracket.
               </div>
+              <Link
+                href={`/tournaments/${tournamentId}?tab=matches`}
+                className="mt-3 inline-flex items-center gap-1 rounded-full px-4 py-2 text-[13px] font-semibold"
+                style={{ background: 'var(--ink)', color: 'var(--paper)' }}
+              >
+                Score pending matches {Icons.arrow}
+              </Link>
             </div>
           ) : showManualBuilder ? (
             // Mixed RR with RR done + manager: offer both seed paths but
@@ -980,6 +987,12 @@ function BracketTab({
 
           {/* Sample preview (faded) so the layout is visible on cold pools. */}
           <div className="mt-6 opacity-40">
+            <div
+              className="mb-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.06em]"
+              style={{ background: 'var(--paper-2)', color: 'var(--ink-3)' }}
+            >
+              Sample · won&rsquo;t be created
+            </div>
             <BracketRound
               title="Preview"
               matches={[

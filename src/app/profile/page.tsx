@@ -104,7 +104,7 @@ export default async function ProfilePage({
           className="mb-[18px] rounded-[18px] p-4"
           style={{ background: 'var(--ink)', color: 'var(--paper)' }}
         >
-          <div className="mb-3.5 flex items-end justify-between">
+          <div className="flex items-end justify-between">
             <div>
               <div className="text-[11px] tracking-[0.06em] opacity-60">DOUBLES</div>
               <div
@@ -121,28 +121,11 @@ export default async function ProfilePage({
               </div>
             </div>
           </div>
-          <svg width="100%" height="40" viewBox="0 0 280 40" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="duprGrad" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="var(--court)" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="var(--court)" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <polyline
-              points="0,30 40,28 80,25 120,28 160,22 200,18 240,15 280,12"
-              fill="url(#duprGrad)"
-              stroke="none"
-            />
-            <polyline
-              points="0,30 40,28 80,25 120,28 160,22 200,18 240,15 280,12"
-              fill="none"
-              stroke="var(--court)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <div className="mt-1 text-[11px] opacity-60">+0.18 over 3 months</div>
+          {!dupr && !duprSingles && (
+            <div className="mt-3 text-[11px] opacity-60">
+              Add your DUPR ID below to sync ratings.
+            </div>
+          )}
         </div>
 
         <SectionHeader title="Settings" />
@@ -162,7 +145,6 @@ export default async function ProfilePage({
             value={profile.dupr_id ?? '—'}
           />
           <SettingRow href="/profile?edit=1" label="Bio" value={profile.bio ? '✏️ Edit' : 'Add a line'} />
-          <SettingRow href="/profile?edit=1" label="Notifications" value="On" />
           <form action="/auth/signout" method="post" className="contents">
             <button
               type="submit"
