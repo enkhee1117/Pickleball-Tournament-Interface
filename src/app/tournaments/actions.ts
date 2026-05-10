@@ -424,6 +424,17 @@ export async function generatePlayoffsFromOrganizerSeed(
     ([a, b]) => `${a.trim()} & ${b.trim()}`,
   ) as [string, string, string, string];
 
+  // Reject duplicate players across teams — the client filters as the
+  // organizer picks, but a stale form could submit "Alice & Bob" twice
+  // and produce a bracket with the same team in both semis.
+  const allPlayers = (parsed as [string, string][]).flatMap(([a, b]) => [a.trim(), b.trim()]);
+  if (new Set(allPlayers).size !== allPlayers.length) {
+    return { error: "Each player can only appear on one team — somebody's listed twice." };
+  }
+  if (new Set(teamLabels).size !== 4) {
+    return { error: 'Pick four distinct teams before generating the bracket.' };
+  }
+
   const { supabase, user } = await getAuthedClient();
   if (!user) return { error: 'Please sign in.' };
 

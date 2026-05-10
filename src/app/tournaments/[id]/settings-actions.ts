@@ -91,3 +91,30 @@ export async function deleteTournament(formData: FormData): Promise<void> {
   revalidatePath('/history');
   redirect(`/tournaments?ok=${encodeURIComponent('Tournament deleted')}`);
 }
+
+// Cover image setter — takes a public URL (already uploaded to storage by
+// the client) and stores it on the tournament. Returns ok/error so the
+// upload component can surface failures inline.
+export async function setTournamentCoverImage(
+  tournamentId: string,
+  url: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!tournamentId) return { ok: false, error: 'Missing tournament id.' };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Sign in to manage the tournament.' };
+
+  const { error } = await supabase.rpc('app_set_tournament_cover', {
+    p_tournament_id: tournamentId,
+    p_url: url,
+  });
+  if (error) return { ok: false, error: formatPgError(error) };
+
+  revalidatePath(`/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}/invite`);
+  revalidatePath('/tournaments');
+  return { ok: true };
+}

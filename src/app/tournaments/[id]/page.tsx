@@ -24,6 +24,7 @@ import {
 import { refreshTournamentStatus } from '@/lib/tournament-status-server';
 import { GeneratePlayoffsForm } from './GeneratePlayoffsForm';
 import { BracketSeedingChoice } from './BracketSeedingChoice';
+import { CoverImageUpload } from './CoverImageUpload';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { deleteTournament, resetTournamentMatches } from './settings-actions';
 import { GenerateMatchesPanel } from './invite/GenerateMatchesPanel';
@@ -94,7 +95,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
   ] = await Promise.all([
     supabase
       .from('tournaments')
-      .select('id,owner_user_id,name,format,status,whatsapp_group_url,invite_code,gender_mode,pairing_mode,created_at,updated_at')
+      .select('id,owner_user_id,name,format,status,whatsapp_group_url,invite_code,gender_mode,pairing_mode,cover_image_url,created_at,updated_at')
       .eq('id', id)
       .single(),
     supabase
@@ -162,11 +163,18 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
           .map((p) => ({ id: p.id, displayName: p.display_name }))
       : [];
 
+  const coverImageUrl =
+    (t as Tournament & { cover_image_url?: string | null }).cover_image_url ?? null;
   return (
     <div className="flex min-h-full flex-col bg-paper">
       <div
         className="relative overflow-hidden px-[18px] pb-[18px]"
-        style={{ background: 'var(--ink)', color: 'var(--paper)' }}
+        style={{
+          background: coverImageUrl
+            ? `linear-gradient(180deg, oklch(0.18 0.02 100 / 0.4) 0%, oklch(0.18 0.02 100 / 0.85) 100%), url('${coverImageUrl}') center / cover`
+            : 'var(--ink)',
+          color: 'var(--paper)',
+        }}
       >
         <TopBar
           dark
@@ -303,6 +311,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
             tournamentInviteCode={t.invite_code}
             tournamentFormat={t.format}
             genderMode={(t as Tournament & { gender_mode?: 'open' | 'mixed' | 'same' }).gender_mode ?? 'open'}
+            coverImageUrl={coverImageUrl}
             matchCount={m.length}
             playerCount={playerCount}
             roster={rosterPlayers.map((p) => {
@@ -566,6 +575,7 @@ function SettingsTab({
   isOwner,
   currentUserId,
   userHasClaimedSlot,
+  coverImageUrl,
 }: {
   tournamentId: string;
   tournamentName: string;
@@ -574,6 +584,7 @@ function SettingsTab({
   genderMode: 'open' | 'mixed' | 'same';
   matchCount: number;
   playerCount: number;
+  coverImageUrl: string | null;
   roster: {
     id: string;
     display_name: string;
@@ -602,6 +613,11 @@ function SettingsTab({
   const untagged = roster.filter((p) => !p.gender).length;
   return (
     <div className="px-[18px] py-[18px] pb-24">
+      <SectionHeader title="Cover image" mute="Shown on the scoreboard banner" />
+      <div className="mb-5">
+        <CoverImageUpload tournamentId={tournamentId} initialUrl={coverImageUrl} />
+      </div>
+
       <SectionHeader
         title="Roster"
         mute={
