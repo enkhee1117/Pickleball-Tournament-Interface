@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
@@ -17,6 +18,35 @@ type PageProps = {
   params: Promise<{ code: string }>;
   searchParams: Promise<{ tab?: 'matches' | 'standings' }>;
 };
+
+// Generate share-card metadata so links posted to messaging apps unfurl
+// with the tournament name + cover image instead of the bare URL. Falls
+// back to a generic title when the code doesn't resolve.
+export async function generateMetadata({ params }: { params: PageProps['params'] }): Promise<Metadata> {
+  const { code: rawCode } = await params;
+  const code = normalizeInviteCode(rawCode);
+  if (!isValidInviteCode(code)) {
+    return { title: 'Tournament' };
+  }
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('tournaments')
+    .select('name,cover_image_url')
+    .eq('invite_code', code)
+    .maybeSingle();
+  const t = data as { name: string; cover_image_url: string | null } | null;
+  if (!t) return { title: 'Tournament' };
+
+  const title = `${t.name} · live scoreboard`;
+  const description = 'Tap to follow scores in real time.';
+  const images = t.cover_image_url ? [t.cover_image_url] : undefined;
+  return {
+    title,
+    description,
+    openGraph: { title, description, images },
+    twitter: { card: 'summary_large_image', title, description, images },
+  };
+}
 
 type PublicMatch = {
   id: string;

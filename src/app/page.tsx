@@ -7,6 +7,7 @@ import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Icons } from '@/components/ui/icons';
 import type { Tournament } from '@/lib/types';
+import { HomeGreeting } from './HomeGreeting';
 
 type LiveMatch = {
   id: string;
@@ -94,9 +95,7 @@ export default async function HomePage() {
 
       <div className="flex-1">
         <div className="px-[18px] pt-2 pb-[18px]">
-          <div className="text-[13px] tracking-wide text-ink-3">
-            {greetingTime()}, {greetingName} 🎾
-          </div>
+          <HomeGreeting name={greetingName} />
           <Headline tournaments={tournaments} liveMatches={liveMatches} />
         </div>
 
@@ -169,6 +168,13 @@ function SignedOutHome() {
             style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}
           >
             Create account
+          </Link>
+          <Link
+            href="/join"
+            className="mt-1 text-center text-[12px] font-semibold opacity-70"
+            style={{ color: 'var(--ink-2)' }}
+          >
+            Have an invite code? →
           </Link>
         </div>
       </div>
@@ -418,10 +424,3 @@ function formatLabelFor(format: string): string {
   }
 }
 
-function greetingTime(): string {
-  const hour = new Date().getHours();
-  if (hour < 5) return 'Late night';
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
-}

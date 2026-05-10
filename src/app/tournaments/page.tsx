@@ -114,7 +114,10 @@ export default async function TournamentsPage({
             className="mb-3 rounded-2xl bg-white p-4 text-sm text-ink-2"
             style={{ border: '1px solid var(--line)' }}
           >
-            Sign in to see your tournaments. You can still browse anything public below.
+            <strong className="text-ink">Sign in to see your tournaments.</strong>
+            <div className="mt-1 text-[12px] text-ink-3">
+              Got an invite code? <Link href="/join" className="font-semibold underline">Join with code</Link>.
+            </div>
           </div>
         )}
 
