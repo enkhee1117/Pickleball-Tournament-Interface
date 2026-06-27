@@ -80,6 +80,7 @@ export function TabBar() {
 
   return (
     <nav
+      data-app-tabbar
       className="fixed bottom-0 left-1/2 z-40 w-full max-w-[480px] -translate-x-1/2 border-t bg-paper px-2 pt-2 pb-[max(env(safe-area-inset-bottom),6px)]"
       style={{ borderColor: 'var(--line)' }}
     >
