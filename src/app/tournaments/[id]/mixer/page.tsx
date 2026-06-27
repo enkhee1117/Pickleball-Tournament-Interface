@@ -309,8 +309,9 @@ function VoteTab({
   const myPool = states.find((s) => s.player_id === myPlayer.id)?.pairing_pool ?? poolFor(myPlayer);
   const targets = roster.filter((p) => p.id !== myPlayer.id && poolFor(p) !== myPool);
   const spent = votes.reduce((s, v) => s + v.up_tokens + v.down_tokens, 0);
-  const budget = (myState?.tokens_base_remaining ?? config.starting_tokens) + (myState?.tokens_bought_remaining ?? 0);
-  const left = Math.max(0, budget - spent);
+  const remaining = (myState?.tokens_base_remaining ?? config.starting_tokens) + (myState?.tokens_bought_remaining ?? 0);
+  const budget = remaining + spent;
+  const left = remaining;
   const locked = round.state !== 'open';
   return (
     <div className="px-[18px]">
@@ -404,7 +405,7 @@ function BettingTab({ tournamentId, roster, myPlayer, myState, bets, enabled }: 
         <div key={place} className="mb-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
           <div className="font-bold">{place === 1 ? '1st' : place === 2 ? '2nd' : '3rd'} place market</div>
           <div className="mt-3 grid gap-2">
-            {roster.slice(0, 5).map((p) => {
+            {roster.map((p) => {
               const mine = bets.find((b) => b.market_place === place && b.pick_player_id === p.id);
               return (
                 <form key={p.id} action={placeMixerBet} className="flex items-center gap-2 rounded-xl p-2" style={{ background: 'oklch(0.285 0.038 266)' }}>
