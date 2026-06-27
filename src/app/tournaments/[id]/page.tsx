@@ -120,6 +120,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
 
   if (!tournament) notFound();
   const t = tournament as Tournament;
+  const isMixer = t.format === 'partner_mixer';
   const m = (matches ?? []) as MatchRow[];
 
   const liveCount = m.filter((row) => !row.completed_at && (row.team_a_score || row.team_b_score)).length;
@@ -222,7 +223,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
           </Chip>
           <div className="serif mt-2 text-[32px] leading-[1.05] tracking-tight">{t.name}</div>
           <div className="mt-1.5 text-xs opacity-60">
-            Round Robin · {(players?.length ?? 0)} players
+            {formatLabelFor(t.format)} · {(players?.length ?? 0)} players
           </div>
         </div>
 
@@ -292,7 +293,26 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
           </div>
         )}
 
-        {tab === 'matches' && (
+        {isMixer && (
+          <div className="mx-[18px] mt-3 rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+            <div className="serif text-[24px] leading-none text-ink">Partner Mixer runtime</div>
+            <div className="mt-1 text-sm text-ink-3">
+              Voting, draw reveal, court pairings, pooled betting, and raffle live in the Mixer view.
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Link href={`/tournaments/${id}/mixer`} className="rounded-xl px-4 py-3 text-center text-sm font-semibold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
+                Player view
+              </Link>
+              {isManager && (
+                <Link href={`/tournaments/${id}/mixer/admin`} className="rounded-xl px-4 py-3 text-center text-sm font-semibold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>
+                  Organizer controls
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'matches' && !isMixer && (
           <>
             {claimableForBanner.length > 0 && (
               <ScoreboardClaimBanner
@@ -303,6 +323,17 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
             )}
             <MatchesTab tournamentId={id} matches={rrMatches} showDone={showDone} />
           </>
+        )}
+        {tab === 'matches' && isMixer && (
+          <div className="px-[18px] pt-6 pb-24">
+            <div className="rounded-2xl bg-white p-5 text-center" style={{ border: '1px dashed var(--line)' }}>
+              <div className="text-[15px] font-semibold text-ink">Mixer matches are drawn live</div>
+              <div className="mt-1 text-xs text-ink-3">Open the Mixer to vote, reveal pairings, and score courts.</div>
+              <Link href={`/tournaments/${id}/mixer`} className="mt-3 inline-flex items-center gap-1 rounded-full px-4 py-2 text-[13px] font-semibold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
+                Open Mixer {Icons.arrow}
+              </Link>
+            </div>
+          </div>
         )}
         {tab === 'settings' && isManager && (
           <SettingsTab
@@ -466,6 +497,21 @@ function MatchesTab({
 function roundNumber(label: string): number {
   const match = label.match(/(\d+)/);
   return match ? Number.parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
+}
+
+function formatLabelFor(format: string): string {
+  switch (format) {
+    case 'round_robin':
+      return 'Round Robin';
+    case 'fixed_partners':
+      return 'Fixed Partners';
+    case 'bracket':
+      return 'Bracket';
+    case 'partner_mixer':
+      return 'Partner Mixer';
+    default:
+      return format;
+  }
 }
 
 function RealMatchCard({ tournamentId, row }: { tournamentId: string; row: MatchRow }) {
@@ -1269,4 +1315,3 @@ function BracketLine({
     </div>
   );
 }
-

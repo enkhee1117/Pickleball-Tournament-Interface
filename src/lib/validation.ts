@@ -10,7 +10,7 @@ export function validateTournamentName(raw: string): Validation {
 }
 
 export function validateTournamentFormat(raw: string): Validation {
-  if (raw === 'round_robin' || raw === 'fixed_partners' || raw === 'bracket') return { ok: true };
+  if (raw === 'round_robin' || raw === 'fixed_partners' || raw === 'bracket' || raw === 'partner_mixer') return { ok: true };
   return { ok: false, error: 'Pick a tournament format.' };
 }
 

@@ -166,7 +166,7 @@ function TournamentRow({ t }: { t: Tournament }) {
   });
   return (
     <Link
-      href={`/tournaments/${t.id}`}
+      href={t.format === 'partner_mixer' ? `/tournaments/${t.id}/mixer` : `/tournaments/${t.id}`}
       className="relative flex items-center gap-3 overflow-hidden rounded-[18px] bg-white p-4"
       style={{ border: '1px solid var(--line)' }}
     >
@@ -206,6 +206,8 @@ function formatDisplay(format: string): string {
       return 'Fixed Partners';
     case 'bracket':
       return 'Bracket';
+    case 'partner_mixer':
+      return 'Partner Mixer';
     case 'rr-mixed':
       return 'Round Robin · Mixed';
     case 'rr-same':

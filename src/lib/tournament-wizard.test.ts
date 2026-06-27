@@ -4,6 +4,7 @@ import {
   dbFormat,
   defaultPairingForFormat,
   isFixedPartners,
+  isPartnerMixer,
   isValidPairingForFormat,
   isWizardFormat,
   pairingOptionsForFormat,
@@ -14,18 +15,20 @@ import {
 } from '@/lib/tournament-wizard';
 import { generateMatchDrafts } from '@/lib/match-schemes';
 
-const ALL_FORMATS: WizardFormat[] = ['rr-mixed', 'rr-same', 'fp-mixed', 'fp-same'];
+const ALL_FORMATS: WizardFormat[] = ['mixer', 'rr-mixed', 'rr-same', 'fp-mixed', 'fp-same'];
+const CLASSIC_FORMATS: WizardFormat[] = ['rr-mixed', 'rr-same', 'fp-mixed', 'fp-same'];
 const RR_PAIRINGS: WizardPairing[] = ['balanced', 'random', 'snake'];
 const FP_PAIRINGS: WizardPairing[] = ['manual', 'balanced', 'random'];
 
 describe('isWizardFormat', () => {
-  it('accepts the four UI format ids', () => {
+  it('accepts the UI format ids', () => {
     for (const f of ALL_FORMATS) expect(isWizardFormat(f)).toBe(true);
   });
 
   it('rejects DB formats and arbitrary strings', () => {
     expect(isWizardFormat('round_robin')).toBe(false);
     expect(isWizardFormat('fixed_partners')).toBe(false);
+    expect(isWizardFormat('partner_mixer')).toBe(false);
     expect(isWizardFormat('whatever')).toBe(false);
   });
 });
@@ -43,9 +46,22 @@ describe('dbFormat', () => {
     expect(dbFormat('fixed_partners')).toBe('fixed_partners');
   });
 
+  it('maps mixer to partner_mixer', () => {
+    expect(dbFormat('mixer')).toBe('partner_mixer');
+    expect(dbFormat('partner_mixer')).toBe('partner_mixer');
+  });
+
   it('passes through bracket and falls back to round_robin for unknowns', () => {
     expect(dbFormat('bracket')).toBe('bracket');
     expect(dbFormat('something-else')).toBe('round_robin');
+  });
+});
+
+describe('isPartnerMixer', () => {
+  it('matches both UI and DB mixer labels', () => {
+    expect(isPartnerMixer('mixer')).toBe(true);
+    expect(isPartnerMixer('partner_mixer')).toBe(true);
+    expect(isPartnerMixer('round_robin')).toBe(false);
   });
 });
 
@@ -79,6 +95,10 @@ describe('shouldAutoGenerate', () => {
       expect(shouldAutoGenerate('rr-mixed', p)).toBe(true);
       expect(shouldAutoGenerate('rr-same', p)).toBe(true);
     }
+  });
+
+  it('never auto-generates classic matches for mixer', () => {
+    expect(shouldAutoGenerate('mixer', 'balanced')).toBe(false);
   });
 
   it('skips auto-generation only for fixed-partners + manual', () => {
@@ -121,10 +141,14 @@ describe('isValidPairingForFormat', () => {
 
 describe('canGenerateMatches', () => {
   it('rejects rosters smaller than 4', () => {
-    for (const f of ALL_FORMATS) {
+    for (const f of CLASSIC_FORMATS) {
       expect(canGenerateMatches(f, 0)).toBe(false);
       expect(canGenerateMatches(f, 3)).toBe(false);
     }
+  });
+
+  it('does not use classic match generation for mixer', () => {
+    expect(canGenerateMatches('mixer', 12)).toBe(false);
   });
 
   it('accepts any size >= 4 for round-robin', () => {
@@ -149,7 +173,7 @@ describe('canGenerateMatches', () => {
 describe('full wizard scenario coverage', () => {
   const players = (n: number) => Array.from({ length: n }, (_, i) => `P${i + 1}`);
 
-  for (const format of ALL_FORMATS) {
+  for (const format of CLASSIC_FORMATS) {
     const pairings = pairingOptionsForFormat(format);
     for (const pairing of pairings) {
       it(`${format} + ${pairing}`, () => {

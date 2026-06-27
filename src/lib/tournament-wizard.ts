@@ -4,24 +4,26 @@
 
 import type { MatchScheme } from '@/lib/match-schemes';
 
-export type WizardFormat = 'rr-mixed' | 'rr-same' | 'fp-mixed' | 'fp-same';
+export type WizardFormat = 'mixer' | 'rr-mixed' | 'rr-same' | 'fp-mixed' | 'fp-same';
 export type WizardPairing = 'balanced' | 'random' | 'snake' | 'manual';
 
 // What the DB stores in tournaments.format. Older code still passes raw db
 // values through this module, so we accept both.
-export type DbFormat = 'round_robin' | 'fixed_partners' | 'bracket';
+export type DbFormat = 'round_robin' | 'fixed_partners' | 'bracket' | 'partner_mixer';
 
 const DB_FORMATS: ReadonlySet<string> = new Set<DbFormat>([
   'round_robin',
   'fixed_partners',
   'bracket',
+  'partner_mixer',
 ]);
 
 export function isWizardFormat(value: string): value is WizardFormat {
-  return value === 'rr-mixed' || value === 'rr-same' || value === 'fp-mixed' || value === 'fp-same';
+  return value === 'mixer' || value === 'rr-mixed' || value === 'rr-same' || value === 'fp-mixed' || value === 'fp-same';
 }
 
 export function dbFormat(format: WizardFormat | DbFormat | string): DbFormat {
+  if (format === 'mixer' || format === 'partner_mixer') return 'partner_mixer';
   if (format === 'fp-mixed' || format === 'fp-same' || format === 'fixed_partners') {
     return 'fixed_partners';
   }
@@ -36,11 +38,16 @@ export function isFixedPartners(format: WizardFormat | DbFormat | string): boole
   return dbFormat(format) === 'fixed_partners';
 }
 
+export function isPartnerMixer(format: WizardFormat | DbFormat | string): boolean {
+  return dbFormat(format) === 'partner_mixer';
+}
+
 // Maps the wizard's "rr-mixed / fp-same / etc" format into a gender mode
 // the DB and generator understand. Plain DB formats default to 'open'.
 export type GenderMode = 'open' | 'mixed' | 'same';
 
 export function genderModeFor(format: WizardFormat | DbFormat | string): GenderMode {
+  if (format === 'mixer' || format === 'partner_mixer') return 'mixed';
   if (format === 'rr-mixed' || format === 'fp-mixed') return 'mixed';
   if (format === 'rr-same' || format === 'fp-same') return 'same';
   return 'open';
@@ -48,6 +55,7 @@ export function genderModeFor(format: WizardFormat | DbFormat | string): GenderM
 
 // Which generation scheme to feed into generateMatchDrafts.
 export function pickScheme(format: WizardFormat | DbFormat | string): MatchScheme {
+  if (isPartnerMixer(format)) return 'rotating_partners';
   if (dbFormat(format) === 'fixed_partners') return 'fixed_partners';
   return 'rotating_partners';
 }
@@ -59,6 +67,7 @@ export function shouldAutoGenerate(
   format: WizardFormat | DbFormat | string,
   pairing: WizardPairing | undefined,
 ): boolean {
+  if (isPartnerMixer(format)) return false;
   if (isFixedPartners(format) && pairing === 'manual') return false;
   return true;
 }
@@ -66,6 +75,7 @@ export function shouldAutoGenerate(
 // Pairing options vary by format. The wizard uses this to reset the
 // selection when the format flips between RR and FP.
 export function pairingOptionsForFormat(format: WizardFormat | DbFormat | string): WizardPairing[] {
+  if (isPartnerMixer(format)) return ['balanced'];
   return isFixedPartners(format)
     ? ['manual', 'balanced', 'random']
     : ['balanced', 'random', 'snake'];
@@ -89,6 +99,7 @@ export function canGenerateMatches(
   format: WizardFormat | DbFormat | string,
   playerCount: number,
 ): boolean {
+  if (isPartnerMixer(format)) return false;
   if (playerCount < 4) return false;
   if (pickScheme(format) === 'fixed_partners' && playerCount % 2 !== 0) return false;
   return true;
