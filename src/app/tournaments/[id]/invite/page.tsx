@@ -46,6 +46,7 @@ export default async function InvitePage({
   ]);
   if (!tournament) notFound();
   const t = tournament as Tournament & { owner_user_id: string };
+  const isMixer = t.format === 'partner_mixer';
   const inviteCode = formatInviteCode(t.invite_code);
   const isOwner = !!user && user.id === t.owner_user_id;
   const role = (memberRow as { role?: string } | null)?.role ?? null;
@@ -136,14 +137,16 @@ export default async function InvitePage({
           </div>
           <div className="mt-0.5 text-[12px] text-ink-3">
             {isManager
-              ? 'Add players, edit names, or generate matches in Settings on the scoreboard.'
+              ? isMixer
+                ? 'Add players or open the Mixer controls to run voting and the reveal.'
+                : 'Add players, edit names, or generate matches in Settings on the scoreboard.'
               : 'Open the scoreboard to see the roster, matches, and standings.'}
           </div>
         </div>
 
         <div className="mt-5 grid gap-2">
           <Link
-            href={`/tournaments/${t.id}`}
+            href={isMixer ? `/tournaments/${t.id}/mixer` : `/tournaments/${t.id}`}
             className="block w-full rounded-2xl px-5 py-[18px] text-center text-base font-semibold tracking-tight"
             style={{
               background: 'var(--ink)',
@@ -151,15 +154,15 @@ export default async function InvitePage({
               boxShadow: '0 4px 14px oklch(0.2 0.05 100 / 0.12)',
             }}
           >
-            Open scoreboard →
+            {isMixer ? 'Open Mixer →' : 'Open scoreboard →'}
           </Link>
           {isManager && (
             <Link
-              href={`/tournaments/${t.id}?tab=settings`}
+              href={isMixer ? `/tournaments/${t.id}/mixer/admin` : `/tournaments/${t.id}?tab=settings`}
               className="block w-full rounded-2xl px-5 py-3 text-center text-[13px] font-semibold"
               style={{ background: '#fff', color: 'var(--ink)', border: '1px solid var(--line)' }}
             >
-              Manage roster + schedule →
+              {isMixer ? 'Open Mixer controls →' : 'Manage roster + schedule →'}
             </Link>
           )}
         </div>

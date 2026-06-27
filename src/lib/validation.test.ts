@@ -30,7 +30,7 @@ describe('validateTournamentName', () => {
 
 describe('validateTournamentFormat', () => {
   it('accepts known formats', () => {
-    for (const f of ['round_robin', 'fixed_partners', 'bracket']) {
+    for (const f of ['round_robin', 'fixed_partners', 'bracket', 'partner_mixer']) {
       expect(validateTournamentFormat(f).ok).toBe(true);
     }
   });

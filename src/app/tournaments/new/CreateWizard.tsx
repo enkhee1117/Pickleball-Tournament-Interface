@@ -10,6 +10,7 @@ import {
   defaultPairingForFormat,
   genderModeFor,
   isFixedPartners,
+  isPartnerMixer,
   isValidPairingForFormat,
   shouldAutoGenerate,
   type GenderMode,
@@ -40,6 +41,12 @@ type WizardData = {
   playerCount: number;
   courts: number;
   rounds: number;
+  startTokens: number;
+  entryFee: number;
+  betting: boolean;
+  raffle: boolean;
+  downvotes: boolean;
+  lockSeconds: number;
   rosterMode: 'placeholders' | 'names';
   players: WizardPlayer[];
 };
@@ -60,7 +67,8 @@ function makePlayers(n: number, existing: WizardPlayer[] = []): WizardPlayer[] {
   return out;
 }
 
-const STEP_LABELS = ['Name', 'Format', 'Pairing', 'Roster', 'Schedule', 'Review'];
+const CLASSIC_STEP_LABELS = ['Name', 'Format', 'Pairing', 'Roster', 'Schedule', 'Review'];
+const MIXER_STEP_LABELS = ['Name', 'Format', 'Roster', 'Tokens & Voting', 'Prizes', 'Review'];
 
 export function CreateWizard() {
   const router = useRouter();
@@ -69,11 +77,17 @@ export function CreateWizard() {
   const [isPending, startTransition] = useTransition();
   const [data, setData] = useState<WizardData>({
     name: '',
-    format: 'rr-mixed',
+    format: 'mixer',
     pairing: 'balanced',
     playerCount: 8,
-    courts: 2,
+    courts: 3,
     rounds: 5,
+    startTokens: 10,
+    entryFee: 20,
+    betting: true,
+    raffle: true,
+    downvotes: true,
+    lockSeconds: 90,
     rosterMode: 'placeholders',
     players: makePlayers(8),
   });
@@ -81,12 +95,14 @@ export function CreateWizard() {
     setData((d) => ({ ...d, [k]: v }));
 
   const manualFp = !shouldAutoGenerate(data.format, data.pairing);
+  const isMixer = isPartnerMixer(data.format);
   const genderMode = genderModeFor(data.format);
+  const steps = isMixer ? MIXER_STEP_LABELS : CLASSIC_STEP_LABELS;
 
   // Pairing choices vary by format — reset to a sane default whenever the
   // format flips between round-robin and fixed-partners.
   useEffect(() => {
-    if (!isValidPairingForFormat(data.format, data.pairing)) {
+    if (!isMixer && !isValidPairingForFormat(data.format, data.pairing)) {
       set('pairing', defaultPairingForFormat(data.format));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -130,9 +146,19 @@ export function CreateWizard() {
             : undefined,
         courts: data.courts,
         rounds: data.rounds,
+        startTokens: data.startTokens,
+        entryFee: data.entryFee,
+        betting: data.betting,
+        raffle: data.raffle,
+        downvotes: data.downvotes,
+        lockSeconds: data.lockSeconds,
       });
       if (result.error || !result.id) {
         setError(result.error ?? 'Could not create tournament.');
+        return;
+      }
+      if (result.mixer) {
+        router.push(`/tournaments/${result.id}/mixer/admin?new=1`);
         return;
       }
       // Manual fixed-partners → land on invite/roster so the organizer can
@@ -151,13 +177,13 @@ export function CreateWizard() {
     });
   };
 
-  const ctaLabel = manualFp ? 'Set up teams →' : 'Generate matches →';
+  const ctaLabel = isMixer ? 'Open Mixer controls →' : manualFp ? 'Set up teams →' : 'Generate matches →';
 
   return (
     <div className="flex min-h-full flex-col bg-paper">
       <TopBar
         title="New tournament"
-        sub={`Step ${step + 1} of ${STEP_LABELS.length} · ${STEP_LABELS[step]}`}
+        sub={`Step ${step + 1} of ${steps.length} · ${steps[step]}`}
         left={
           <IconBtn onClick={() => (step === 0 ? router.push('/') : setStep(step - 1))} aria-label="Back">
             {Icons.back}
@@ -171,7 +197,7 @@ export function CreateWizard() {
       />
 
       <div className="flex gap-1 px-[18px] pb-3.5">
-        {STEP_LABELS.map((_, i) => (
+        {steps.map((_, i) => (
           <div
             key={i}
             className="h-1 flex-1 rounded-full transition-colors"
@@ -183,10 +209,21 @@ export function CreateWizard() {
       <div className="flex-1 overflow-y-auto px-[18px] pt-1 pb-4">
         {step === 0 && <StepName data={data} set={set} />}
         {step === 1 && <StepFormat data={data} set={set} />}
-        {step === 2 && <StepPairing data={data} set={set} />}
-        {step === 3 && <StepRoster data={data} set={set} genderMode={genderMode} />}
-        {step === 4 && <StepSchedule data={data} set={set} />}
-        {step === 5 && <StepReview data={data} manualTeams={manualFp} genderMode={genderMode} />}
+        {isMixer ? (
+          <>
+            {step === 2 && <StepRoster data={data} set={set} genderMode={genderMode} />}
+            {step === 3 && <StepMixerVoting data={data} set={set} />}
+            {step === 4 && <StepMixerPrizes data={data} set={set} />}
+            {step === 5 && <StepReview data={data} manualTeams={false} genderMode={genderMode} />}
+          </>
+        ) : (
+          <>
+            {step === 2 && <StepPairing data={data} set={set} />}
+            {step === 3 && <StepRoster data={data} set={set} genderMode={genderMode} />}
+            {step === 4 && <StepSchedule data={data} set={set} />}
+            {step === 5 && <StepReview data={data} manualTeams={manualFp} genderMode={genderMode} />}
+          </>
+        )}
 
         {error && (
           <div
@@ -199,7 +236,7 @@ export function CreateWizard() {
       </div>
 
       <div className="border-t bg-paper px-[18px] pt-3 pb-[18px]" style={{ borderColor: 'var(--line)' }}>
-        {step < STEP_LABELS.length - 1 ? (
+        {step < steps.length - 1 ? (
           <BigButton tone="ink" disabled={!canNext} onClick={() => setStep(step + 1)}>
             Continue
           </BigButton>
@@ -253,10 +290,47 @@ const FORMAT_OPTS: Array<{ id: FormatId; title: string; sub: string; desc: strin
 ];
 
 function StepFormat({ data, set }: { data: WizardData; set: <K extends keyof WizardData>(k: K, v: WizardData[K]) => void }) {
+  const mixerOn = data.format === 'mixer';
   return (
     <div>
       <div className="serif mb-1.5 text-[28px] leading-[1.1] text-ink">How do we play?</div>
-      <div className="mb-[18px] text-[13px] text-ink-3">Round robin = social mixer. Fixed = team commitment.</div>
+      <div className="mb-[18px] text-[13px] text-ink-3">The format decides how partners are chosen.</div>
+      <button
+        onClick={() => set('format', 'mixer')}
+        className="mb-4 w-full rounded-[18px] p-[18px] text-left transition-colors"
+        style={{
+          background: mixerOn ? 'var(--ink)' : '#fff',
+          color: mixerOn ? 'var(--paper)' : 'var(--ink)',
+          border: `1.5px solid ${mixerOn ? 'var(--ink)' : 'var(--court)'}`,
+        }}
+      >
+        <div className="mb-2.5 flex items-center justify-between">
+          <span
+            className="rounded-full px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.08em]"
+            style={{
+              color: mixerOn ? 'var(--court)' : 'var(--court-deep)',
+              background: mixerOn ? 'oklch(0.28 0.04 140)' : 'oklch(0.95 0.05 140)',
+            }}
+          >
+            ★ Most popular
+          </span>
+          {mixerOn && <span style={{ color: 'var(--court)' }}>{Icons.check}</span>}
+        </div>
+        <div className="flex items-start gap-3.5">
+          <div className="text-[30px] leading-none">🎟️</div>
+          <div className="flex-1">
+            <div className="serif text-[24px] leading-none tracking-normal">Partner Mixer</div>
+            <div className="mt-1.5 text-[12.5px] leading-[1.45]" style={{ opacity: mixerOn ? 0.78 : 0.66 }}>
+              Players vote with tokens, then a weighted draw reveals partners live. Betting, raffle, and manual payments are built in.
+            </div>
+          </div>
+        </div>
+      </button>
+      <div className="mb-3 flex items-center gap-2.5">
+        <div className="h-px flex-1 bg-line" />
+        <div className="text-[11px] uppercase tracking-[0.04em] text-ink-3">Classic formats</div>
+        <div className="h-px flex-1 bg-line" />
+      </div>
       <div className="grid gap-2.5">
         {FORMAT_OPTS.map((o) => {
           const on = data.format === o.id;
@@ -725,6 +799,140 @@ function StepSchedule({ data, set }: { data: WizardData; set: <K extends keyof W
   );
 }
 
+function StepMixerVoting({
+  data,
+  set,
+}: {
+  data: WizardData;
+  set: <K extends keyof WizardData>(k: K, v: WizardData[K]) => void;
+}) {
+  return (
+    <div>
+      <div className="serif mb-1.5 text-[28px] leading-[1.1] text-ink">
+        Tokens and voting
+      </div>
+      <div className="mb-[18px] text-[13px] text-ink-3">
+        Voting is blind. Players only see their own budget and allocations.
+      </div>
+
+      <Stepper label="Tokens per player" value={data.startTokens} min={4} max={20} onChange={(v) => set('startTokens', v)} />
+      <Stepper label="Voting lock seconds" value={data.lockSeconds} min={30} max={300} onChange={(v) => set('lockSeconds', v)} />
+      <Stepper label="Rounds" value={data.rounds} min={3} max={12} onChange={(v) => set('rounds', v)} />
+      <Stepper label="Courts" value={data.courts} min={1} max={6} onChange={(v) => set('courts', v)} />
+
+      <div
+        className="mt-2 flex items-start gap-2.5 rounded-2xl p-3.5 text-[13px]"
+        style={{
+          background: 'oklch(0.96 0.04 140)',
+          border: '1px solid oklch(0.85 0.08 140)',
+          color: 'oklch(0.3 0.05 140)',
+        }}
+      >
+        <span style={{ color: 'var(--court-deep)', flexShrink: 0 }}>{Icons.spark}</span>
+        <div>
+          Formula defaults: α 1 · β 2.5 · γ 1 · τ 2 · floor 4 · repeat decay 0.2.
+          The server owns the draw and never exposes raw vote rows.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StepMixerPrizes({
+  data,
+  set,
+}: {
+  data: WizardData;
+  set: <K extends keyof WizardData>(k: K, v: WizardData[K]) => void;
+}) {
+  return (
+    <div>
+      <div className="serif mb-1.5 text-[28px] leading-[1.1] text-ink">
+        Prizes and add-ons
+      </div>
+      <div className="mb-[18px] text-[13px] text-ink-3">
+        The app tracks payments, chips, and tickets. Organizers confirm money manually.
+      </div>
+
+      <div
+        className="mb-3 flex items-center justify-between rounded-2xl bg-white p-4"
+        style={{ border: '1px solid var(--line)' }}
+      >
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.06em] text-ink-3">Entry fee</div>
+          <div className="mono text-[28px] font-bold tracking-tight text-ink">${data.entryFee}</div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => set('entryFee', Math.max(0, data.entryFee - 5))}
+            className="h-10 w-10 rounded-xl bg-white text-[20px]"
+            style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}
+          >
+            −
+          </button>
+          <button
+            onClick={() => set('entryFee', Math.min(200, data.entryFee + 5))}
+            className="h-10 w-10 rounded-xl text-[20px]"
+            style={{ background: 'var(--ink)', color: 'var(--paper)' }}
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-2.5">
+        <MixerToggle label="Pooled betting" sub="100 free chips, podium parimutuel markets." value={data.betting} onChange={(v) => set('betting', v)} />
+        <MixerToggle label="Raffle draw" sub="Tickets from upvotes received and unused base tokens." value={data.raffle} onChange={(v) => set('raffle', v)} />
+        <MixerToggle label="Rather-not votes" sub="Allow downvote tokens with the anti-grief floor." value={data.downvotes} onChange={(v) => set('downvotes', v)} />
+      </div>
+
+      <div className="mt-4 rounded-2xl bg-white p-4 text-[12.5px] text-ink-3" style={{ border: '1px solid var(--line)' }}>
+        Pay-to-play defaults to +5 tokens for $20 once. Bought tokens affect matchmaking but never raffle odds.
+      </div>
+    </div>
+  );
+}
+
+function MixerToggle({
+  label,
+  sub,
+  value,
+  onChange,
+}: {
+  label: string;
+  sub: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <button
+      onClick={() => onChange(!value)}
+      className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3.5 text-left"
+      style={{ border: '1px solid var(--line)' }}
+    >
+      <div className="min-w-0">
+        <div className="text-[14.5px] font-semibold text-ink">{label}</div>
+        <div className="mt-0.5 text-xs text-ink-3">{sub}</div>
+      </div>
+      <span
+        className="relative h-7 w-[46px] shrink-0 rounded-full transition-colors"
+        style={{
+          background: value ? 'var(--court)' : 'var(--paper-2)',
+          border: `1px solid ${value ? 'var(--court-deep)' : 'var(--line)'}`,
+        }}
+      >
+        <span
+          className="absolute top-0.5 h-[22px] w-[22px] rounded-full transition-all"
+          style={{
+            left: value ? 20 : 2,
+            background: value ? 'oklch(0.25 0.05 140)' : 'var(--ink-3)',
+          }}
+        />
+      </span>
+    </button>
+  );
+}
+
 function Stepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
   return (
     <div
@@ -756,6 +964,7 @@ function Stepper({ label, value, min, max, onChange }: { label: string; value: n
 }
 
 const FORMAT_LABEL: Record<FormatId, string> = {
+  mixer: 'Partner Mixer · Token voting',
   'rr-mixed': 'Round Robin · Mixed',
   'rr-same': 'Round Robin · Same gender',
   'fp-mixed': 'Fixed Partners · Mixed',
@@ -785,23 +994,44 @@ function StepReview({
   const linked = named.filter((p) => p.profileId).length;
   const ungendered = named.length - males - females;
   const showGenderRow = (genderMode === 'mixed' || genderMode === 'same') && data.rosterMode === 'names';
-  const rows: Array<[string, string]> = [
-    ['Name', data.name || '—'],
-    ['Format', FORMAT_LABEL[data.format]],
-    ['Pairing', PAIRING_LABEL[data.pairing]],
-    ['Players', `${data.playerCount}${data.rosterMode === 'names' ? ' (named)' : ''}`],
-    ...(showGenderRow
-      ? ([['Gender split', `M ${males} · F ${females}${ungendered ? ` · ${ungendered} untagged` : ''}`]] as Array<
-          [string, string]
-        >)
-      : []),
-    ...(linked > 0
-      ? ([['Linked players', `${linked} from existing accounts`]] as Array<[string, string]>)
-      : []),
-    ['Courts', `${data.courts}`],
-    ['Rounds', `${data.rounds}`],
-    ['Total games', manualTeams ? '—' : `~${games}`],
-  ];
+  const isMixer = data.format === 'mixer';
+  const rows: Array<[string, string]> = isMixer
+    ? [
+        ['Name', data.name || '—'],
+        ['Format', FORMAT_LABEL[data.format]],
+        ['Players', `${data.playerCount}${data.rosterMode === 'names' ? ' (named)' : ''}`],
+        ...(showGenderRow
+          ? ([['Gender split', `M ${males} · F ${females}${ungendered ? ` · ${ungendered} untagged` : ''}`]] as Array<
+              [string, string]
+            >)
+          : []),
+        ...(linked > 0
+          ? ([['Linked players', `${linked} from existing accounts`]] as Array<[string, string]>)
+          : []),
+        ['Tokens / player', `${data.startTokens}`],
+        ['Lock timer', `${data.lockSeconds}s`],
+        ['Entry fee', `$${data.entryFee}`],
+        ['Add-ons', [data.betting && 'Betting', data.raffle && 'Raffle', data.downvotes && 'Rather-not'].filter(Boolean).join(' · ') || 'None'],
+        ['Courts', `${data.courts}`],
+        ['Rounds', `${data.rounds}`],
+      ]
+    : [
+        ['Name', data.name || '—'],
+        ['Format', FORMAT_LABEL[data.format]],
+        ['Pairing', PAIRING_LABEL[data.pairing]],
+        ['Players', `${data.playerCount}${data.rosterMode === 'names' ? ' (named)' : ''}`],
+        ...(showGenderRow
+          ? ([['Gender split', `M ${males} · F ${females}${ungendered ? ` · ${ungendered} untagged` : ''}`]] as Array<
+              [string, string]
+            >)
+          : []),
+        ...(linked > 0
+          ? ([['Linked players', `${linked} from existing accounts`]] as Array<[string, string]>)
+          : []),
+        ['Courts', `${data.courts}`],
+        ['Rounds', `${data.rounds}`],
+        ['Total games', manualTeams ? '—' : `~${games}`],
+      ];
   return (
     <div>
       <div className="serif mb-[18px] text-[28px] leading-[1.1] text-ink">Look right?</div>
@@ -835,7 +1065,12 @@ function StepReview({
       >
         <span style={{ color: 'var(--court-deep)', flexShrink: 0 }}>{Icons.spark}</span>
         <div>
-          {manualTeams ? (
+          {isMixer ? (
+            <>
+              <strong>Next:</strong> we&rsquo;ll create the Mixer, open Round 1 voting, and drop you on the
+              organizer controls. No classic schedule is generated yet.
+            </>
+          ) : manualTeams ? (
             <>
               <strong>Manual teams:</strong> we&rsquo;ll create the tournament and roster, then drop you on
               the invite screen so you can pair people up before the first round.

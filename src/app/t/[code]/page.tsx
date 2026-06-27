@@ -13,6 +13,7 @@ import {
   type StandingsMatch,
 } from '@/lib/scoring';
 import { RecordingsMenu } from '@/components/RecordingsMenu';
+import { AnonymousMixerJoinButton } from '@/app/tournaments/[id]/mixer/AnonymousMixerJoinButton';
 
 type PageProps = {
   params: Promise<{ code: string }>;
@@ -217,6 +218,7 @@ export default async function PublicTournamentPage({ params, searchParams }: Pag
         <CtaBar
           tournamentId={t.id}
           inviteCode={t.invite_code}
+          format={t.format}
           authed={!!user}
           isMember={isMember}
         />
@@ -231,23 +233,26 @@ export default async function PublicTournamentPage({ params, searchParams }: Pag
 function CtaBar({
   tournamentId,
   inviteCode,
+  format,
   authed,
   isMember,
 }: {
   tournamentId: string;
   inviteCode: string;
+  format: string;
   authed: boolean;
   isMember: boolean;
 }) {
+  const target = format === 'partner_mixer' ? `/tournaments/${tournamentId}/mixer` : `/tournaments/${tournamentId}`;
   if (authed && isMember) {
     return (
       <div className="px-[18px] pt-3.5">
         <Link
-          href={`/tournaments/${tournamentId}`}
+          href={target}
           className="block w-full rounded-2xl px-5 py-3.5 text-center text-base font-semibold tracking-tight"
           style={{ background: 'var(--ink)', color: 'var(--paper)' }}
         >
-          Open scoreboard →
+          {format === 'partner_mixer' ? 'Open Mixer →' : 'Open scoreboard →'}
         </Link>
       </div>
     );
@@ -256,11 +261,25 @@ function CtaBar({
     return (
       <div className="px-[18px] pt-3.5">
         <Link
-          href={`/join?code=${inviteCode}`}
+          href={format === 'partner_mixer' ? target : `/join?code=${inviteCode}`}
           className="block w-full rounded-2xl px-5 py-3.5 text-center text-base font-semibold tracking-tight"
           style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}
         >
-          Join this tournament →
+          {format === 'partner_mixer' ? 'Join the Mixer →' : 'Join this tournament →'}
+        </Link>
+      </div>
+    );
+  }
+  if (format === 'partner_mixer') {
+    return (
+      <div className="grid gap-2 px-[18px] pt-3.5">
+        <AnonymousMixerJoinButton tournamentId={tournamentId} />
+        <Link
+          href={`/login?next=${encodeURIComponent(`/t/${inviteCode}`)}`}
+          className="block w-full rounded-2xl px-5 py-3 text-center text-[13px] font-semibold tracking-tight"
+          style={{ background: '#fff', color: 'var(--ink)', border: '1px solid var(--line)' }}
+        >
+          Sign in instead
         </Link>
       </div>
     );
@@ -550,6 +569,8 @@ function formatLabelFor(format: string): string {
       return 'Fixed Partners';
     case 'bracket':
       return 'Bracket';
+    case 'partner_mixer':
+      return 'Partner Mixer';
     default:
       return format;
   }

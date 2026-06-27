@@ -11,6 +11,7 @@ import {
   canGenerateMatches,
   dbFormat,
   genderModeFor,
+  isPartnerMixer,
   pickScheme,
   shouldAutoGenerate,
   type WizardFormat,
@@ -39,10 +40,16 @@ type CreateInput = {
   playerNames?: string[];
   courts?: number;
   rounds?: number;
+  startTokens?: number;
+  entryFee?: number;
+  betting?: boolean;
+  raffle?: boolean;
+  downvotes?: boolean;
+  lockSeconds?: number;
 };
 
 type CreateResult =
-  | { id: string; matchesGenerated: number; manualTeams: boolean; error?: undefined }
+  | { id: string; matchesGenerated: number; manualTeams: boolean; mixer: boolean; error?: undefined }
   | { id?: undefined; matchesGenerated?: undefined; manualTeams?: undefined; error: string };
 
 type CleanPlayer = {
@@ -113,6 +120,7 @@ export async function createTournamentClient(input: CreateInput): Promise<Create
     return { error: error ? formatPgError(error) : 'Could not create tournament.' };
   }
   const tournamentId = newId as string;
+  const isMixer = isPartnerMixer(input.format);
 
   if (players.length > 0) {
     const { data: rosterRows } = await supabase
@@ -129,9 +137,9 @@ export async function createTournamentClient(input: CreateInput): Promise<Create
         p_tournament_id: tournamentId,
         p_renames: renames,
       });
-      if (bulkErr) {
+      if (bulkErr && !isMixer) {
         revalidatePath('/tournaments');
-        return { id: tournamentId, matchesGenerated: 0, manualTeams: false };
+        return { id: tournamentId, matchesGenerated: 0, manualTeams: false, mixer: isMixer };
       }
     }
 
@@ -186,6 +194,26 @@ export async function createTournamentClient(input: CreateInput): Promise<Create
       });
     });
     await Promise.all(links.filter((l): l is NonNullable<typeof l> => l !== null));
+  }
+
+  if (isMixer) {
+    const { error: configErr } = await supabase.rpc('app_ensure_mixer_event', {
+      p_tournament_id: tournamentId,
+      p_starting_tokens: input.startTokens ?? 10,
+      p_starting_chips: 100,
+      p_rounds: input.rounds ?? 5,
+      p_courts: input.courts ?? 3,
+      p_lock_seconds: input.lockSeconds ?? 90,
+      p_entry_fee: input.entryFee ?? 20,
+      p_betting_enabled: input.betting ?? true,
+      p_raffle_enabled: input.raffle ?? true,
+      p_downvotes_enabled: input.downvotes ?? true,
+    });
+    if (configErr) return { error: formatPgError(configErr) };
+    revalidatePath('/tournaments');
+    revalidatePath(`/tournaments/${tournamentId}`);
+    revalidatePath(`/tournaments/${tournamentId}/mixer`);
+    return { id: tournamentId, matchesGenerated: 0, manualTeams: false, mixer: true };
   }
 
   const manualTeams = !shouldAutoGenerate(input.format, input.pairing);
@@ -248,5 +276,5 @@ export async function createTournamentClient(input: CreateInput): Promise<Create
 
   revalidatePath('/tournaments');
   revalidatePath(`/tournaments/${tournamentId}`);
-  return { id: tournamentId, matchesGenerated, manualTeams };
+  return { id: tournamentId, matchesGenerated, manualTeams, mixer: false };
 }
