@@ -36,6 +36,9 @@ declare
   v_snapshot_count int;
   v_payout int;
   v_winner uuid;
+  v_pool text;
+  v_lock_mode text;
+  v_raffle_winner jsonb;
 begin
   insert into auth.users (
     id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -62,6 +65,42 @@ begin
     'balanced'
   );
   perform public.app_ensure_mixer_event(v_tournament, 10, 100, 2, 2, 30, 20, true, true, true);
+  perform public.app_update_mixer_config(
+    p_tournament_id => v_tournament,
+    p_starting_tokens => 10,
+    p_starting_chips => 100,
+    p_rounds => 2,
+    p_courts => 2,
+    p_lock_mode => 'manual',
+    p_lock_seconds => 45,
+    p_alpha => 1,
+    p_beta => 2.5,
+    p_gamma => 1,
+    p_tau => 2,
+    p_grief_floor => 4,
+    p_repeat_decay => 0.2,
+    p_entry_fee => 25,
+    p_pay_to_play_enabled => true,
+    p_boost_tokens => 5,
+    p_boost_price => 25,
+    p_boost_limit => 1,
+    p_betting_enabled => true,
+    p_raffle_enabled => true,
+    p_downvotes_enabled => true,
+    p_podium_markets => 3,
+    p_betting_prize_winners => 3,
+    p_betting_rake_pct => 0,
+    p_prize_buckets => '{"tournament":0.5,"raffle":0.2,"betting":0.2,"reserve":0.1}'::jsonb,
+    p_payment_methods => '{"zelle":{"on":true,"handle":"smoke@example.invalid"},"venmo":{"on":true,"handle":"smokepickle"},"cash":{"on":true,"handle":""}}'::jsonb,
+    p_raffle_prize => 'Smoke paddle'
+  );
+
+  select lock_mode into v_lock_mode
+  from public.event_config
+  where tournament_id = v_tournament;
+  if v_lock_mode <> 'manual' then
+    raise exception 'expected lock mode to update to manual, got %', v_lock_mode;
+  end if;
 
   perform set_config('request.jwt.claim.sub', v_u1::text, true);
   v_p1 := public.app_mixer_bind_roster_entry(v_tournament, 'Al Smoke');
@@ -79,6 +118,23 @@ begin
   v_p7 := public.app_mixer_bind_roster_entry(v_tournament, 'Gus Smoke');
   perform set_config('request.jwt.claim.sub', v_u8::text, true);
   v_p8 := public.app_mixer_bind_roster_entry(v_tournament, 'Hal Smoke');
+
+  perform set_config('request.jwt.claim.sub', v_owner::text, true);
+  perform public.app_mixer_update_player_pool(v_p1, 'a');
+  perform public.app_mixer_update_player_pool(v_p2, 'b');
+  perform public.app_mixer_update_player_pool(v_p3, 'a');
+  perform public.app_mixer_update_player_pool(v_p4, 'b');
+  perform public.app_mixer_update_player_pool(v_p5, 'a');
+  perform public.app_mixer_update_player_pool(v_p6, 'b');
+  perform public.app_mixer_update_player_pool(v_p7, 'a');
+  perform public.app_mixer_update_player_pool(v_p8, 'b');
+
+  select pairing_pool into v_pool
+  from public.player_event_state
+  where player_id = v_p2;
+  if v_pool <> 'b' then
+    raise exception 'expected p2 pool b, got %', v_pool;
+  end if;
 
   select id into v_round1
   from public.mixer_rounds
@@ -184,9 +240,17 @@ begin
   from public.mixer_final_snapshots
   where tournament_id = v_tournament
     and jsonb_array_length(standings) > 0
-    and jsonb_array_length(raffle_tickets) > 0;
+    and jsonb_array_length(raffle_tickets) > 0
+    and raffle_winner <> '{}'::jsonb;
   if v_snapshot_count <> 1 then
-    raise exception 'expected final snapshot with standings and raffle tickets';
+    raise exception 'expected final snapshot with standings, raffle tickets, and raffle winner';
+  end if;
+
+  select raffle_winner into v_raffle_winner
+  from public.mixer_final_snapshots
+  where tournament_id = v_tournament;
+  if v_raffle_winner->>'prize' <> 'Smoke paddle' then
+    raise exception 'expected raffle prize to be Smoke paddle, got %', v_raffle_winner;
   end if;
 
   select payout into v_payout

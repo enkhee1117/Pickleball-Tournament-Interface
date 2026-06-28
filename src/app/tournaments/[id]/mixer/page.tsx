@@ -30,6 +30,7 @@ type ConfigRow = {
   starting_chips: number;
   rounds: number;
   courts: number;
+  lock_mode: 'timer' | 'manual';
   lock_seconds: number;
   betting_enabled: boolean;
   raffle_enabled: boolean;
@@ -38,6 +39,12 @@ type ConfigRow = {
   pay_to_play_enabled: boolean;
   boost_tokens: number;
   boost_price: number;
+  boost_limit: number;
+  podium_markets: number;
+  betting_rake_pct: number;
+  prize_buckets: unknown;
+  payment_methods: unknown;
+  raffle_prize: string;
 };
 
 type RoundRow = {
@@ -101,6 +108,29 @@ type PaymentRow = {
   status: string;
 };
 
+type SnapshotRow = {
+  standings: unknown;
+  raffle_tickets: unknown;
+  raffle_winner: unknown;
+  bet_settlements: unknown;
+};
+
+type StandingItem = {
+  rank: number;
+  playerId: string;
+  displayName: string;
+  points: number;
+};
+
+type RaffleItem = {
+  playerId: string;
+  displayName: string;
+  popularityTickets: number;
+  frugalityTickets: number;
+  tickets: number;
+  prize?: string;
+};
+
 export default async function MixerPlayerPage({ params, searchParams }: PageProps) {
   const { id } = await params;
   const sp = await searchParams;
@@ -133,7 +163,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const myPlayer = user ? roster.find((p) => p.profile_id === user.id) ?? null : null;
   const myState = myPlayer ? stateRows.find((s) => s.player_id === myPlayer.id) ?? null : null;
 
-  const [{ data: votes }, { data: pairings }, { data: scores }, { data: bets }, { data: payments }] = await Promise.all([
+  const [{ data: votes }, { data: pairings }, { data: scores }, { data: bets }, { data: payments }, { data: snapshot }] = await Promise.all([
     currentRound && myPlayer
       ? supabase.from('mixer_votes').select('target_player_id,up_tokens,down_tokens').eq('round_id', currentRound.id).eq('voter_player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
@@ -149,6 +179,9 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     myPlayer
       ? supabase.from('payments').select('id,type,amount,method,status').eq('tournament_id', id).eq('player_id', myPlayer.id).order('created_at', { ascending: false })
       : Promise.resolve({ data: [] }),
+    myPlayer
+      ? supabase.from('mixer_final_snapshots').select('standings,raffle_tickets,raffle_winner,bet_settlements').eq('tournament_id', id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const voteRows = (votes ?? []) as VoteRow[];
@@ -156,6 +189,10 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const scoreRows = (scores ?? []) as ScoreRow[];
   const betRows = (bets ?? []) as BetRow[];
   const paymentRows = (payments ?? []) as PaymentRow[];
+  const final = snapshot as SnapshotRow | null;
+  const standings = Array.isArray(final?.standings) ? (final.standings as StandingItem[]) : [];
+  const raffleTickets = Array.isArray(final?.raffle_tickets) ? (final.raffle_tickets as RaffleItem[]) : [];
+  const raffleWinner = final?.raffle_winner && !Array.isArray(final.raffle_winner) ? (final.raffle_winner as RaffleItem) : null;
 
   if (!cfg || !currentRound) {
     return <MissingSetup tournamentId={id} tournamentName={t.name} />;
@@ -215,13 +252,13 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
         />
       )}
       {tab === 'match' && (
-        <MatchTab roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} />
+        <MatchTab roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} />
       )}
       {tab === 'betting' && (
-        <BettingTab tournamentId={id} roster={roster} myPlayer={myPlayer} myState={myState} bets={betRows} enabled={cfg.betting_enabled} />
+        <BettingTab tournamentId={id} roster={roster} myPlayer={myPlayer} myState={myState} bets={betRows} config={cfg} />
       )}
       {tab === 'me' && (
-        <MeTab tournament={t} config={cfg} player={myPlayer} state={myState} inviteCode={t.invite_code} payments={paymentRows} />
+        <MeTab tournament={t} config={cfg} player={myPlayer} state={myState} inviteCode={t.invite_code} payments={paymentRows} raffleTickets={raffleTickets} raffleWinner={raffleWinner} standings={standings} />
       )}
     </MixerShell>
   );
@@ -248,7 +285,7 @@ function MixerShell({
     ['me', 'Me'],
   ];
   return (
-    <div className="flex min-h-full flex-col" style={{ background: 'oklch(0.155 0.024 264)', color: 'oklch(0.975 0.012 264)' }}>
+    <div className="flex min-h-[100dvh] flex-col" style={{ background: 'oklch(0.155 0.024 264)', color: 'oklch(0.975 0.012 264)' }}>
       <TopBar
         dark
         title={tournament.name}
@@ -340,15 +377,17 @@ function VoteTab({
               <input type="hidden" name="round_id" value={round.id} />
               <input type="hidden" name="voter_player_id" value={myPlayer.id} />
               <input type="hidden" name="target_player_id" value={p.id} />
-              <div className="flex items-center gap-3">
-                <Avatar player={playerFromName(p.display_name)} size={44} />
+              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+                <Avatar player={playerFromName(p.display_name)} size={40} />
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold">{p.display_name}</div>
+                  <div className="truncate font-bold">{p.display_name}</div>
                   <div className="mono text-[11px]" style={{ color: 'oklch(0.7 0.03 264)' }}>DUPR {p.dupr ?? '—'}</div>
                 </div>
-                <input name="up_tokens" type="number" min={0} max={budget} defaultValue={vote.up_tokens} disabled={locked} className="mono h-10 w-14 rounded-xl text-center text-ink" />
-                {config.downvotes_enabled && <input name="down_tokens" type="number" min={0} max={budget} defaultValue={vote.down_tokens} disabled={locked} className="mono h-10 w-14 rounded-xl text-center text-ink" />}
-                <button disabled={locked} className="h-10 rounded-xl px-3 text-xs font-bold disabled:opacity-40" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>Save</button>
+                <div className="flex items-center gap-1">
+                  <input name="up_tokens" type="number" min={0} max={budget} defaultValue={vote.up_tokens} disabled={locked} className="mono h-10 w-11 rounded-xl text-center text-ink" />
+                  {config.downvotes_enabled && <input name="down_tokens" type="number" min={0} max={budget} defaultValue={vote.down_tokens} disabled={locked} className="mono h-10 w-11 rounded-xl text-center text-ink" />}
+                  <button disabled={locked} className="h-10 rounded-xl px-2 text-xs font-bold disabled:opacity-40" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>Save</button>
+                </div>
               </div>
             </form>
           );
@@ -358,8 +397,11 @@ function VoteTab({
   );
 }
 
-function MatchTab({ roster, pairings, scores, myPlayer }: { roster: PlayerRow[]; pairings: PairingRow[]; scores: ScoreRow[]; myPlayer: PlayerRow }) {
+function MatchTab({ roster, pairings, scores, myPlayer, standings }: { roster: PlayerRow[]; pairings: PairingRow[]; scores: ScoreRow[]; myPlayer: PlayerRow; standings: StandingItem[] }) {
   const myPairing = pairings.find((p) => p.player_a_id === myPlayer.id || p.player_b_id === myPlayer.id);
+  if (standings.length > 0) {
+    return <FinalStandingsNight standings={standings} myPlayer={myPlayer} />;
+  }
   const name = (id: string) => roster.find((p) => p.id === id)?.display_name ?? 'TBD';
   if (!myPairing) {
     return <EmptyNight title="No pairing yet" body="When the organizer draws this round, your court and partner land here." />;
@@ -393,17 +435,21 @@ function MatchTab({ roster, pairings, scores, myPlayer }: { roster: PlayerRow[];
   );
 }
 
-function BettingTab({ tournamentId, roster, myPlayer, myState, bets, enabled }: { tournamentId: string; roster: PlayerRow[]; myPlayer: PlayerRow; myState: StateRow | null; bets: BetRow[]; enabled: boolean }) {
-  if (!enabled) return <EmptyNight title="Pool is off" body="This Mixer is running without podium pools." />;
+function BettingTab({ tournamentId, roster, myPlayer, myState, bets, config }: { tournamentId: string; roster: PlayerRow[]; myPlayer: PlayerRow; myState: StateRow | null; bets: BetRow[]; config: ConfigRow }) {
+  if (!config.betting_enabled) return <EmptyNight title="Pool is off" body="This Mixer is running without podium pools." />;
+  const markets = Array.from({ length: Math.max(1, Math.min(config.podium_markets ?? 3, 8)) }, (_, i) => i + 1);
   return (
     <div className="px-[18px]">
       <div className="mb-3 flex items-center justify-between">
         <div className="serif text-[30px]">Podium pools</div>
         <div className="mono text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>chips {myState?.chips_remaining ?? 0}</div>
       </div>
-      {[1, 2, 3].map((place) => (
+      <div className="mb-3 rounded-2xl p-3 text-xs leading-5" style={{ background: 'oklch(0.215 0.03 264)', color: 'oklch(0.78 0.028 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+        Markets close when the event is finalized. Rake: {Math.round(Number(config.betting_rake_pct ?? 0) * 100)}%. Winnings return as chips.
+      </div>
+      {markets.map((place) => (
         <div key={place} className="mb-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
-          <div className="font-bold">{place === 1 ? '1st' : place === 2 ? '2nd' : '3rd'} place market</div>
+          <div className="font-bold">{ordinal(place)} place market</div>
           <div className="mt-3 grid gap-2">
             {roster.map((p) => {
               const mine = bets.find((b) => b.market_place === place && b.pick_player_id === p.id);
@@ -434,6 +480,9 @@ function MeTab({
   state,
   inviteCode,
   payments,
+  raffleTickets,
+  raffleWinner,
+  standings,
 }: {
   tournament: TournamentRow;
   config: ConfigRow;
@@ -441,10 +490,18 @@ function MeTab({
   state: StateRow | null;
   inviteCode: string;
   payments: PaymentRow[];
+  raffleTickets: RaffleItem[];
+  raffleWinner: RaffleItem | null;
+  standings: StandingItem[];
 }) {
   const entry = payments.find((p) => p.type === 'entry');
   const boost = payments.find((p) => p.type === 'pay_to_play');
   const boostUsed = (state?.boosts_used ?? 0) > 0;
+  const methods = normalizePaymentMethods(config.payment_methods);
+  const primaryMethod = firstEnabledPaymentMethod(methods);
+  const myTickets = raffleTickets.find((r) => r.playerId === player.id);
+  const myStanding = standings.find((s) => s.playerId === player.id);
+  const wonRaffle = raffleWinner?.playerId === player.id;
   return (
     <div className="px-[18px]">
       <div className="rounded-2xl p-5" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
@@ -458,13 +515,32 @@ function MeTab({
         <div className="mt-5 grid grid-cols-2 gap-2">
           <Stat label="Tokens" value={(state?.tokens_base_remaining ?? config.starting_tokens) + (state?.tokens_bought_remaining ?? 0)} />
           <Stat label="Chips" value={state?.chips_remaining ?? config.starting_chips} />
+          <Stat label="Raffle" value={myTickets ? Math.round(myTickets.tickets * 10) / 10 : '—'} />
+          <Stat label="Standing" value={myStanding ? `#${myStanding.rank}` : 'Live'} />
           <Stat label="Entry fee" value={`$${config.entry_fee}`} />
           <Stat label="Code" value={formatInviteCode(inviteCode)} />
         </div>
       </div>
+      {raffleWinner && (
+        <div className="mt-3 rounded-2xl p-5" style={{ background: wonRaffle ? 'color-mix(in oklch, var(--court) 22%, oklch(0.215 0.03 264))' : 'oklch(0.215 0.03 264)', border: wonRaffle ? '1px solid var(--court)' : '1px solid oklch(0.36 0.04 266)' }}>
+          <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--court)' }}>Raffle winner</div>
+          <div className="serif mt-2 text-[30px] leading-none">{wonRaffle ? 'You won' : raffleWinner.displayName}</div>
+          <div className="mt-1 text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>
+            {raffleWinner.prize ?? config.raffle_prize} · {Math.round(Number(raffleWinner.tickets ?? 0) * 10) / 10} tickets
+          </div>
+        </div>
+      )}
       <div className="mt-3 rounded-2xl p-5" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
         <div className="serif text-[28px] leading-none">Payments</div>
-        <div className="mt-1 text-xs" style={{ color: 'oklch(0.78 0.028 264)' }}>Manual Zelle/Cash records. Organizers confirm them from controls.</div>
+        <div className="mt-1 text-xs" style={{ color: 'oklch(0.78 0.028 264)' }}>Manual records only. Organizers confirm them from controls.</div>
+        <div className="mt-3 grid gap-2">
+          {paymentMethodRows(methods).map((m) => (
+            <div key={m.key} className="rounded-xl px-3 py-2 text-sm" style={{ background: 'oklch(0.285 0.038 266)' }}>
+              <div className="font-bold">{m.label}</div>
+              <div className="mono mt-1 text-xs" style={{ color: 'oklch(0.78 0.028 264)' }}>{m.handle || 'Pay organizer in person'} · memo: {player.display_name}</div>
+            </div>
+          ))}
+        </div>
         <div className="mt-4 grid gap-3">
           <PaymentRequest
             tournamentId={tournament.id}
@@ -472,6 +548,7 @@ function MeTab({
             type="entry"
             title="Entry"
             amount={config.entry_fee}
+            method={primaryMethod}
             status={entry?.status}
             disabled={!!entry && entry.status !== 'refunded'}
           />
@@ -482,11 +559,20 @@ function MeTab({
               type="pay_to_play"
               title={`+${config.boost_tokens} token boost`}
               amount={config.boost_price}
+              method={primaryMethod}
               status={boost?.status ?? (boostUsed ? 'confirmed' : undefined)}
-              disabled={boostUsed || (!!boost && boost.status !== 'refunded')}
+              disabled={boostUsed || (state?.boosts_used ?? 0) >= config.boost_limit || (!!boost && boost.status !== 'refunded')}
             />
           )}
         </div>
+        {myTickets && (
+          <div className="mt-4 rounded-xl p-3 text-sm" style={{ background: 'oklch(0.285 0.038 266)' }}>
+            <div className="font-bold">Raffle ticket math</div>
+            <div className="mt-1 text-xs leading-5" style={{ color: 'oklch(0.78 0.028 264)' }}>
+              Popularity {Math.round(myTickets.popularityTickets * 10) / 10} + unused base token bonus {Math.round(myTickets.frugalityTickets * 10) / 10}. Bought tokens do not count.
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -498,6 +584,7 @@ function PaymentRequest({
   type,
   title,
   amount,
+  method,
   status,
   disabled,
 }: {
@@ -506,6 +593,7 @@ function PaymentRequest({
   type: 'entry' | 'pay_to_play';
   title: string;
   amount: number;
+  method: string;
   status?: string;
   disabled: boolean;
 }) {
@@ -514,7 +602,7 @@ function PaymentRequest({
       <input type="hidden" name="tournament_id" value={tournamentId} />
       <input type="hidden" name="player_id" value={playerId} />
       <input type="hidden" name="type" value={type} />
-      <input type="hidden" name="method" value="zelle" />
+      <input type="hidden" name="method" value={method} />
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-bold">{title}</div>
@@ -562,6 +650,32 @@ function StandingsMini({ roster, pairings, scores }: { roster: PlayerRow[]; pair
   );
 }
 
+function FinalStandingsNight({ standings, myPlayer }: { standings: StandingItem[]; myPlayer: PlayerRow }) {
+  return (
+    <div className="px-[18px]">
+      <div className="mb-3 rounded-2xl p-5" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+        <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--court)' }}>Final standings</div>
+        <div className="serif mt-2 text-[34px] leading-none">Mixer complete</div>
+        <div className="mt-1 text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>Podium markets and raffle are settled from these results.</div>
+      </div>
+      <div className="grid gap-2">
+        {standings.slice(0, 12).map((row) => {
+          const me = row.playerId === myPlayer.id;
+          return (
+            <div key={row.playerId} className="flex items-center justify-between rounded-2xl p-3" style={{ background: me ? 'color-mix(in oklch, var(--court) 18%, oklch(0.215 0.03 264))' : 'oklch(0.215 0.03 264)', border: me ? '1px solid var(--court)' : '1px solid oklch(0.36 0.04 266)' }}>
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>{ordinal(row.rank)}</div>
+                <div className="text-sm font-bold">{me ? 'You' : row.displayName}</div>
+              </div>
+              <div className="mono text-xl font-bold" style={{ color: 'var(--court)' }}>{row.points}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-xl p-3" style={{ background: 'oklch(0.285 0.038 266)' }}>
@@ -569,6 +683,53 @@ function Stat({ label, value }: { label: string; value: string | number }) {
       <div className="mono mt-1 text-[22px] font-bold" style={{ color: 'var(--court)' }}>{value}</div>
     </div>
   );
+}
+
+type PaymentMethod = {
+  on: boolean;
+  handle: string;
+};
+
+type PaymentMethods = {
+  zelle: PaymentMethod;
+  venmo: PaymentMethod;
+  cash: PaymentMethod;
+};
+
+function normalizePaymentMethods(value: unknown): PaymentMethods {
+  const record = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return {
+    zelle: normalizePaymentMethod(record.zelle, true),
+    venmo: normalizePaymentMethod(record.venmo, false),
+    cash: normalizePaymentMethod(record.cash, true),
+  };
+}
+
+function normalizePaymentMethod(value: unknown, fallbackOn: boolean): PaymentMethod {
+  const record = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return {
+    on: typeof record.on === 'boolean' ? record.on : fallbackOn,
+    handle: typeof record.handle === 'string' ? record.handle : '',
+  };
+}
+
+function paymentMethodRows(methods: PaymentMethods) {
+  return [
+    methods.zelle.on ? { key: 'zelle', label: 'Zelle', handle: methods.zelle.handle } : null,
+    methods.venmo.on ? { key: 'venmo', label: 'Venmo', handle: methods.venmo.handle ? `@${methods.venmo.handle.replace(/^@/, '')}` : '' } : null,
+    methods.cash.on ? { key: 'cash', label: 'Cash', handle: '' } : null,
+  ].filter((row): row is { key: string; label: string; handle: string } => !!row);
+}
+
+function firstEnabledPaymentMethod(methods: PaymentMethods) {
+  if (methods.zelle.on) return 'zelle';
+  if (methods.venmo.on) return 'venmo';
+  return 'cash';
+}
+
+function ordinal(n: number) {
+  const suffix = n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th';
+  return `${n}${suffix}`;
 }
 
 function Notice({ tone, children }: { tone: 'ok' | 'error'; children: ReactNode }) {

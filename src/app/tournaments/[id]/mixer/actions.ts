@@ -9,6 +9,17 @@ function mixerPath(tournamentId: string) {
   return `/tournaments/${tournamentId}/mixer`;
 }
 
+function fieldNumber(formData: FormData, key: string, fallback: number, min: number, max: number): number {
+  const raw = String(formData.get(key) ?? '').trim();
+  const n = raw ? Number(raw) : fallback;
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+function fieldBool(formData: FormData, key: string): boolean {
+  return formData.get(key) === 'on' || formData.get(key) === 'true';
+}
+
 export async function bindMixerRosterEntry(formData: FormData): Promise<void> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const displayName = fieldString(formData, 'display_name');
@@ -23,6 +34,78 @@ export async function bindMixerRosterEntry(formData: FormData): Promise<void> {
 
   revalidatePath(mixerPath(tournamentId));
   redirect(mixerPath(tournamentId));
+}
+
+export async function updateMixerConfig(formData: FormData): Promise<void> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  if (!tournamentId) redirect('/tournaments');
+
+  const prizeBuckets = {
+    tournament: fieldNumber(formData, 'bucket_tournament', 50, 0, 100) / 100,
+    raffle: fieldNumber(formData, 'bucket_raffle', 20, 0, 100) / 100,
+    betting: fieldNumber(formData, 'bucket_betting', 20, 0, 100) / 100,
+    reserve: fieldNumber(formData, 'bucket_reserve', 10, 0, 100) / 100,
+  };
+  const paymentMethods = {
+    zelle: { on: fieldBool(formData, 'pay_zelle_on'), handle: fieldString(formData, 'pay_zelle_handle') },
+    venmo: { on: fieldBool(formData, 'pay_venmo_on'), handle: fieldString(formData, 'pay_venmo_handle') },
+    cash: { on: fieldBool(formData, 'pay_cash_on'), handle: '' },
+  };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_update_mixer_config', {
+    p_tournament_id: tournamentId,
+    p_starting_tokens: fieldInt(formData, 'starting_tokens', 10, 1, 100),
+    p_starting_chips: fieldInt(formData, 'starting_chips', 100, 0, 100000),
+    p_rounds: fieldInt(formData, 'rounds', 5, 1, 50),
+    p_courts: fieldInt(formData, 'courts', 3, 1, 16),
+    p_lock_mode: fieldString(formData, 'lock_mode') || 'timer',
+    p_lock_seconds: fieldInt(formData, 'lock_seconds', 90, 5, 3600),
+    p_alpha: fieldNumber(formData, 'alpha', 1, 0, 100),
+    p_beta: fieldNumber(formData, 'beta', 2.5, 0, 100),
+    p_gamma: fieldNumber(formData, 'gamma', 1, 0, 100),
+    p_tau: fieldNumber(formData, 'tau', 2, 0.01, 100),
+    p_grief_floor: fieldNumber(formData, 'grief_floor', 4, 0, 100),
+    p_repeat_decay: fieldNumber(formData, 'repeat_decay', 0.2, 0, 1),
+    p_entry_fee: fieldNumber(formData, 'entry_fee', 20, 0, 100000),
+    p_pay_to_play_enabled: fieldBool(formData, 'pay_to_play_enabled'),
+    p_boost_tokens: fieldInt(formData, 'boost_tokens', 5, 0, 100),
+    p_boost_price: fieldNumber(formData, 'boost_price', 20, 0, 100000),
+    p_boost_limit: fieldInt(formData, 'boost_limit', 1, 0, 10),
+    p_betting_enabled: fieldBool(formData, 'betting_enabled'),
+    p_raffle_enabled: fieldBool(formData, 'raffle_enabled'),
+    p_downvotes_enabled: fieldBool(formData, 'downvotes_enabled'),
+    p_podium_markets: fieldInt(formData, 'podium_markets', 3, 1, 8),
+    p_betting_prize_winners: fieldInt(formData, 'betting_prize_winners', 3, 1, 20),
+    p_betting_rake_pct: fieldNumber(formData, 'betting_rake_pct', 0, 0, 100) / 100,
+    p_prize_buckets: prizeBuckets,
+    p_payment_methods: paymentMethods,
+    p_raffle_prize: fieldString(formData, 'raffle_prize') || 'Raffle prize',
+  });
+  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  revalidatePath(`${mixerPath(tournamentId)}/present`);
+  redirect(`${mixerPath(tournamentId)}/admin?ok=Mixer%20configuration%20saved`);
+}
+
+export async function updateMixerPlayerPool(formData: FormData): Promise<void> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  const playerId = fieldString(formData, 'player_id');
+  const pool = fieldString(formData, 'pairing_pool');
+  if (!tournamentId || !playerId || !pool) redirect('/tournaments');
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_mixer_update_player_pool', {
+    p_player_id: playerId,
+    p_pairing_pool: pool,
+  });
+  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  redirect(`${mixerPath(tournamentId)}/admin?ok=Player%20pool%20updated`);
 }
 
 export async function setMixerVote(formData: FormData): Promise<void> {
