@@ -8,6 +8,7 @@ import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
 import { Icons } from '@/components/ui/icons';
 import { ShareCodeCard } from '../../invite/ShareCodeCard';
+import { MixerModeSwitch } from '../MixerModeSwitch';
 import {
   confirmMixerPayment,
   drawMixerRound,
@@ -205,15 +206,15 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
         <TopBar
           dark
           title={t.name}
-          sub="Mixer organizer"
+          sub="Organizer controls"
           left={<Link href={`/tournaments/${id}`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
           right={
             <div className="flex items-center gap-1">
               <Link href={`/tournaments/${id}/invite`} aria-label="Invite players" className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.share}</Link>
-              <Link href={`/tournaments/${id}/mixer/present`} aria-label="Presentation view" className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.eye}</Link>
             </div>
           }
         />
+        <MixerModeSwitch tournamentId={id} active="organizer" />
         <div className="pl-1">
           <Chip tone="live">{currentRound ? currentRound.state : 'SETUP'}</Chip>
           <div className="serif mt-2 text-[34px] leading-none">Run the draw</div>

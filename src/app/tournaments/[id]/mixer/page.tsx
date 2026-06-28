@@ -10,6 +10,7 @@ import { Icons } from '@/components/ui/icons';
 import { formatInviteCode } from '@/lib/invite-codes';
 import { AnonymousMixerJoinButton } from './AnonymousMixerJoinButton';
 import { bindMixerRosterEntry, placeMixerBet, requestMixerPayment, setMixerVote } from './actions';
+import { MixerModeSwitch } from './MixerModeSwitch';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -144,12 +145,16 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     { data: rounds },
     { data: players },
     { data: states },
+    { data: member },
   ] = await Promise.all([
     supabase.from('tournaments').select('id,name,format,status,invite_code,owner_user_id').eq('id', id).single(),
     supabase.from('event_config').select('*').eq('tournament_id', id).maybeSingle(),
     supabase.from('mixer_rounds').select('id,round_no,state,lock_at').eq('tournament_id', id).order('round_no', { ascending: false }),
     supabase.from('tournament_players').select('id,display_name,profile_id,gender,dupr').eq('tournament_id', id).order('created_at', { ascending: true }),
     supabase.from('player_event_state').select('player_id,pairing_pool,tokens_base_remaining,tokens_bought_remaining,chips_remaining,sit_out_count,boosts_used').eq('tournament_id', id),
+    user
+      ? supabase.from('tournament_members').select('role').eq('tournament_id', id).eq('user_id', user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   if (!tournament) notFound();
@@ -160,6 +165,8 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const currentRound = ((rounds ?? []) as RoundRow[])[0] ?? null;
   const roster = (players ?? []) as PlayerRow[];
   const stateRows = (states ?? []) as StateRow[];
+  const role = (member as { role?: string } | null)?.role ?? null;
+  const isManager = !!user && (user.id === t.owner_user_id || role === 'organizer' || role === 'admin' || role === 'owner');
   const myPlayer = user ? roster.find((p) => p.profile_id === user.id) ?? null : null;
   const myState = myPlayer ? stateRows.find((s) => s.player_id === myPlayer.id) ?? null : null;
 
@@ -200,7 +207,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
 
   if (!user) {
     return (
-      <MixerShell tournament={t} currentRound={currentRound} tab={tab} player={null}>
+      <MixerShell tournament={t} currentRound={currentRound} tab={tab} player={null} isManager={isManager}>
         <div className="px-[18px] pt-6">
           <div className="rounded-2xl bg-white p-5 text-center" style={{ border: '1px solid var(--line)' }}>
             <div className="serif text-[32px] leading-none text-ink">Jump into the Mixer</div>
@@ -219,7 +226,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
 
   if (!myPlayer) {
     return (
-      <MixerShell tournament={t} currentRound={currentRound} tab={tab} player={null}>
+      <MixerShell tournament={t} currentRound={currentRound} tab={tab} player={null} isManager={isManager}>
         <form action={bindMixerRosterEntry} className="px-[18px] pt-6">
           <input type="hidden" name="tournament_id" value={id} />
           <div className="rounded-2xl bg-white p-5" style={{ border: '1px solid var(--line)' }}>
@@ -236,7 +243,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   }
 
   return (
-    <MixerShell tournament={t} currentRound={currentRound} tab={tab} player={myPlayer}>
+    <MixerShell tournament={t} currentRound={currentRound} tab={tab} player={myPlayer} isManager={isManager}>
       {sp.error && <Notice tone="error">{sp.error}</Notice>}
       {sp.ok && <Notice tone="ok">{sp.ok}</Notice>}
       {tab === 'vote' && (
@@ -269,12 +276,14 @@ function MixerShell({
   currentRound,
   tab,
   player,
+  isManager,
   children,
 }: {
   tournament: TournamentRow;
   currentRound: RoundRow;
   tab: string;
   player: PlayerRow | null;
+  isManager: boolean;
   children: ReactNode;
 }) {
   const base = `/tournaments/${tournament.id}/mixer`;
@@ -289,10 +298,10 @@ function MixerShell({
       <TopBar
         dark
         title={tournament.name}
-        sub={`Partner Mixer · Round ${currentRound.round_no} · ${currentRound.state}`}
+        sub={`Player view · Round ${currentRound.round_no} · ${currentRound.state}`}
         left={<Link href="/tournaments" className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
-        right={<Link href={`/tournaments/${tournament.id}/mixer/admin`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.more}</Link>}
       />
+      {isManager && <MixerModeSwitch tournamentId={tournament.id} active="player" />}
       <div className="px-[18px] pb-3">
         <div className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
           <div>
