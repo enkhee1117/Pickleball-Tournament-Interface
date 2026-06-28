@@ -22,7 +22,7 @@ import {
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ ok?: string; error?: string }>;
+  searchParams: Promise<{ tab?: string; ok?: string; error?: string }>;
 };
 
 type TournamentRow = {
@@ -139,6 +139,16 @@ type PaymentMethods = {
   cash: PaymentMethod;
 };
 
+type OrganizerTab = 'run' | 'roster' | 'scores' | 'prizes' | 'setup';
+
+const ORGANIZER_TABS: Array<{ id: OrganizerTab; label: string; description: string }> = [
+  { id: 'run', label: 'Run', description: 'Ballot and draw' },
+  { id: 'roster', label: 'Roster', description: 'Players and payments' },
+  { id: 'scores', label: 'Scores', description: 'Courts and results' },
+  { id: 'prizes', label: 'Prizes', description: 'Pots and raffle' },
+  { id: 'setup', label: 'Setup', description: 'Rules and money' },
+];
+
 export default async function MixerAdminPage({ params, searchParams }: PageProps) {
   const { id } = await params;
   const sp = await searchParams;
@@ -199,6 +209,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const paymentMethods = normalizePaymentMethods(cfg?.payment_methods);
   const finalStandings = Array.isArray(final?.standings) ? final.standings : [];
   const raffleWinner = final?.raffle_winner && !Array.isArray(final.raffle_winner) ? final.raffle_winner as Record<string, unknown> : null;
+  const activeTab = getOrganizerTab(sp.tab);
 
   return (
     <div className="flex min-h-full flex-col bg-paper">
@@ -237,163 +248,307 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
           </form>
         ) : (
           <>
-            <Section title="Invite players">
-              <ShareCodeCard
-                inviteCode={formatInviteCode(t.invite_code)}
-                rawInviteCode={t.invite_code}
-                tournamentId={t.id}
-                tournamentName={t.name}
-              />
-              <Link
-                href={`/tournaments/${id}/invite`}
-                className="block rounded-2xl bg-white px-4 py-3 text-center text-sm font-bold text-ink"
-                style={{ border: '1px solid var(--line)' }}
-              >
-                Manage roster and personal invites
-              </Link>
-            </Section>
+            <OrganizerTabNav tournamentId={id} active={activeTab} pendingPayments={pendingPayments} />
 
-            <Section title="Round controls">
-              <div className="grid grid-cols-2 gap-2">
-                <StateButton tournamentId={id} roundId={currentRound.id} state="open" label="Open vote" />
-                <StateButton tournamentId={id} roundId={currentRound.id} state="locked" label="Lock vote" />
-                <form action={drawMixerRound}>
-                  <input type="hidden" name="tournament_id" value={id} />
-                  <input type="hidden" name="round_id" value={currentRound.id} />
-                  <button className="w-full rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
-                    Draw + reveal
-                  </button>
-                </form>
-                <StateButton tournamentId={id} roundId={currentRound.id} state="playing" label="Start play" />
-                <StateButton tournamentId={id} roundId={currentRound.id} state="done" label="Mark done" />
-              </div>
-              <form action={finalizeMixerEvent} className="mt-2">
-                <input type="hidden" name="tournament_id" value={id} />
-                <button className="w-full rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>
-                  Finalize standings, raffle, and pools
-                </button>
-              </form>
-            </Section>
-
-            <Section title="Event setup">
-              <ConfigForm tournamentId={id} cfg={cfg} prizeBuckets={prizeBuckets} paymentMethods={paymentMethods} playerCount={roster.length} betChips={betChips} />
-            </Section>
-
-            <Section title="Money and prizes">
-              <div className="grid grid-cols-2 gap-2">
-                <Stat label="Paid entries" value={`${paidCount}/${roster.length}`} />
-                <Stat label="Pending" value={pendingPayments} />
-                <Stat label="Entry pot" value={`$${Math.round(paidCount * Number(cfg.entry_fee))}`} />
-                <Stat label="Pool chips" value={betChips} />
-              </div>
-              <div className="mt-3 grid gap-2">
-                <PrizeBucket label="Tournament" pct={prizeBuckets.tournament} amount={roster.length * Number(cfg.entry_fee) * prizeBuckets.tournament} />
-                <PrizeBucket label="Raffle" pct={prizeBuckets.raffle} amount={roster.length * Number(cfg.entry_fee) * prizeBuckets.raffle} />
-                <PrizeBucket label="Betting" pct={prizeBuckets.betting} amount={roster.length * Number(cfg.entry_fee) * prizeBuckets.betting} />
-                <PrizeBucket label="Reserve" pct={prizeBuckets.reserve} amount={roster.length * Number(cfg.entry_fee) * prizeBuckets.reserve} />
-              </div>
-              {finalStandings.length > 0 && (
-                <div className="mt-3 rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-3">Finalized</div>
-                  <div className="mt-1 text-sm font-semibold text-ink">Snapshot is ready for presentation.</div>
-                  <div className="mt-1 text-xs text-ink-3">Raffle winner: {String(raffleWinner?.displayName ?? 'not drawn')}</div>
-                </div>
-              )}
-            </Section>
-
-            <Section title="Courts and scores">
-              {pairingRows.length === 0 ? (
-                <div className="rounded-2xl bg-white p-4 text-center text-sm text-ink-3" style={{ border: '1px dashed var(--line)' }}>
-                  No pairings revealed yet.
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {[...new Set(pairingRows.map((p) => p.court_no))].map((courtNo) => {
-                    const teams = pairingRows.filter((p) => p.court_no === courtNo);
-                    const score = scoreRows.find((s) => s.court_no === courtNo);
-                    return (
-                      <div key={courtNo} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
-                        <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-3">Court {courtNo}</div>
-                        <div className="grid gap-1 text-sm font-semibold text-ink">
-                          {teams.map((team, idx) => (
-                            <div key={team.id}>{idx === 0 ? 'A' : 'B'} · {name(team.player_a_id)} & {name(team.player_b_id)}</div>
-                          ))}
-                        </div>
-                        <form action={scoreMixerCourt} className="mt-3 flex items-center gap-2">
-                          <input type="hidden" name="tournament_id" value={id} />
-                          <input type="hidden" name="round_id" value={currentRound.id} />
-                          <input type="hidden" name="court_no" value={courtNo} />
-                          <input name="team_a_score" type="number" min={0} defaultValue={score?.team_a_score ?? 0} className="mono h-10 w-16 rounded-xl bg-paper-2 text-center text-ink" />
-                          <span className="text-xs text-ink-3">to</span>
-                          <input name="team_b_score" type="number" min={0} defaultValue={score?.team_b_score ?? 0} className="mono h-10 w-16 rounded-xl bg-paper-2 text-center text-ink" />
-                          <button className="ml-auto rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Post</button>
-                        </form>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Section>
-
-            <Section title="Roster health">
-              <div className="grid gap-2">
-                {roster.map((p) => {
-                  const state = stateRows.find((s) => s.player_id === p.id);
-                  const pool = state?.pairing_pool ?? (p.gender === 'f' ? 'b' : 'a');
-                  return (
-                  <div key={p.id} className="rounded-xl bg-white p-3 text-sm" style={{ border: '1px solid var(--line)' }}>
+            {activeTab === 'run' && (
+              <>
+                <Section title="Round state">
+                  <div className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="font-semibold text-ink">{p.display_name}</div>
-                        <div className="mt-1 text-xs text-ink-3">
-                          {p.profile_id ? 'linked' : 'anonymous'} · gender {p.gender ?? 'unset'} · sit-outs {state?.sit_out_count ?? 0}
-                        </div>
+                        <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-3">Round {currentRound.round_no} of {cfg.rounds}</div>
+                        <div className="serif mt-1 text-[26px] leading-none text-ink">{runEventHeadline(currentRound.state)}</div>
+                        <div className="mt-2 text-sm leading-5 text-ink-3">{runEventBody(currentRound.state, cfg.lock_mode)}</div>
                       </div>
-                      <Chip tone={pool === 'a' ? 'court' : 'ghost'}>Pool {pool.toUpperCase()}</Chip>
+                      <Chip tone={currentRound.state === 'open' || currentRound.state === 'playing' ? 'live' : 'court'}>{currentRound.state}</Chip>
                     </div>
-                    <form action={updateMixerPlayerPool} className="mt-3 flex items-center gap-2">
-                      <input type="hidden" name="tournament_id" value={id} />
-                      <input type="hidden" name="player_id" value={p.id} />
-                      <select name="pairing_pool" defaultValue={pool} className="h-10 flex-1 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink">
-                        <option value="a">Pool A</option>
-                        <option value="b">Pool B</option>
-                      </select>
-                      <button className="h-10 rounded-xl px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Save</button>
-                    </form>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <Stat label="Players" value={roster.length} />
+                      <Stat label="Courts" value={cfg.courts} />
+                      <Stat label="Vote window" value={cfg.lock_mode === 'manual' ? 'Manual' : formatLockDuration(cfg.lock_seconds)} />
+                      <Stat label="Pool chips" value={betChips} />
+                    </div>
                   </div>
-                  );
-                })}
-              </div>
-            </Section>
+                </Section>
 
-            <Section title="Payments">
-              {paymentRows.length === 0 ? (
-                <div className="text-sm text-ink-3">No payment records yet.</div>
-              ) : (
-                <div className="grid gap-2">
-                  {paymentRows.map((p) => (
-                    <div key={p.id} className="rounded-xl bg-white p-3 text-sm" style={{ border: '1px solid var(--line)' }}>
-                      <div className="flex justify-between">
-                        <span className="font-semibold text-ink">{name(p.player_id)}</span>
-                        <span className="mono text-ink">${p.amount}</span>
-                      </div>
-                      <div className="mt-1 text-xs text-ink-3">{p.type} · {p.method} · {p.status}</div>
-                      {p.status === 'pending' && (
-                        <div className="mt-3 flex gap-2">
-                          <PaymentButton tournamentId={id} paymentId={p.id} status="confirmed" label="Confirm" />
-                          <PaymentButton tournamentId={id} paymentId={p.id} status="refunded" label="Refund" />
+                <Section title="Run controls">
+                  <div className="grid grid-cols-2 gap-2">
+                    <StateButton tournamentId={id} roundId={currentRound.id} state="open" label="Open ballot" />
+                    <StateButton tournamentId={id} roundId={currentRound.id} state="locked" label="Lock ballot" />
+                    <form action={drawMixerRound}>
+                      <input type="hidden" name="tournament_id" value={id} />
+                      <input type="hidden" name="round_id" value={currentRound.id} />
+                      <button className="w-full rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
+                        Draw & reveal
+                      </button>
+                    </form>
+                    <StateButton tournamentId={id} roundId={currentRound.id} state="playing" label="Start play" />
+                    <StateButton tournamentId={id} roundId={currentRound.id} state="done" label="Mark done" />
+                  </div>
+                  <form action={finalizeMixerEvent} className="mt-2">
+                    <input type="hidden" name="tournament_id" value={id} />
+                    <button className="w-full rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>
+                      Finalize standings, raffle, and pools
+                    </button>
+                  </form>
+                </Section>
+
+                <Section title="Live surfaces">
+                  <div className="grid grid-cols-2 gap-2">
+                    <AdminLink href={`/tournaments/${id}/mixer`} title="Player mode" sub="Vote, match, pool, and me" />
+                    <AdminLink href={`/tournaments/${id}/mixer/present`} title="Present" sub="Reveal and raffle board" />
+                  </div>
+                </Section>
+              </>
+            )}
+
+            {activeTab === 'roster' && (
+              <>
+                <Section title="Invite players">
+                  <ShareCodeCard
+                    inviteCode={formatInviteCode(t.invite_code)}
+                    rawInviteCode={t.invite_code}
+                    tournamentId={t.id}
+                    tournamentName={t.name}
+                  />
+                  <Link
+                    href={`/tournaments/${id}/invite`}
+                    className="block rounded-2xl bg-white px-4 py-3 text-center text-sm font-bold text-ink"
+                    style={{ border: '1px solid var(--line)' }}
+                  >
+                    Manage roster and personal invites
+                  </Link>
+                </Section>
+
+                <Section title="Roster health">
+                  <div className="grid gap-2">
+                    {roster.map((p) => {
+                      const state = stateRows.find((s) => s.player_id === p.id);
+                      const pool = state?.pairing_pool ?? (p.gender === 'f' ? 'b' : 'a');
+                      return (
+                        <div key={p.id} className="rounded-xl bg-white p-3 text-sm" style={{ border: '1px solid var(--line)' }}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="font-semibold text-ink">{p.display_name}</div>
+                              <div className="mt-1 text-xs text-ink-3">
+                                {p.profile_id ? 'linked' : 'anonymous'} · gender {p.gender ?? 'unset'} · sit-outs {state?.sit_out_count ?? 0}
+                              </div>
+                            </div>
+                            <Chip tone={pool === 'a' ? 'court' : 'ghost'}>Pool {pool.toUpperCase()}</Chip>
+                          </div>
+                          <form action={updateMixerPlayerPool} className="mt-3 flex items-center gap-2">
+                            <input type="hidden" name="tournament_id" value={id} />
+                            <input type="hidden" name="player_id" value={p.id} />
+                            <select name="pairing_pool" defaultValue={pool} className="h-10 flex-1 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink">
+                              <option value="a">Pool A</option>
+                              <option value="b">Pool B</option>
+                            </select>
+                            <button className="h-10 rounded-xl px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Save</button>
+                          </form>
                         </div>
-                      )}
+                      );
+                    })}
+                  </div>
+                </Section>
+
+                <Section title="Payments">
+                  {paymentRows.length === 0 ? (
+                    <div className="rounded-2xl bg-white p-4 text-sm text-ink-3" style={{ border: '1px dashed var(--line)' }}>No payment records yet.</div>
+                  ) : (
+                    <div className="grid gap-2">
+                      {paymentRows.map((p) => (
+                        <div key={p.id} className="rounded-xl bg-white p-3 text-sm" style={{ border: '1px solid var(--line)' }}>
+                          <div className="flex justify-between">
+                            <span className="font-semibold text-ink">{name(p.player_id)}</span>
+                            <span className="mono text-ink">${p.amount}</span>
+                          </div>
+                          <div className="mt-1 text-xs text-ink-3">{p.type} · {p.method} · {p.status}</div>
+                          {p.status === 'pending' && (
+                            <div className="mt-3 flex gap-2">
+                              <PaymentButton tournamentId={id} paymentId={p.id} status="confirmed" label="Confirm" />
+                              <PaymentButton tournamentId={id} paymentId={p.id} status="refunded" label="Refund" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                </Section>
+              </>
+            )}
+
+            {activeTab === 'scores' && (
+              <Section title="Courts and scores">
+                {pairingRows.length === 0 ? (
+                  <div className="rounded-2xl bg-white p-4 text-center text-sm text-ink-3" style={{ border: '1px dashed var(--line)' }}>
+                    No pairings revealed yet.
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {[...new Set(pairingRows.map((p) => p.court_no))].map((courtNo) => {
+                      const teams = pairingRows.filter((p) => p.court_no === courtNo);
+                      const score = scoreRows.find((s) => s.court_no === courtNo);
+                      return (
+                        <div key={courtNo} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-3">Court {courtNo}</div>
+                          <div className="grid gap-1 text-sm font-semibold text-ink">
+                            {teams.map((team, idx) => (
+                              <div key={team.id}>{idx === 0 ? 'A' : 'B'} · {name(team.player_a_id)} & {name(team.player_b_id)}</div>
+                            ))}
+                          </div>
+                          <form action={scoreMixerCourt} className="mt-3 flex items-center gap-2">
+                            <input type="hidden" name="tournament_id" value={id} />
+                            <input type="hidden" name="round_id" value={currentRound.id} />
+                            <input type="hidden" name="court_no" value={courtNo} />
+                            <input name="team_a_score" type="number" min={0} defaultValue={score?.team_a_score ?? 0} className="mono h-10 w-16 rounded-xl bg-paper-2 text-center text-ink" />
+                            <span className="text-xs text-ink-3">to</span>
+                            <input name="team_b_score" type="number" min={0} defaultValue={score?.team_b_score ?? 0} className="mono h-10 w-16 rounded-xl bg-paper-2 text-center text-ink" />
+                            <button className="ml-auto rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Post</button>
+                          </form>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Section>
+            )}
+
+            {activeTab === 'prizes' && (
+              <Section title="Money and prizes">
+                <div className="grid grid-cols-2 gap-2">
+                  <Stat label="Paid entries" value={`${paidCount}/${roster.length}`} />
+                  <Stat label="Pending" value={pendingPayments} />
+                  <Stat label="Entry pot" value={`$${Math.round(paidCount * Number(cfg.entry_fee))}`} />
+                  <Stat label="Pool chips" value={betChips} />
                 </div>
-              )}
-            </Section>
+                <div className="mt-3 grid gap-2">
+                  <PrizeBucket label="Tournament" pct={prizeBuckets.tournament} amount={roster.length * Number(cfg.entry_fee) * prizeBuckets.tournament} />
+                  <PrizeBucket label="Raffle" pct={prizeBuckets.raffle} amount={roster.length * Number(cfg.entry_fee) * prizeBuckets.raffle} />
+                  <PrizeBucket label="Betting" pct={prizeBuckets.betting} amount={roster.length * Number(cfg.entry_fee) * prizeBuckets.betting} />
+                  <PrizeBucket label="Reserve" pct={prizeBuckets.reserve} amount={roster.length * Number(cfg.entry_fee) * prizeBuckets.reserve} />
+                </div>
+                {finalStandings.length > 0 && (
+                  <div className="mt-3 rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-3">Finalized</div>
+                    <div className="mt-1 text-sm font-semibold text-ink">Snapshot is ready for presentation.</div>
+                    <div className="mt-1 text-xs text-ink-3">Raffle winner: {String(raffleWinner?.displayName ?? 'not drawn')}</div>
+                  </div>
+                )}
+              </Section>
+            )}
+
+            {activeTab === 'setup' && (
+              <Section title="Event setup">
+                <ConfigForm tournamentId={id} cfg={cfg} prizeBuckets={prizeBuckets} paymentMethods={paymentMethods} playerCount={roster.length} betChips={betChips} />
+              </Section>
+            )}
           </>
         )}
       </div>
     </div>
   );
+}
+
+function OrganizerTabNav({
+  tournamentId,
+  active,
+  pendingPayments,
+}: {
+  tournamentId: string;
+  active: OrganizerTab;
+  pendingPayments: number;
+}) {
+  return (
+    <nav aria-label="Organizer sections" className="mb-4 overflow-x-auto">
+      <div className="flex min-w-max gap-2">
+        {ORGANIZER_TABS.map((tab) => {
+          const on = active === tab.id;
+          const badge = tab.id === 'roster' && pendingPayments > 0 ? pendingPayments : null;
+          return (
+            <Link
+              key={tab.id}
+              href={tab.id === 'run' ? `/tournaments/${tournamentId}/mixer/admin` : `/tournaments/${tournamentId}/mixer/admin?tab=${tab.id}`}
+              aria-current={on ? 'page' : undefined}
+              className="flex min-w-[104px] flex-col rounded-2xl px-3 py-2.5"
+              style={{
+                background: on ? 'var(--ink)' : '#fff',
+                color: on ? 'var(--paper)' : 'var(--ink)',
+                border: `1px solid ${on ? 'var(--ink)' : 'var(--line)'}`,
+              }}
+            >
+              <span className="flex items-center justify-between gap-2 text-sm font-bold">
+                {tab.label}
+                {badge ? (
+                  <span className="mono rounded-full px-1.5 py-0.5 text-[10px]" style={{ background: 'var(--serve)', color: 'var(--paper)' }}>
+                    {badge}
+                  </span>
+                ) : null}
+              </span>
+              <span className="mt-0.5 text-[10.5px]" style={{ color: on ? 'oklch(0.82 0.02 95)' : 'var(--ink-3)' }}>
+                {tab.description}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+function AdminLink({ href, title, sub }: { href: string; title: string; sub: string }) {
+  return (
+    <Link href={href} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+      <span className="flex items-center justify-between gap-2 text-sm font-bold text-ink">
+        {title}
+        <span className="text-ink-3">{Icons.arrow}</span>
+      </span>
+      <span className="mt-1 block text-xs text-ink-3">{sub}</span>
+    </Link>
+  );
+}
+
+function getOrganizerTab(value: string | undefined): OrganizerTab {
+  return ORGANIZER_TABS.some((tab) => tab.id === value) ? (value as OrganizerTab) : 'run';
+}
+
+function runEventHeadline(state: string) {
+  switch (state) {
+    case 'open':
+      return 'Ballot is live';
+    case 'locked':
+      return 'Ballot locked';
+    case 'drawing':
+      return 'Drawing partners';
+    case 'revealed':
+      return 'Pairings revealed';
+    case 'playing':
+      return 'Games are on court';
+    case 'done':
+      return 'Round complete';
+    default:
+      return 'Ready to run';
+  }
+}
+
+function runEventBody(state: string, lockMode: ConfigRow['lock_mode']) {
+  switch (state) {
+    case 'open':
+      return lockMode === 'timer'
+        ? 'Players are voting now. The configured timer will define when ballots should close.'
+        : 'Players are voting now. Lock the ballot manually when the room is ready.';
+    case 'locked':
+      return 'Votes are sealed. Draw and reveal when players are watching.';
+    case 'drawing':
+      return 'The draw is in progress. Keep presentation mode ready for the reveal.';
+    case 'revealed':
+      return 'Partners and courts are visible. Start play when everyone reaches their court.';
+    case 'playing':
+      return 'Enter scores as courts finish so standings, raffle, and pools can settle cleanly.';
+    case 'done':
+      return 'Scores are in. Finalize the event or prepare the next voting window.';
+    default:
+      return 'Open the ballot to begin the Mixer round loop.';
+  }
 }
 
 function ConfigForm({
