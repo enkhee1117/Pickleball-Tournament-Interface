@@ -3,9 +3,11 @@ import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
+import { formatInviteCode } from '@/lib/invite-codes';
 import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
 import { Icons } from '@/components/ui/icons';
+import { ShareCodeCard } from '../../invite/ShareCodeCard';
 import {
   confirmMixerPayment,
   drawMixerRound,
@@ -28,6 +30,7 @@ type TournamentRow = {
   format: string;
   owner_user_id: string;
   status: string;
+  invite_code: string;
 };
 
 type ConfigRow = {
@@ -148,7 +151,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
     { data: rounds },
     { data: players },
   ] = await Promise.all([
-    supabase.from('tournaments').select('id,name,format,owner_user_id,status').eq('id', id).single(),
+    supabase.from('tournaments').select('id,name,format,owner_user_id,status,invite_code').eq('id', id).single(),
     user
       ? supabase.from('tournament_members').select('role').eq('tournament_id', id).eq('user_id', user.id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -204,7 +207,12 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
           title={t.name}
           sub="Mixer organizer"
           left={<Link href={`/tournaments/${id}`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
-          right={<Link href={`/tournaments/${id}/mixer/present`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.share}</Link>}
+          right={
+            <div className="flex items-center gap-1">
+              <Link href={`/tournaments/${id}/invite`} aria-label="Invite players" className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.share}</Link>
+              <Link href={`/tournaments/${id}/mixer/present`} aria-label="Presentation view" className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.eye}</Link>
+            </div>
+          }
         />
         <div className="pl-1">
           <Chip tone="live">{currentRound ? currentRound.state : 'SETUP'}</Chip>
@@ -228,6 +236,22 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
           </form>
         ) : (
           <>
+            <Section title="Invite players">
+              <ShareCodeCard
+                inviteCode={formatInviteCode(t.invite_code)}
+                rawInviteCode={t.invite_code}
+                tournamentId={t.id}
+                tournamentName={t.name}
+              />
+              <Link
+                href={`/tournaments/${id}/invite`}
+                className="block rounded-2xl bg-white px-4 py-3 text-center text-sm font-bold text-ink"
+                style={{ border: '1px solid var(--line)' }}
+              >
+                Manage roster and personal invites
+              </Link>
+            </Section>
+
             <Section title="Round controls">
               <div className="grid grid-cols-2 gap-2">
                 <StateButton tournamentId={id} roundId={currentRound.id} state="open" label="Open vote" />
