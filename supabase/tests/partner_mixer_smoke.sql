@@ -38,6 +38,7 @@ declare
   v_winner uuid;
   v_pool text;
   v_lock_mode text;
+  v_lock_seconds int;
   v_raffle_winner jsonb;
 begin
   insert into auth.users (
@@ -64,7 +65,7 @@ begin
     'mixed',
     'balanced'
   );
-  perform public.app_ensure_mixer_event(v_tournament, 10, 100, 2, 2, 30, 20, true, true, true);
+  perform public.app_ensure_mixer_event(v_tournament, 10, 100, 2, 2, 86400, 20, true, true, true);
   perform public.app_update_mixer_config(
     p_tournament_id => v_tournament,
     p_starting_tokens => 10,
@@ -72,7 +73,7 @@ begin
     p_rounds => 2,
     p_courts => 2,
     p_lock_mode => 'manual',
-    p_lock_seconds => 45,
+    p_lock_seconds => 90061,
     p_alpha => 1,
     p_beta => 2.5,
     p_gamma => 1,
@@ -95,11 +96,14 @@ begin
     p_raffle_prize => 'Smoke paddle'
   );
 
-  select lock_mode into v_lock_mode
+  select lock_mode, lock_seconds into v_lock_mode, v_lock_seconds
   from public.event_config
   where tournament_id = v_tournament;
   if v_lock_mode <> 'manual' then
     raise exception 'expected lock mode to update to manual, got %', v_lock_mode;
+  end if;
+  if v_lock_seconds <> 90061 then
+    raise exception 'expected lock duration over one hour to persist, got %', v_lock_seconds;
   end if;
 
   perform set_config('request.jwt.claim.sub', v_u1::text, true);
