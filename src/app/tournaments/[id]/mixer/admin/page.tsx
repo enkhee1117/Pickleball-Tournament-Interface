@@ -13,6 +13,8 @@ import {
   initializeMixerEvent,
   scoreMixerCourt,
   setMixerRoundState,
+  updateMixerConfig,
+  updateMixerPlayerPool,
 } from '../actions';
 
 type PageProps = {
@@ -33,11 +35,28 @@ type ConfigRow = {
   starting_chips: number;
   rounds: number;
   courts: number;
+  lock_mode: 'timer' | 'manual';
   lock_seconds: number;
+  alpha: number;
+  beta: number;
+  gamma: number;
+  tau: number;
+  grief_floor: number;
+  repeat_decay: number;
   entry_fee: number;
+  pay_to_play_enabled: boolean;
+  boost_tokens: number;
+  boost_price: number;
+  boost_limit: number;
   betting_enabled: boolean;
   raffle_enabled: boolean;
   downvotes_enabled: boolean;
+  podium_markets: number;
+  betting_prize_winners: number;
+  betting_rake_pct: number;
+  prize_buckets: unknown;
+  payment_methods: unknown;
+  raffle_prize: string;
 };
 
 type RoundRow = {
@@ -77,6 +96,45 @@ type PaymentRow = {
   status: string;
 };
 
+type StateRow = {
+  player_id: string;
+  pairing_pool: 'a' | 'b';
+  tokens_base_remaining: number;
+  tokens_bought_remaining: number;
+  chips_remaining: number;
+  sit_out_count: number;
+};
+
+type BetRow = {
+  market_place: number;
+  chips: number;
+};
+
+type SnapshotRow = {
+  standings: unknown;
+  raffle_tickets: unknown;
+  raffle_winner: unknown;
+  bet_settlements: unknown;
+};
+
+type PrizeBuckets = {
+  tournament: number;
+  raffle: number;
+  betting: number;
+  reserve: number;
+};
+
+type PaymentMethod = {
+  on: boolean;
+  handle: string;
+};
+
+type PaymentMethods = {
+  zelle: PaymentMethod;
+  venmo: PaymentMethod;
+  cash: PaymentMethod;
+};
+
 export default async function MixerAdminPage({ params, searchParams }: PageProps) {
   const { id } = await params;
   const sp = await searchParams;
@@ -110,7 +168,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const currentRound = ((rounds ?? []) as RoundRow[])[0] ?? null;
   const roster = (players ?? []) as PlayerRow[];
 
-  const [{ data: pairings }, { data: scores }, { data: payments }] = await Promise.all([
+  const [{ data: pairings }, { data: scores }, { data: payments }, { data: states }, { data: bets }, { data: snapshot }] = await Promise.all([
     currentRound
       ? supabase.from('mixer_pairings').select('id,player_a_id,player_b_id,court_no').eq('round_id', currentRound.id).order('court_no', { ascending: true })
       : Promise.resolve({ data: [] }),
@@ -118,12 +176,25 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
       ? supabase.from('mixer_scores').select('court_no,team_a_score,team_b_score').eq('round_id', currentRound.id)
       : Promise.resolve({ data: [] }),
     supabase.from('payments').select('id,player_id,type,amount,method,status').eq('tournament_id', id).order('created_at', { ascending: false }).limit(50),
+    supabase.from('player_event_state').select('player_id,pairing_pool,tokens_base_remaining,tokens_bought_remaining,chips_remaining,sit_out_count').eq('tournament_id', id),
+    supabase.from('bets').select('market_place,chips').eq('tournament_id', id),
+    supabase.from('mixer_final_snapshots').select('standings,raffle_tickets,raffle_winner,bet_settlements').eq('tournament_id', id).maybeSingle(),
   ]);
 
   const pairingRows = (pairings ?? []) as PairingRow[];
   const scoreRows = (scores ?? []) as ScoreRow[];
   const paymentRows = (payments ?? []) as PaymentRow[];
+  const stateRows = (states ?? []) as StateRow[];
+  const betRows = (bets ?? []) as BetRow[];
+  const final = snapshot as SnapshotRow | null;
   const name = (playerId: string) => roster.find((p) => p.id === playerId)?.display_name ?? 'TBD';
+  const paidCount = paymentRows.filter((p) => p.type === 'entry' && p.status === 'confirmed').length;
+  const pendingPayments = paymentRows.filter((p) => p.status === 'pending').length;
+  const betChips = betRows.reduce((sum, b) => sum + b.chips, 0);
+  const prizeBuckets = normalizePrizeBuckets(cfg?.prize_buckets);
+  const paymentMethods = normalizePaymentMethods(cfg?.payment_methods);
+  const finalStandings = Array.isArray(final?.standings) ? final.standings : [];
+  const raffleWinner = final?.raffle_winner && !Array.isArray(final.raffle_winner) ? final.raffle_winner as Record<string, unknown> : null;
 
   return (
     <div className="flex min-h-full flex-col bg-paper">
@@ -179,16 +250,30 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
               </form>
             </Section>
 
-            <Section title="Setup">
+            <Section title="Event setup">
+              <ConfigForm tournamentId={id} cfg={cfg} prizeBuckets={prizeBuckets} paymentMethods={paymentMethods} playerCount={roster.length} betChips={betChips} />
+            </Section>
+
+            <Section title="Money and prizes">
               <div className="grid grid-cols-2 gap-2">
-                <Stat label="Tokens" value={cfg.starting_tokens} />
-                <Stat label="Chips" value={cfg.starting_chips} />
-                <Stat label="Entry" value={`$${cfg.entry_fee}`} />
-                <Stat label="Lock" value={`${cfg.lock_seconds}s`} />
+                <Stat label="Paid entries" value={`${paidCount}/${roster.length}`} />
+                <Stat label="Pending" value={pendingPayments} />
+                <Stat label="Entry pot" value={`$${Math.round(paidCount * Number(cfg.entry_fee))}`} />
+                <Stat label="Pool chips" value={betChips} />
               </div>
-              <div className="mt-2 text-xs text-ink-3">
-                Betting {cfg.betting_enabled ? 'on' : 'off'} · Raffle {cfg.raffle_enabled ? 'on' : 'off'} · Downvotes {cfg.downvotes_enabled ? 'on' : 'off'}
+              <div className="mt-3 grid gap-2">
+                <PrizeBucket label="Tournament" pct={prizeBuckets.tournament} amount={roster.length * Number(cfg.entry_fee) * prizeBuckets.tournament} />
+                <PrizeBucket label="Raffle" pct={prizeBuckets.raffle} amount={roster.length * Number(cfg.entry_fee) * prizeBuckets.raffle} />
+                <PrizeBucket label="Betting" pct={prizeBuckets.betting} amount={roster.length * Number(cfg.entry_fee) * prizeBuckets.betting} />
+                <PrizeBucket label="Reserve" pct={prizeBuckets.reserve} amount={roster.length * Number(cfg.entry_fee) * prizeBuckets.reserve} />
               </div>
+              {finalStandings.length > 0 && (
+                <div className="mt-3 rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-3">Finalized</div>
+                  <div className="mt-1 text-sm font-semibold text-ink">Snapshot is ready for presentation.</div>
+                  <div className="mt-1 text-xs text-ink-3">Raffle winner: {String(raffleWinner?.displayName ?? 'not drawn')}</div>
+                </div>
+              )}
             </Section>
 
             <Section title="Courts and scores">
@@ -227,12 +312,32 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
 
             <Section title="Roster health">
               <div className="grid gap-2">
-                {roster.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-sm" style={{ border: '1px solid var(--line)' }}>
-                    <span className="font-semibold text-ink">{p.display_name}</span>
-                    <span className="text-xs text-ink-3">{p.profile_id ? 'linked' : 'anonymous'} · {p.gender ?? 'pool?'}</span>
+                {roster.map((p) => {
+                  const state = stateRows.find((s) => s.player_id === p.id);
+                  const pool = state?.pairing_pool ?? (p.gender === 'f' ? 'b' : 'a');
+                  return (
+                  <div key={p.id} className="rounded-xl bg-white p-3 text-sm" style={{ border: '1px solid var(--line)' }}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-ink">{p.display_name}</div>
+                        <div className="mt-1 text-xs text-ink-3">
+                          {p.profile_id ? 'linked' : 'anonymous'} · gender {p.gender ?? 'unset'} · sit-outs {state?.sit_out_count ?? 0}
+                        </div>
+                      </div>
+                      <Chip tone={pool === 'a' ? 'court' : 'ghost'}>Pool {pool.toUpperCase()}</Chip>
+                    </div>
+                    <form action={updateMixerPlayerPool} className="mt-3 flex items-center gap-2">
+                      <input type="hidden" name="tournament_id" value={id} />
+                      <input type="hidden" name="player_id" value={p.id} />
+                      <select name="pairing_pool" defaultValue={pool} className="h-10 flex-1 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink">
+                        <option value="a">Pool A</option>
+                        <option value="b">Pool B</option>
+                      </select>
+                      <button className="h-10 rounded-xl px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Save</button>
+                    </form>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </Section>
 
@@ -262,6 +367,172 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function ConfigForm({
+  tournamentId,
+  cfg,
+  prizeBuckets,
+  paymentMethods,
+  playerCount,
+  betChips,
+}: {
+  tournamentId: string;
+  cfg: ConfigRow;
+  prizeBuckets: PrizeBuckets;
+  paymentMethods: PaymentMethods;
+  playerCount: number;
+  betChips: number;
+}) {
+  const pot = playerCount * Number(cfg.entry_fee);
+  return (
+    <form action={updateMixerConfig} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+      <input type="hidden" name="tournament_id" value={tournamentId} />
+      <div className="grid grid-cols-2 gap-3">
+        <NumberField name="rounds" label="Rounds" value={cfg.rounds} min={1} max={50} />
+        <NumberField name="courts" label="Courts" value={cfg.courts} min={1} max={16} />
+        <NumberField name="starting_tokens" label="Start tokens" value={cfg.starting_tokens} min={1} max={100} />
+        <NumberField name="starting_chips" label="Start chips" value={cfg.starting_chips} min={0} max={100000} />
+      </div>
+
+      <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--line)' }}>
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-3">Voting</div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-xs font-semibold text-ink-3">Lock mode</span>
+            <select name="lock_mode" defaultValue={cfg.lock_mode} className="mt-1 h-11 w-full rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink">
+              <option value="timer">Countdown</option>
+              <option value="manual">Manual close</option>
+            </select>
+          </label>
+          <NumberField name="lock_seconds" label="Lock seconds" value={cfg.lock_seconds} min={5} max={3600} />
+        </div>
+        <div className="mt-3 grid gap-2">
+          <ToggleField name="downvotes_enabled" label="Downvotes" checked={cfg.downvotes_enabled} sub="Let players spend tokens on a gentle no-thanks." />
+        </div>
+      </div>
+
+      <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--line)' }}>
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-3">Tokens and money</div>
+        <div className="grid grid-cols-2 gap-3">
+          <NumberField name="entry_fee" label="Entry fee" value={cfg.entry_fee} min={0} max={100000} prefix="$" />
+          <NumberField name="boost_price" label="Boost price" value={cfg.boost_price} min={0} max={100000} prefix="$" />
+          <NumberField name="boost_tokens" label="Boost tokens" value={cfg.boost_tokens} min={0} max={100} />
+          <NumberField name="boost_limit" label="Boost limit" value={cfg.boost_limit} min={0} max={10} />
+        </div>
+        <div className="mt-3 grid gap-2">
+          <ToggleField name="pay_to_play_enabled" label="Pay-to-play token boost" checked={cfg.pay_to_play_enabled} sub="Bought tokens affect matchmaking but never raffle tickets." />
+          <ToggleField name="betting_enabled" label="Pooled betting" checked={cfg.betting_enabled} sub={`${betChips} chips currently staked.`} />
+          <ToggleField name="raffle_enabled" label="Raffle draw" checked={cfg.raffle_enabled} sub="Tickets come from upvotes received plus unused base tokens." />
+        </div>
+      </div>
+
+      <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--line)' }}>
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-3">Payment methods</div>
+        <div className="grid gap-2">
+          <PaymentMethodField name="zelle" label="Zelle" method={paymentMethods.zelle} placeholder="email or mobile number" />
+          <PaymentMethodField name="venmo" label="Venmo" method={paymentMethods.venmo} placeholder="@username" />
+          <ToggleField name="pay_cash_on" label="Cash / in person" checked={paymentMethods.cash.on} sub="No destination required." />
+        </div>
+      </div>
+
+      <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--line)' }}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-3">Prize buckets</div>
+          <div className="mono text-xs text-ink-3">pot {money(pot)}</div>
+        </div>
+        <div className="mt-3 grid gap-3">
+          <RangeField name="bucket_tournament" label="Tournament" value={prizeBuckets.tournament * 100} amount={pot * prizeBuckets.tournament} />
+          <RangeField name="bucket_raffle" label="Raffle" value={prizeBuckets.raffle * 100} amount={pot * prizeBuckets.raffle} />
+          <RangeField name="bucket_betting" label="Betting" value={prizeBuckets.betting * 100} amount={pot * prizeBuckets.betting} />
+          <RangeField name="bucket_reserve" label="Reserve" value={prizeBuckets.reserve * 100} amount={pot * prizeBuckets.reserve} />
+          <label>
+            <span className="text-xs font-semibold text-ink-3">Raffle prize</span>
+            <input name="raffle_prize" defaultValue={cfg.raffle_prize ?? 'Raffle prize'} className="mt-1 h-11 w-full rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink" />
+          </label>
+        </div>
+      </div>
+
+      <details className="mt-4 rounded-2xl bg-paper-2 p-3">
+        <summary className="cursor-pointer text-sm font-bold text-ink">Matching formula</summary>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <NumberField name="alpha" label="Alpha" value={cfg.alpha} min={0} max={100} step="0.1" />
+          <NumberField name="beta" label="Beta" value={cfg.beta} min={0} max={100} step="0.1" />
+          <NumberField name="gamma" label="Gamma" value={cfg.gamma} min={0} max={100} step="0.1" />
+          <NumberField name="tau" label="Tau" value={cfg.tau} min={0.01} max={100} step="0.1" />
+          <NumberField name="grief_floor" label="Grief floor" value={cfg.grief_floor} min={0} max={100} step="0.1" />
+          <NumberField name="repeat_decay" label="Repeat decay" value={cfg.repeat_decay} min={0} max={1} step="0.05" />
+          <NumberField name="podium_markets" label="Podium markets" value={cfg.podium_markets} min={1} max={8} />
+          <NumberField name="betting_prize_winners" label="Betting winners" value={cfg.betting_prize_winners} min={1} max={20} />
+          <NumberField name="betting_rake_pct" label="Rake %" value={Number(cfg.betting_rake_pct) * 100} min={0} max={100} step="1" />
+        </div>
+      </details>
+
+      <button className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
+        Save configuration
+      </button>
+    </form>
+  );
+}
+
+function NumberField({ name, label, value, min, max, step = '1', prefix }: { name: string; label: string; value: string | number; min: number; max: number; step?: string; prefix?: string }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold text-ink-3">{label}</span>
+      <div className="mt-1 flex h-11 items-center rounded-xl bg-paper-2 px-3">
+        {prefix && <span className="mr-1 text-sm font-semibold text-ink-3">{prefix}</span>}
+        <input name={name} type="number" min={min} max={max} step={step} defaultValue={value} className="mono w-full bg-transparent text-sm font-bold text-ink outline-none" />
+      </div>
+    </label>
+  );
+}
+
+function ToggleField({ name, label, checked, sub }: { name: string; label: string; checked: boolean; sub?: string }) {
+  return (
+    <label className="flex items-center gap-3 rounded-xl bg-paper-2 px-3 py-2">
+      <input name={name} type="checkbox" defaultChecked={checked} className="h-5 w-5 accent-[var(--court)]" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold text-ink">{label}</span>
+        {sub && <span className="block text-xs text-ink-3">{sub}</span>}
+      </span>
+    </label>
+  );
+}
+
+function PaymentMethodField({ name, label, method, placeholder }: { name: 'zelle' | 'venmo'; label: string; method: PaymentMethod; placeholder: string }) {
+  return (
+    <div className="rounded-xl bg-paper-2 px-3 py-2">
+      <ToggleField name={`pay_${name}_on`} label={label} checked={method.on} />
+      <input name={`pay_${name}_handle`} defaultValue={method.handle} placeholder={placeholder} className="mt-2 h-10 w-full rounded-xl bg-white px-3 text-sm font-semibold text-ink" style={{ border: '1px solid var(--line)' }} />
+    </div>
+  );
+}
+
+function RangeField({ name, label, value, amount }: { name: string; label: string; value: number; amount: number }) {
+  return (
+    <label className="block">
+      <span className="flex items-center justify-between text-xs font-semibold text-ink-3">
+        <span>{label}</span>
+        <span className="mono">{Math.round(value)}% · {money(amount)}</span>
+      </span>
+      <input name={name} type="range" min={0} max={100} step={5} defaultValue={Math.round(value)} className="mt-1 w-full accent-[var(--court)]" />
+    </label>
+  );
+}
+
+function PrizeBucket({ label, pct, amount }: { label: string; pct: number; amount: number }) {
+  return (
+    <div className="rounded-xl bg-white p-3" style={{ border: '1px solid var(--line)' }}>
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-semibold text-ink">{label}</span>
+        <span className="mono text-ink">{Math.round(pct * 100)}%</span>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-paper-2">
+        <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct * 100))}%`, background: 'var(--court)' }} />
+      </div>
+      <div className="mt-1 text-xs text-ink-3">{money(amount)}</div>
     </div>
   );
 }
@@ -324,4 +595,44 @@ function Notice({ tone, children }: { tone: 'ok' | 'error'; children: ReactNode 
       {children}
     </div>
   );
+}
+
+function money(value: number) {
+  return `$${Math.round(value).toLocaleString()}`;
+}
+
+function normalizePrizeBuckets(value: unknown): PrizeBuckets {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { tournament: 0.5, raffle: 0.2, betting: 0.2, reserve: 0.1 };
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    tournament: toFraction(record.tournament, 0.5),
+    raffle: toFraction(record.raffle, 0.2),
+    betting: toFraction(record.betting, 0.2),
+    reserve: toFraction(record.reserve, 0.1),
+  };
+}
+
+function normalizePaymentMethods(value: unknown): PaymentMethods {
+  const record = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return {
+    zelle: normalizePaymentMethod(record.zelle, true),
+    venmo: normalizePaymentMethod(record.venmo, false),
+    cash: normalizePaymentMethod(record.cash, true),
+  };
+}
+
+function normalizePaymentMethod(value: unknown, fallbackOn: boolean): PaymentMethod {
+  const record = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  return {
+    on: typeof record.on === 'boolean' ? record.on : fallbackOn,
+    handle: typeof record.handle === 'string' ? record.handle : '',
+  };
+}
+
+function toFraction(value: unknown, fallback: number) {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(1, numeric));
 }
