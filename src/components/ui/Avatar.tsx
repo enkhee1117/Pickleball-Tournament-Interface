@@ -23,7 +23,7 @@ export function Avatar({ player, size = 40, ring = false }: AvatarProps) {
         width={size}
         height={size}
         className="shrink-0 rounded-full object-cover"
-        style={{ width: size, height: size, boxShadow: ringStyle }}
+        style={{ width: size, height: size, boxShadow: ringStyle, objectPosition: 'center top' }}
       />
     );
   }
