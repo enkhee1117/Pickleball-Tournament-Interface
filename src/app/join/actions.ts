@@ -6,7 +6,7 @@ import { formatPgError } from '@/lib/forms';
 import { isValidInviteCode, normalizeInviteCode } from '@/lib/invite-codes';
 
 export type JoinResult =
-  | { tournamentId: string; error?: undefined }
+  | { tournamentId: string; format: string | null; error?: undefined }
   | { tournamentId?: undefined; error: string };
 
 export async function joinByInviteCode(rawCode: string): Promise<JoinResult> {
@@ -31,7 +31,13 @@ export async function joinByInviteCode(rawCode: string): Promise<JoinResult> {
   }
 
   const tournamentId = data as string;
+  const { data: tournament } = await supabase
+    .from('tournaments')
+    .select('format')
+    .eq('id', tournamentId)
+    .maybeSingle();
   revalidatePath('/tournaments');
   revalidatePath(`/tournaments/${tournamentId}`);
-  return { tournamentId };
+  revalidatePath(`/tournaments/${tournamentId}/mixer`);
+  return { tournamentId, format: (tournament as { format?: string } | null)?.format ?? null };
 }

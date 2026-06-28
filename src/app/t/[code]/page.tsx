@@ -14,10 +14,11 @@ import {
 } from '@/lib/scoring';
 import { RecordingsMenu } from '@/components/RecordingsMenu';
 import { AnonymousMixerJoinButton } from '@/app/tournaments/[id]/mixer/AnonymousMixerJoinButton';
+import { joinPublicTournament } from './actions';
 
 type PageProps = {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ tab?: 'matches' | 'standings' }>;
+  searchParams: Promise<{ tab?: 'matches' | 'standings'; error?: string }>;
 };
 
 // Generate share-card metadata so links posted to messaging apps unfurl
@@ -215,6 +216,14 @@ export default async function PublicTournamentPage({ params, searchParams }: Pag
       </div>
 
       <div className="flex-1 overflow-y-auto pb-24">
+        {sp.error && (
+          <div
+            className="mx-[18px] mt-3 rounded-xl border px-3 py-2 text-sm"
+            style={{ borderColor: 'var(--berry)', color: 'var(--berry)', background: 'oklch(0.96 0.04 12)' }}
+          >
+            {sp.error}
+          </div>
+        )}
         <CtaBar
           tournamentId={t.id}
           inviteCode={t.invite_code}
@@ -258,14 +267,29 @@ function CtaBar({
     );
   }
   if (authed) {
+    if (format === 'partner_mixer') {
+      return (
+        <div className="px-[18px] pt-3.5">
+          <form action={joinPublicTournament}>
+            <input type="hidden" name="code" value={inviteCode} />
+            <button
+              className="block w-full rounded-2xl px-5 py-3.5 text-center text-base font-semibold tracking-tight"
+              style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}
+            >
+              Join the Mixer →
+            </button>
+          </form>
+        </div>
+      );
+    }
     return (
       <div className="px-[18px] pt-3.5">
         <Link
-          href={format === 'partner_mixer' ? target : `/join?code=${inviteCode}`}
+          href={`/join?code=${inviteCode}`}
           className="block w-full rounded-2xl px-5 py-3.5 text-center text-base font-semibold tracking-tight"
           style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}
         >
-          {format === 'partner_mixer' ? 'Join the Mixer →' : 'Join this tournament →'}
+          Join this tournament →
         </Link>
       </div>
     );
