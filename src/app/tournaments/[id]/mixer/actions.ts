@@ -121,7 +121,9 @@ export async function setMixerVote(formData: FormData): Promise<void> {
   const targetPlayerId = fieldString(formData, 'target_player_id');
   const up = fieldInt(formData, 'up_tokens', 0, 0, 100);
   const down = fieldInt(formData, 'down_tokens', 0, 0, 100);
+  const returnRound = fieldInt(formData, 'return_round', 0, 0, 1000);
   if (!tournamentId || !roundId || !voterPlayerId || !targetPlayerId) redirect('/tournaments');
+  const returnPath = returnRound > 0 ? `${mixerPath(tournamentId)}?round=${returnRound}` : mixerPath(tournamentId);
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_mixer_set_vote', {
@@ -131,10 +133,10 @@ export async function setMixerVote(formData: FormData): Promise<void> {
     p_up_tokens: up,
     p_down_tokens: down,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) redirect(`${returnPath}${returnPath.includes('?') ? '&' : '?'}error=${encodeURIComponent(formatPgError(error))}`);
 
   revalidatePath(mixerPath(tournamentId));
-  redirect(mixerPath(tournamentId));
+  redirect(returnPath);
 }
 
 export async function setMixerRoundState(formData: FormData): Promise<void> {
