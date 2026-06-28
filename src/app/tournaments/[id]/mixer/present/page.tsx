@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { TopBar } from '@/components/ui/TopBar';
 import { Icons } from '@/components/ui/icons';
+import { MixerModeSwitch } from '../MixerModeSwitch';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -111,6 +112,7 @@ export default async function MixerPresentPage({ params }: PageProps) {
         sub={round ? `Round ${round.round_no} · ${round.state}` : 'Presentation'}
         left={<Link href={`/tournaments/${id}/mixer/admin`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
       />
+      <MixerModeSwitch tournamentId={id} active="present" />
       <div className="flex flex-1 flex-col items-center justify-center px-8 pb-10 text-center">
         {standings.length > 0 ? (
           <div className="w-full max-w-6xl">
