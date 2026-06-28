@@ -36,10 +36,10 @@ export default async function LoginPage({
           <br />
           tournament
           <br />
-          <span className="italic" style={{ color: 'var(--court)' }}>in 90 seconds.</span>
+          <span className="italic" style={{ color: 'var(--court)' }}>without spreadsheets.</span>
         </div>
         <div className="mt-[18px] max-w-[280px] text-[15px] leading-[1.45] opacity-70">
-          Round robin, fixed partners, brackets. Skill-balanced auto-pairings. WhatsApp updates. Less spreadsheet, more pickleball.
+          Mixers, round robins, fixed partners, and brackets. Invite players, run the room, and keep the night moving.
         </div>
 
         {sp.ok && (

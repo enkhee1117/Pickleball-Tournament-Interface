@@ -158,7 +158,7 @@ export function CreateWizard() {
         return;
       }
       if (result.mixer) {
-        router.push(`/tournaments/${result.id}/mixer/admin?new=1`);
+        router.push(`/tournaments/${result.id}?ok=${encodeURIComponent('Mixer created. Invite players, then open voting when the roster is ready.')}`);
         return;
       }
       // Manual fixed-partners → land on invite/roster so the organizer can
@@ -177,7 +177,7 @@ export function CreateWizard() {
     });
   };
 
-  const ctaLabel = isMixer ? 'Open Mixer controls →' : manualFp ? 'Set up teams →' : 'Generate matches →';
+  const ctaLabel = isMixer ? 'Open event home →' : manualFp ? 'Set up teams →' : 'Generate matches →';
 
   return (
     <div className="flex min-h-full flex-col bg-paper">

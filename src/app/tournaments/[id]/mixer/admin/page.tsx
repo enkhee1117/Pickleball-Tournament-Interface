@@ -206,7 +206,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
         <TopBar
           dark
           title={t.name}
-          sub="Organizer controls"
+          sub="Organizer mode"
           left={<Link href={`/tournaments/${id}`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
           right={
             <div className="flex items-center gap-1">
@@ -217,7 +217,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
         <MixerModeSwitch tournamentId={id} active="organizer" />
         <div className="pl-1">
           <Chip tone="live">{currentRound ? currentRound.state : 'SETUP'}</Chip>
-          <div className="serif mt-2 text-[34px] leading-none">Run the draw</div>
+          <div className="serif mt-2 text-[34px] leading-none">Run the event</div>
           <div className="mt-1 text-xs opacity-60">{roster.length} players · {cfg?.courts ?? 3} courts</div>
         </div>
       </div>
@@ -436,7 +436,7 @@ function ConfigForm({
           </label>
           <div className="grid grid-cols-2 gap-3">
             <NumberField name="lock_hours" label="Lock hours" value={lockHours} min={0} max={168} />
-            <NumberField name="lock_extra_seconds" label="Extra seconds" value={lockExtraSeconds} min={0} max={3599} />
+            <NumberField name="lock_extra_seconds" label="Fine-tune seconds" value={lockExtraSeconds} min={0} max={3599} />
           </div>
         </div>
         <div className="mt-2 text-xs text-ink-3">
@@ -504,7 +504,7 @@ function ConfigForm({
       </details>
 
       <button className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
-        Save configuration
+        Save event settings
       </button>
     </form>
   );

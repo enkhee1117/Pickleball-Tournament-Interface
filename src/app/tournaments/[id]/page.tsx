@@ -35,11 +35,13 @@ import { ScoreboardClaimBanner } from './ScoreboardClaimBanner';
 import { RecordingsMenu } from '@/components/RecordingsMenu';
 import { ConfirmForm } from '@/components/ui/ConfirmForm';
 import { SubmitButton } from '@/components/ui/SubmitButton';
+import { formatInviteCode } from '@/lib/invite-codes';
+import { MixerModeSwitch } from './mixer/MixerModeSwitch';
 
 type PageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{
-    tab?: 'matches' | 'standings' | 'bracket' | 'settings';
+    tab?: 'matches' | 'standings' | 'bracket' | 'settings' | 'overview' | 'roster';
     done?: string;
     ok?: string;
     error?: string;
@@ -61,10 +63,41 @@ type MatchRow = {
   forfeited_by: string | null;
 };
 
+type MixerConfigRow = {
+  rounds: number;
+  courts: number;
+  lock_mode: 'timer' | 'manual';
+  lock_seconds: number;
+  entry_fee: number;
+  betting_enabled: boolean;
+  raffle_enabled: boolean;
+  pay_to_play_enabled: boolean;
+};
+
+type MixerRoundRow = {
+  id: string;
+  round_no: number;
+  state: string;
+  lock_at: string | null;
+};
+
+type MixerStateRow = {
+  player_id: string;
+  pairing_pool: 'a' | 'b';
+  tokens_base_remaining: number;
+  tokens_bought_remaining: number;
+  chips_remaining: number;
+  sit_out_count: number;
+};
+
+type MixerPaymentRow = {
+  status: string;
+  type: string;
+};
+
 export default async function TournamentDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
   const sp = await searchParams;
-  const tab = sp.tab ?? 'matches';
   const showDone = sp.done === '1';
   const supabase = await createClient();
   const user = await getCurrentUser();
@@ -122,6 +155,39 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
   const t = tournament as Tournament;
   const isMixer = t.format === 'partner_mixer';
   const m = (matches ?? []) as MatchRow[];
+  const [{ data: mixerConfig }, { data: mixerRounds }, { data: mixerStates }, { data: mixerPayments }] =
+    isMixer
+      ? await Promise.all([
+          supabase
+            .from('event_config')
+            .select('rounds,courts,lock_mode,lock_seconds,entry_fee,betting_enabled,raffle_enabled,pay_to_play_enabled')
+            .eq('tournament_id', id)
+            .maybeSingle(),
+          supabase
+            .from('mixer_rounds')
+            .select('id,round_no,state,lock_at')
+            .eq('tournament_id', id)
+            .order('round_no', { ascending: false })
+            .limit(1),
+          supabase
+            .from('player_event_state')
+            .select('player_id,pairing_pool,tokens_base_remaining,tokens_bought_remaining,chips_remaining,sit_out_count')
+            .eq('tournament_id', id),
+          supabase
+            .from('payments')
+            .select('status,type')
+            .eq('tournament_id', id),
+        ])
+      : [
+          { data: null },
+          { data: [] },
+          { data: [] },
+          { data: [] },
+        ];
+  const mixerCfg = mixerConfig as MixerConfigRow | null;
+  const mixerRound = ((mixerRounds ?? []) as MixerRoundRow[])[0] ?? null;
+  const mixerStateRows = (mixerStates ?? []) as MixerStateRow[];
+  const mixerPaymentRows = (mixerPayments ?? []) as MixerPaymentRow[];
 
   const liveCount = m.filter((row) => !row.completed_at && (row.team_a_score || row.team_b_score)).length;
 
@@ -163,6 +229,16 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
           .filter((p) => !p.profile_id)
           .map((p) => ({ id: p.id, displayName: p.display_name }))
       : [];
+  const activeTab = isMixer
+    ? sp.tab === 'roster' || sp.tab === 'settings'
+      ? sp.tab
+      : 'overview'
+    : sp.tab ?? 'matches';
+  const statusLabel = isMixer && mixerRound
+    ? `${mixerRound.state.toUpperCase()} · ROUND ${mixerRound.round_no} OF ${mixerCfg?.rounds ?? '—'}`
+    : t.status === 'active'
+      ? 'LIVE'
+      : t.status.toUpperCase();
 
   const coverImageUrl =
     (t as Tournament & { cover_image_url?: string | null }).cover_image_url ?? null;
@@ -219,7 +295,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
         />
         <div className="pl-1">
           <Chip tone={t.status === 'active' ? 'live' : 'court'}>
-            {t.status === 'active' ? 'LIVE · ROUND 3 OF 5' : t.status.toUpperCase()}
+            {statusLabel}
           </Chip>
           <div className="serif mt-2 text-[32px] leading-[1.05] tracking-tight">{t.name}</div>
           <div className="mt-1.5 text-xs opacity-60">
@@ -227,52 +303,56 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
           </div>
         </div>
 
-        <div
-          className="mt-4 flex gap-1 rounded-xl p-1"
-          style={{ background: 'oklch(0.24 0.02 100)' }}
-        >
-          {(
-            [
-              ['matches', 'Matches', liveCount],
-              ['standings', 'Standings', 0],
-              ['bracket', 'Bracket', 0],
-              ...(isManager
-                ? ([['settings', 'Settings', 0]] as Array<[
-                    'matches' | 'standings' | 'bracket' | 'settings',
-                    string,
-                    number,
-                  ]>)
-                : []),
-            ] as Array<[
-              'matches' | 'standings' | 'bracket' | 'settings',
-              string,
-              number,
-            ]>
-          ).map(([id_, label, badge]) => {
-            const on = tab === id_;
-            return (
-              <Link
-                key={id_}
-                href={`/tournaments/${id}?tab=${id_}`}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-[9px] px-1.5 py-2 text-xs font-semibold"
-                style={{
-                  background: on ? 'var(--paper)' : 'transparent',
-                  color: on ? 'var(--ink)' : 'oklch(0.78 0.02 100)',
-                }}
-              >
-                {label}
-                {badge ? (
-                  <span
-                    className="flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                    style={{ background: 'var(--serve)' }}
-                  >
-                    {badge}
-                  </span>
-                ) : null}
-              </Link>
-            );
-          })}
-        </div>
+        {isMixer ? (
+          isManager ? <MixerModeSwitch tournamentId={id} active="event" /> : null
+        ) : (
+          <div
+            className="mt-4 flex gap-1 rounded-xl p-1"
+            style={{ background: 'oklch(0.24 0.02 100)' }}
+          >
+            {(
+              [
+                ['matches', 'Matches', liveCount],
+                ['standings', 'Standings', 0],
+                ['bracket', 'Bracket', 0],
+                ...(isManager
+                  ? ([['settings', 'Settings', 0]] as Array<[
+                      'matches' | 'standings' | 'bracket' | 'settings',
+                      string,
+                      number,
+                    ]>)
+                  : []),
+              ] as Array<[
+                'matches' | 'standings' | 'bracket' | 'settings',
+                string,
+                number,
+              ]>
+            ).map(([id_, label, badge]) => {
+              const on = activeTab === id_;
+              return (
+                <Link
+                  key={id_}
+                  href={`/tournaments/${id}?tab=${id_}`}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-[9px] px-1.5 py-2 text-xs font-semibold"
+                  style={{
+                    background: on ? 'var(--paper)' : 'transparent',
+                    color: on ? 'var(--ink)' : 'oklch(0.78 0.02 100)',
+                  }}
+                >
+                  {label}
+                  {badge ? (
+                    <span
+                      className="flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                      style={{ background: 'var(--serve)' }}
+                    >
+                      {badge}
+                    </span>
+                  ) : null}
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -294,25 +374,20 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
         )}
 
         {isMixer && (
-          <div className="mx-[18px] mt-3 rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
-            <div className="serif text-[24px] leading-none text-ink">Partner Mixer runtime</div>
-            <div className="mt-1 text-sm text-ink-3">
-              Voting, draw reveal, court pairings, pooled betting, and raffle live in the Mixer view.
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Link href={`/tournaments/${id}/mixer`} className="rounded-xl px-4 py-3 text-center text-sm font-semibold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
-                Player view
-              </Link>
-              {isManager && (
-                <Link href={`/tournaments/${id}/mixer/admin`} className="rounded-xl px-4 py-3 text-center text-sm font-semibold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>
-                  Organizer controls
-                </Link>
-              )}
-            </div>
-          </div>
+          <MixerEventHome
+            tournamentId={id}
+            inviteCode={t.invite_code}
+            isManager={isManager}
+            playerCount={playerCount}
+            roster={rosterPlayers}
+            config={mixerCfg}
+            round={mixerRound}
+            states={mixerStateRows}
+            payments={mixerPaymentRows}
+          />
         )}
 
-        {tab === 'matches' && !isMixer && (
+        {activeTab === 'matches' && !isMixer && (
           <>
             {claimableForBanner.length > 0 && (
               <ScoreboardClaimBanner
@@ -324,18 +399,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
             <MatchesTab tournamentId={id} matches={rrMatches} showDone={showDone} />
           </>
         )}
-        {tab === 'matches' && isMixer && (
-          <div className="px-[18px] pt-6 pb-24">
-            <div className="rounded-2xl bg-white p-5 text-center" style={{ border: '1px dashed var(--line)' }}>
-              <div className="text-[15px] font-semibold text-ink">Mixer matches are drawn live</div>
-              <div className="mt-1 text-xs text-ink-3">Open the Mixer to vote, reveal pairings, and score courts.</div>
-              <Link href={`/tournaments/${id}/mixer`} className="mt-3 inline-flex items-center gap-1 rounded-full px-4 py-2 text-[13px] font-semibold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
-                Open Mixer {Icons.arrow}
-              </Link>
-            </div>
-          </div>
-        )}
-        {tab === 'settings' && isManager && (
+        {activeTab === 'settings' && isManager && !isMixer && (
           <SettingsTab
             tournamentId={id}
             tournamentName={t.name}
@@ -370,8 +434,8 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
             userHasClaimedSlot={userHasClaimedSlot}
           />
         )}
-        {tab === 'standings' && <StandingsTab matches={m} />}
-        {tab === 'bracket' && (
+        {activeTab === 'standings' && !isMixer && <StandingsTab matches={m} />}
+        {activeTab === 'bracket' && !isMixer && (
           <BracketTab
             tournamentId={id}
             playoffMatches={playoffMatches}
@@ -401,6 +465,245 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
       </div>
     </div>
   );
+}
+
+function MixerEventHome({
+  tournamentId,
+  inviteCode,
+  isManager,
+  playerCount,
+  roster,
+  config,
+  round,
+  states,
+  payments,
+}: {
+  tournamentId: string;
+  inviteCode: string;
+  isManager: boolean;
+  playerCount: number;
+  roster: { id: string; display_name: string; profile_id?: string | null }[];
+  config: MixerConfigRow | null;
+  round: MixerRoundRow | null;
+  states: MixerStateRow[];
+  payments: MixerPaymentRow[];
+}) {
+  const linkedCount = roster.filter((p) => !!p.profile_id).length;
+  const paidCount = payments.filter((p) => p.type === 'entry' && p.status === 'confirmed').length;
+  const pendingPayments = payments.filter((p) => p.status === 'pending').length;
+  const avgSitOuts = states.length
+    ? states.reduce((sum, state) => sum + Number(state.sit_out_count ?? 0), 0) / states.length
+    : 0;
+  const roundLabel = round ? `Round ${round.round_no} · ${round.state}` : 'Setup';
+  const nextAction = mixerNextAction(round?.state ?? null, isManager);
+  const inviteDisplay = formatInviteCode(inviteCode);
+  const setupItems = [
+    { label: 'Invite link ready', done: true, href: `/tournaments/${tournamentId}/invite` },
+    { label: `${playerCount} roster spot${playerCount === 1 ? '' : 's'}`, done: playerCount >= 4, href: `/tournaments/${tournamentId}/invite` },
+    { label: config ? `${config.courts} court${config.courts === 1 ? '' : 's'} configured` : 'Initialize event setup', done: !!config, href: `/tournaments/${tournamentId}/mixer/admin` },
+    { label: round ? `Voting is ${round.state}` : 'Create the first Mixer round', done: round?.state === 'open' || round?.state === 'playing' || round?.state === 'revealed', href: `/tournaments/${tournamentId}/mixer/admin` },
+  ];
+
+  return (
+    <div className="px-[18px] py-4 pb-28">
+      <section className="rounded-[22px] bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-3">Event home</div>
+            <div className="serif mt-1 text-[28px] leading-none text-ink">{nextAction.title}</div>
+            <div className="mt-2 max-w-[330px] text-sm leading-5 text-ink-3">{nextAction.body}</div>
+          </div>
+          <Chip tone={round?.state === 'open' || round?.state === 'playing' ? 'live' : 'court'}>{roundLabel}</Chip>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <MixerActionCard
+            href={`/tournaments/${tournamentId}/mixer`}
+            title="Play"
+            body="Vote, see pairings, bet, and track your night."
+            primary={!isManager}
+          />
+          {isManager && (
+            <MixerActionCard
+              href={`/tournaments/${tournamentId}/mixer/admin`}
+              title="Organizer"
+              body="Open voting, draw partners, score courts, and settle prizes."
+              primary
+            />
+          )}
+          <MixerActionCard
+            href={`/tournaments/${tournamentId}/invite`}
+            title="Invite"
+            body={`Share code ${inviteDisplay} or manage the roster.`}
+          />
+          {isManager && (
+            <MixerActionCard
+              href={`/tournaments/${tournamentId}/mixer/present`}
+              title="Present"
+              body="Send reveal, courts, raffle, and results to the big screen."
+            />
+          )}
+        </div>
+      </section>
+
+      <section className="mt-5">
+        <SectionHeader title="At a glance" />
+        <div className="grid grid-cols-2 gap-2">
+          <MixerStat label="Players" value={playerCount} sub={`${linkedCount} claimed`} />
+          <MixerStat label="Courts" value={config?.courts ?? '—'} sub={config ? `${config.rounds} rounds` : 'Needs setup'} />
+          <MixerStat label="Vote window" value={config?.lock_mode === 'manual' ? 'Manual' : formatMixerDuration(config?.lock_seconds ?? 0)} sub={round?.lock_at ? 'Timer active' : 'Not started'} />
+          <MixerStat label="Payments" value={`${paidCount}/${playerCount}`} sub={pendingPayments ? `${pendingPayments} pending` : 'No pending'} />
+        </div>
+      </section>
+
+      <section className="mt-5">
+        <SectionHeader title="Setup health" action={isManager ? <Link href={`/tournaments/${tournamentId}/mixer/admin`}>Open organizer</Link> : undefined} />
+        <div className="grid gap-2">
+          {setupItems.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className="flex items-center gap-3 rounded-2xl bg-white p-3"
+              style={{ border: '1px solid var(--line)' }}
+            >
+              <span
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
+                style={{ background: item.done ? 'var(--court)' : 'var(--paper-2)', color: item.done ? 'oklch(0.2 0.04 140)' : 'var(--ink-3)' }}
+              >
+                {item.done ? Icons.check : Icons.arrow}
+              </span>
+              <span className="min-w-0 flex-1 text-sm font-semibold text-ink">{item.label}</span>
+              <span className="text-ink-3">{Icons.arrow}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-5">
+        <SectionHeader title="Roster preview" action={<Link href={`/tournaments/${tournamentId}/invite`}>Manage</Link>} />
+        <div className="grid gap-2">
+          {roster.slice(0, 6).map((player) => (
+            <div key={player.id} className="flex items-center justify-between rounded-2xl bg-white p-3" style={{ border: '1px solid var(--line)' }}>
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar player={playerFromName(player.display_name)} size={34} />
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-ink">{player.display_name}</div>
+                  <div className="text-xs text-ink-3">{player.profile_id ? 'Claimed account' : 'Invite pending'}</div>
+                </div>
+              </div>
+              <Chip tone={player.profile_id ? 'court' : 'ghost'}>{player.profile_id ? 'Ready' : 'Open'}</Chip>
+            </div>
+          ))}
+          {roster.length === 0 && (
+            <div className="rounded-2xl bg-white p-4 text-center text-sm text-ink-3" style={{ border: '1px dashed var(--line)' }}>
+              No players yet. Share the invite or add names from the roster.
+            </div>
+          )}
+          {roster.length > 6 && (
+            <Link href={`/tournaments/${tournamentId}/invite`} className="rounded-2xl bg-white p-3 text-center text-sm font-semibold text-ink" style={{ border: '1px solid var(--line)' }}>
+              View all {roster.length} players
+            </Link>
+          )}
+        </div>
+      </section>
+
+      <section className="mt-5">
+        <SectionHeader title="Mixer settings" />
+        <div className="grid gap-2 rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+          <div className="flex justify-between gap-3 text-sm">
+            <span className="text-ink-3">Token economy</span>
+            <span className="font-semibold text-ink">{config?.pay_to_play_enabled ? 'Boosts on' : 'Base tokens only'}</span>
+          </div>
+          <div className="flex justify-between gap-3 text-sm">
+            <span className="text-ink-3">Pool betting</span>
+            <span className="font-semibold text-ink">{config?.betting_enabled ? 'On' : 'Off'}</span>
+          </div>
+          <div className="flex justify-between gap-3 text-sm">
+            <span className="text-ink-3">Raffle</span>
+            <span className="font-semibold text-ink">{config?.raffle_enabled ? 'On' : 'Off'}</span>
+          </div>
+          <div className="flex justify-between gap-3 text-sm">
+            <span className="text-ink-3">Sit-out average</span>
+            <span className="font-semibold text-ink">{Math.round(avgSitOuts * 10) / 10}</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function MixerActionCard({
+  href,
+  title,
+  body,
+  primary = false,
+}: {
+  href: string;
+  title: string;
+  body: string;
+  primary?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className="min-h-[124px] rounded-2xl p-3.5"
+      style={{
+        background: primary ? 'var(--ink)' : 'var(--paper-2)',
+        color: primary ? 'var(--paper)' : 'var(--ink)',
+      }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-base font-bold tracking-tight">{title}</div>
+        <span style={{ color: primary ? 'var(--court)' : 'var(--ink-3)' }}>{Icons.arrow}</span>
+      </div>
+      <div className="mt-2 text-xs leading-5" style={{ color: primary ? 'oklch(0.86 0.018 100)' : 'var(--ink-3)' }}>
+        {body}
+      </div>
+    </Link>
+  );
+}
+
+function MixerStat({ label, value, sub }: { label: string; value: string | number; sub: string }) {
+  return (
+    <div className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+      <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-ink-3">{label}</div>
+      <div className="mono mt-1 text-[24px] font-bold text-ink">{value}</div>
+      <div className="mt-1 text-xs text-ink-3">{sub}</div>
+    </div>
+  );
+}
+
+function mixerNextAction(state: string | null, isManager: boolean) {
+  if (!state) {
+    return isManager
+      ? { title: 'Finish setup', body: 'Invite players, confirm event settings, then initialize the first Mixer round.' }
+      : { title: 'Waiting for setup', body: 'The organizer is getting voting and roster details ready.' };
+  }
+  if (state === 'open') {
+    return { title: 'Voting is open', body: 'Players can spend partner tokens now. Keep the event home handy for invite and mode switching.' };
+  }
+  if (state === 'locked' || state === 'drawing') {
+    return { title: 'Votes are sealed', body: isManager ? 'Draw and reveal the next round from Organizer mode.' : 'The organizer is drawing partners. Your ballot is locked.' };
+  }
+  if (state === 'revealed') {
+    return { title: 'Pairings revealed', body: 'Open Play for courts or Present for the room reveal.' };
+  }
+  if (state === 'playing') {
+    return { title: 'Games are live', body: isManager ? 'Post scores from Organizer mode as courts finish.' : 'Check your court, follow standings, and get ready for the next round.' };
+  }
+  if (state === 'done') {
+    return { title: 'Round complete', body: isManager ? 'Finalize standings or open the next vote when the room is ready.' : 'Scores are in. Watch for the next voting window.' };
+  }
+  return { title: 'Mixer event', body: 'Use this event home to jump between player, organizer, invite, and presentation modes.' };
+}
+
+function formatMixerDuration(seconds: number) {
+  if (seconds <= 0) return '0s';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const extraSeconds = seconds % 60;
+  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  if (minutes > 0) return extraSeconds > 0 ? `${minutes}m ${extraSeconds}s` : `${minutes}m`;
+  return `${extraSeconds}s`;
 }
 
 function MatchesTab({

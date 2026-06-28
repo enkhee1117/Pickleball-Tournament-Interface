@@ -298,8 +298,8 @@ function MixerShell({
       <TopBar
         dark
         title={tournament.name}
-        sub={`Player view · Round ${currentRound.round_no} · ${currentRound.state}`}
-        left={<Link href="/tournaments" className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
+        sub={`Player mode · Round ${currentRound.round_no} · ${currentRound.state}`}
+        left={<Link href={`/tournaments/${tournament.id}`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
       />
       {isManager && <MixerModeSwitch tournamentId={tournament.id} active="player" />}
       <div className="px-[18px] pb-3">

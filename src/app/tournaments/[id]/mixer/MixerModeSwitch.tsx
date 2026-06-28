@@ -1,9 +1,10 @@
 import Link from 'next/link';
 
-type MixerMode = 'player' | 'organizer' | 'present';
+type MixerMode = 'event' | 'player' | 'organizer' | 'present';
 
 export function MixerModeSwitch({ tournamentId, active, dark = true }: { tournamentId: string; active: MixerMode; dark?: boolean }) {
   const items: Array<{ id: MixerMode; label: string; href: string }> = [
+    { id: 'event', label: 'Event', href: `/tournaments/${tournamentId}` },
     { id: 'player', label: 'Player', href: `/tournaments/${tournamentId}/mixer` },
     { id: 'organizer', label: 'Organizer', href: `/tournaments/${tournamentId}/mixer/admin` },
     { id: 'present', label: 'Present', href: `/tournaments/${tournamentId}/mixer/present` },
@@ -11,7 +12,7 @@ export function MixerModeSwitch({ tournamentId, active, dark = true }: { tournam
   return (
     <nav
       aria-label="Mixer view switcher"
-      className="mx-[18px] mb-3 grid grid-cols-3 gap-1 rounded-2xl p-1"
+      className="mx-[18px] mb-3 grid grid-cols-4 gap-1 rounded-2xl p-1"
       style={{
         background: dark ? 'oklch(0.215 0.03 264)' : 'var(--paper-2)',
         border: dark ? '1px solid oklch(0.36 0.04 266)' : '1px solid var(--line)',

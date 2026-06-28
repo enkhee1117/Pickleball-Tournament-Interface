@@ -110,7 +110,7 @@ export default async function MixerPresentPage({ params }: PageProps) {
         dark
         title={t.name}
         sub={round ? `Round ${round.round_no} · ${round.state}` : 'Presentation'}
-        left={<Link href={`/tournaments/${id}/mixer/admin`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
+        left={<Link href={`/tournaments/${id}`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
       />
       <MixerModeSwitch tournamentId={id} active="present" />
       <div className="flex flex-1 flex-col items-center justify-center px-8 pb-10 text-center">

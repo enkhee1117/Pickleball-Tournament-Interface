@@ -65,7 +65,12 @@ const TABS: Tab[] = [
 
 const HIDDEN_PATH_PREFIXES = ['/login', '/signup', '/onboarding', '/join', '/match', '/t'];
 const HIDDEN_EXACT = new Set<string>();
-const HIDDEN_PATTERNS = [/^\/tournaments\/new(\/|$)/, /^\/tournaments\/[^/]+\/(invite|match|create|mixer)(\/|$)/];
+const HIDDEN_PATTERNS = [
+  /^\/tournaments\/new(\/|$)/,
+  /^\/tournaments\/[^/]+\/(invite|match|create)(\/|$)/,
+  /^\/tournaments\/[^/]+\/mixer$/,
+  /^\/tournaments\/[^/]+\/mixer\/present$/,
+];
 
 export function TabBar() {
   const pathname = usePathname() || '/';
