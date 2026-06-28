@@ -66,7 +66,7 @@ export default async function InvitePage({
             <div>
               <div className="text-sm font-semibold text-ink">Tournament created!</div>
               <div className="mt-0.5 text-xs" style={{ color: 'oklch(0.3 0.05 140)' }}>
-                Share the code below — manage the roster from Settings.
+                Share the code below, then return to the event home when the roster is ready.
               </div>
             </div>
           </div>
@@ -138,15 +138,17 @@ export default async function InvitePage({
           <div className="mt-0.5 text-[12px] text-ink-3">
             {isManager
               ? isMixer
-                ? 'Add players or open the Mixer controls to run voting and the reveal.'
-                : 'Add players, edit names, or generate matches in Settings on the scoreboard.'
-              : 'Open the scoreboard to see the roster, matches, and standings.'}
+                ? 'Add players here, then use Organizer mode from the event home to run voting and the reveal.'
+                : 'Add players, edit names, or generate matches from Settings.'
+              : isMixer
+                ? 'Open the event home to vote, view courts, and follow the Mixer.'
+                : 'Open the scoreboard to see the roster, matches, and standings.'}
           </div>
         </div>
 
         <div className="mt-5 grid gap-2">
           <Link
-            href={isMixer ? `/tournaments/${t.id}/mixer` : `/tournaments/${t.id}`}
+            href={`/tournaments/${t.id}`}
             className="block w-full rounded-2xl px-5 py-[18px] text-center text-base font-semibold tracking-tight"
             style={{
               background: 'var(--ink)',
@@ -154,7 +156,7 @@ export default async function InvitePage({
               boxShadow: '0 4px 14px oklch(0.2 0.05 100 / 0.12)',
             }}
           >
-            {isMixer ? 'Open Mixer →' : 'Open scoreboard →'}
+            {isMixer ? 'Open event home →' : 'Open scoreboard →'}
           </Link>
           {isManager && (
             <Link
@@ -162,7 +164,7 @@ export default async function InvitePage({
               className="block w-full rounded-2xl px-5 py-3 text-center text-[13px] font-semibold"
               style={{ background: '#fff', color: 'var(--ink)', border: '1px solid var(--line)' }}
             >
-              {isMixer ? 'Open Mixer controls →' : 'Manage roster + schedule →'}
+              {isMixer ? 'Open Organizer mode →' : 'Manage roster + schedule →'}
             </Link>
           )}
         </div>

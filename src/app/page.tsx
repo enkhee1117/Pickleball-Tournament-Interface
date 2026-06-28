@@ -436,7 +436,7 @@ function HeroTournament({
         : tournament.status.toUpperCase();
   return (
     <Link
-      href={tournament.format === 'partner_mixer' ? `/tournaments/${tournament.id}/mixer` : `/tournaments/${tournament.id}`}
+      href={`/tournaments/${tournament.id}`}
       className="relative block overflow-hidden rounded-[22px] p-5 text-paper"
       style={{ background: 'linear-gradient(140deg, oklch(0.22 0.04 140), oklch(0.16 0.02 100))' }}
     >
@@ -462,7 +462,7 @@ function HeroTournament({
       </div>
       <div className="relative mt-4 flex items-center justify-between gap-2">
         <div className="text-[12px]" style={{ color: 'oklch(0.85 0.04 140)' }}>
-          {tournament.format === 'partner_mixer' ? 'Open Mixer' : 'Open scoreboard'}
+          {tournament.format === 'partner_mixer' ? 'Open event home' : 'Open scoreboard'}
         </div>
         <span style={{ color: 'var(--court)' }}>{Icons.arrow}</span>
       </div>

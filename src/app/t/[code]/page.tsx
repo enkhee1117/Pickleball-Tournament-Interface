@@ -252,7 +252,7 @@ function CtaBar({
   authed: boolean;
   isMember: boolean;
 }) {
-  const target = format === 'partner_mixer' ? `/tournaments/${tournamentId}/mixer` : `/tournaments/${tournamentId}`;
+  const target = `/tournaments/${tournamentId}`;
   if (authed && isMember) {
     return (
       <div className="px-[18px] pt-3.5">
@@ -261,7 +261,7 @@ function CtaBar({
           className="block w-full rounded-2xl px-5 py-3.5 text-center text-base font-semibold tracking-tight"
           style={{ background: 'var(--ink)', color: 'var(--paper)' }}
         >
-          {format === 'partner_mixer' ? 'Open Mixer →' : 'Open scoreboard →'}
+          {format === 'partner_mixer' ? 'Open event home →' : 'Open scoreboard →'}
         </Link>
       </div>
     );

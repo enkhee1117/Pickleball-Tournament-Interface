@@ -128,7 +128,7 @@ export default async function TournamentsPage({
           >
             <div className="text-[15px] font-semibold text-ink">No tournaments here yet</div>
             <div className="mt-1 text-xs text-ink-3">
-              Spin up your first round robin in 90 seconds.
+              Create a Mixer, round robin, or bracket when the next game night appears.
             </div>
           </div>
         ) : (
@@ -166,7 +166,7 @@ function TournamentRow({ t }: { t: Tournament }) {
   });
   return (
     <Link
-      href={t.format === 'partner_mixer' ? `/tournaments/${t.id}/mixer` : `/tournaments/${t.id}`}
+      href={`/tournaments/${t.id}`}
       className="relative flex items-center gap-3 overflow-hidden rounded-[18px] bg-white p-4"
       style={{ border: '1px solid var(--line)' }}
     >

@@ -5,7 +5,7 @@ import { TabBar } from '@/components/TabBar';
 
 export const metadata: Metadata = {
   title: 'TourneyPal',
-  description: 'Run a tournament in 90 seconds.',
+  description: 'Run pickleball mixers and tournaments without spreadsheets.',
 };
 
 export const viewport: Viewport = {

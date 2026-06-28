@@ -69,7 +69,7 @@ export function JoinForm({ initialCode = '' }: Props) {
         setError(result.error ?? 'Could not join that tournament.');
         return;
       }
-      router.push(result.format === 'partner_mixer' ? `/tournaments/${result.tournamentId}/mixer` : `/tournaments/${result.tournamentId}`);
+      router.push(`/tournaments/${result.tournamentId}`);
     });
   };
 
