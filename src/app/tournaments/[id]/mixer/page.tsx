@@ -14,7 +14,7 @@ import { MixerModeSwitch } from './MixerModeSwitch';
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: 'vote' | 'match' | 'betting' | 'me'; ok?: string; error?: string }>;
+  searchParams: Promise<{ tab?: 'vote' | 'match' | 'betting' | 'me'; round?: string; ok?: string; error?: string }>;
 };
 
 type TournamentRow = {
@@ -74,6 +74,7 @@ type StateRow = {
 };
 
 type VoteRow = {
+  round_id: string;
   target_player_id: string;
   up_tokens: number;
   down_tokens: number;
@@ -162,7 +163,11 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   if (t.format !== 'partner_mixer') notFound();
 
   const cfg = config as ConfigRow | null;
-  const currentRound = ((rounds ?? []) as RoundRow[])[0] ?? null;
+  const roundRows = (rounds ?? []) as RoundRow[];
+  const currentRound = roundRows[0] ?? null;
+  const requestedRoundNo = Number.parseInt(sp.round ?? '', 10);
+  const voteRound = (Number.isFinite(requestedRoundNo) ? roundRows.find((r) => r.round_no === requestedRoundNo) : null) ?? currentRound;
+  const roundIds = roundRows.map((r) => r.id);
   const roster = (players ?? []) as PlayerRow[];
   const stateRows = (states ?? []) as StateRow[];
   const role = (member as { role?: string } | null)?.role ?? null;
@@ -171,8 +176,8 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const myState = myPlayer ? stateRows.find((s) => s.player_id === myPlayer.id) ?? null : null;
 
   const [{ data: votes }, { data: pairings }, { data: scores }, { data: bets }, { data: payments }, { data: snapshot }] = await Promise.all([
-    currentRound && myPlayer
-      ? supabase.from('mixer_votes').select('target_player_id,up_tokens,down_tokens').eq('round_id', currentRound.id).eq('voter_player_id', myPlayer.id)
+    roundIds.length > 0 && myPlayer
+      ? supabase.from('mixer_votes').select('round_id,target_player_id,up_tokens,down_tokens').in('round_id', roundIds).eq('voter_player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
     currentRound
       ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no').eq('round_id', currentRound.id).order('court_no', { ascending: true })
@@ -200,6 +205,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const standings = Array.isArray(final?.standings) ? (final.standings as StandingItem[]) : [];
   const raffleTickets = Array.isArray(final?.raffle_tickets) ? (final.raffle_tickets as RaffleItem[]) : [];
   const raffleWinner = final?.raffle_winner && !Array.isArray(final.raffle_winner) ? (final.raffle_winner as RaffleItem) : null;
+  const shellRound = tab === 'vote' ? (voteRound ?? currentRound) : currentRound;
 
   if (!cfg || !currentRound) {
     return <MissingSetup tournamentId={id} tournamentName={t.name} />;
@@ -207,7 +213,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
 
   if (!user) {
     return (
-      <MixerShell tournament={t} currentRound={currentRound} tab={tab} player={null} isManager={isManager}>
+      <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={null} isManager={isManager}>
         <div className="px-[18px] pt-6">
           <div className="rounded-2xl bg-white p-5 text-center" style={{ border: '1px solid var(--line)' }}>
             <div className="serif text-[32px] leading-none text-ink">Jump into the Mixer</div>
@@ -226,7 +232,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
 
   if (!myPlayer) {
     return (
-      <MixerShell tournament={t} currentRound={currentRound} tab={tab} player={null} isManager={isManager}>
+      <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={null} isManager={isManager}>
         <form action={bindMixerRosterEntry} className="px-[18px] pt-6">
           <input type="hidden" name="tournament_id" value={id} />
           <div className="rounded-2xl bg-white p-5" style={{ border: '1px solid var(--line)' }}>
@@ -243,13 +249,15 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   }
 
   return (
-    <MixerShell tournament={t} currentRound={currentRound} tab={tab} player={myPlayer} isManager={isManager}>
+    <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={myPlayer} isManager={isManager}>
       {sp.error && <Notice tone="error">{sp.error}</Notice>}
       {sp.ok && <Notice tone="ok">{sp.ok}</Notice>}
       {tab === 'vote' && (
         <VoteTab
           tournamentId={id}
-          round={currentRound}
+          round={voteRound ?? currentRound}
+          rounds={roundRows}
+          eventRoundCount={cfg.rounds}
           config={cfg}
           roster={roster}
           states={stateRows}
@@ -351,6 +359,8 @@ function hashString(value: string) {
 function VoteTab({
   tournamentId,
   round,
+  rounds,
+  eventRoundCount,
   config,
   roster,
   states,
@@ -360,6 +370,8 @@ function VoteTab({
 }: {
   tournamentId: string;
   round: RoundRow;
+  rounds: RoundRow[];
+  eventRoundCount: number;
   config: ConfigRow;
   roster: PlayerRow[];
   states: StateRow[];
@@ -370,13 +382,21 @@ function VoteTab({
   const poolFor = (player: PlayerRow): 'a' | 'b' => (player.gender === 'f' ? 'b' : 'a');
   const myPool = states.find((s) => s.player_id === myPlayer.id)?.pairing_pool ?? poolFor(myPlayer);
   const targets = roster.filter((p) => p.id !== myPlayer.id && poolFor(p) !== myPool);
+  const activeVotes = votes.filter((v) => v.round_id === round.id);
   const spent = votes.reduce((s, v) => s + v.up_tokens + v.down_tokens, 0);
   const remaining = (myState?.tokens_base_remaining ?? config.starting_tokens) + (myState?.tokens_bought_remaining ?? 0);
-  const budget = remaining + spent;
+  const budget = Math.max(config.starting_tokens, remaining + spent);
   const left = remaining;
   const locked = round.state !== 'open';
   return (
     <div className="px-[18px]">
+      <RoundSelector
+        tournamentId={tournamentId}
+        rounds={rounds}
+        activeRound={round}
+        eventRoundCount={eventRoundCount}
+        votes={votes}
+      />
       <div className="mb-3 grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
         <div className="min-w-0">
           <div className="flex items-center justify-between gap-3">
@@ -401,7 +421,7 @@ function VoteTab({
       )}
       <div className="grid gap-2.5">
         {targets.map((p) => {
-          const vote = votes.find((v) => v.target_player_id === p.id) ?? { up_tokens: 0, down_tokens: 0 };
+          const vote = activeVotes.find((v) => v.target_player_id === p.id) ?? { up_tokens: 0, down_tokens: 0 };
           const up = vote.up_tokens;
           const down = vote.down_tokens;
           return (
@@ -439,6 +459,7 @@ function VoteTab({
                     targetPlayerId={p.id}
                     upTokens={0}
                     downTokens={0}
+                    returnRound={round.round_no}
                     disabled={locked}
                     tone="clear"
                   />
@@ -452,6 +473,7 @@ function VoteTab({
                     targetPlayerId={p.id}
                     upTokens={0}
                     downTokens={down + 1}
+                    returnRound={round.round_no}
                     disabled={locked || (left <= 0 && up === 0)}
                     tone="down"
                   />
@@ -464,11 +486,72 @@ function VoteTab({
                   targetPlayerId={p.id}
                   upTokens={up + 1}
                   downTokens={0}
+                  returnRound={round.round_no}
                   disabled={locked || (left <= 0 && down === 0)}
                   tone="up"
                 />
               </div>
             </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RoundSelector({
+  tournamentId,
+  rounds,
+  activeRound,
+  eventRoundCount,
+  votes,
+}: {
+  tournamentId: string;
+  rounds: RoundRow[];
+  activeRound: RoundRow;
+  eventRoundCount: number;
+  votes: VoteRow[];
+}) {
+  const byNumber = new Map(rounds.map((round) => [round.round_no, round]));
+  const total = Math.max(eventRoundCount, rounds.length, activeRound.round_no);
+  return (
+    <div className="mb-3 rounded-2xl p-3" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>Voting rounds</div>
+        <div className="mono text-xs font-bold" style={{ color: 'var(--court)' }}>R{activeRound.round_no}</div>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {Array.from({ length: total }).map((_, index) => {
+          const roundNo = index + 1;
+          const round = byNumber.get(roundNo);
+          const active = round?.id === activeRound.id;
+          const spent = round ? votes.filter((vote) => vote.round_id === round.id).reduce((sum, vote) => sum + vote.up_tokens + vote.down_tokens, 0) : 0;
+          if (!round) {
+            return (
+              <span
+                key={roundNo}
+                className="flex min-w-[76px] flex-col items-center rounded-xl px-3 py-2 text-center opacity-45"
+                style={{ border: '1px dashed oklch(0.36 0.04 266)', color: 'oklch(0.78 0.028 264)' }}
+              >
+                <span className="mono text-sm font-bold">R{roundNo}</span>
+                <span className="mt-0.5 text-[10px] uppercase tracking-[0.08em]">Locked</span>
+              </span>
+            );
+          }
+          return (
+            <Link
+              key={round.id}
+              href={`/tournaments/${tournamentId}/mixer?round=${round.round_no}`}
+              className="flex min-w-[76px] flex-col items-center rounded-xl px-3 py-2 text-center"
+              style={{
+                background: active ? 'var(--court)' : 'oklch(0.285 0.038 266)',
+                color: active ? 'oklch(0.2 0.04 140)' : 'oklch(0.975 0.012 264)',
+                border: active ? '1px solid var(--court)' : '1px solid oklch(0.42 0.045 266)',
+              }}
+            >
+              <span className="mono text-sm font-bold">R{round.round_no}</span>
+              <span className="mt-0.5 text-[10px] uppercase tracking-[0.08em]">{spent > 0 ? `${spent} token${spent === 1 ? '' : 's'}` : round.state}</span>
+            </Link>
           );
         })}
       </div>
@@ -484,6 +567,7 @@ function VoteSubmit({
   targetPlayerId,
   upTokens,
   downTokens,
+  returnRound,
   disabled,
   tone,
 }: {
@@ -494,6 +578,7 @@ function VoteSubmit({
   targetPlayerId: string;
   upTokens: number;
   downTokens: number;
+  returnRound: number;
   disabled: boolean;
   tone: 'up' | 'down' | 'clear';
 }) {
@@ -507,6 +592,7 @@ function VoteSubmit({
       <input type="hidden" name="target_player_id" value={targetPlayerId} />
       <input type="hidden" name="up_tokens" value={upTokens} />
       <input type="hidden" name="down_tokens" value={downTokens} />
+      <input type="hidden" name="return_round" value={returnRound} />
       <button
         disabled={disabled}
         className="h-10 rounded-xl px-3 text-xs font-extrabold disabled:opacity-40"
