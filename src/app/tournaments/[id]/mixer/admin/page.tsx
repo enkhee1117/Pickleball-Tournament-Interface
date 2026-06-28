@@ -387,6 +387,8 @@ function ConfigForm({
   betChips: number;
 }) {
   const pot = playerCount * Number(cfg.entry_fee);
+  const lockHours = Math.floor(cfg.lock_seconds / 3600);
+  const lockExtraSeconds = cfg.lock_seconds % 3600;
   return (
     <form action={updateMixerConfig} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
       <input type="hidden" name="tournament_id" value={tournamentId} />
@@ -407,7 +409,13 @@ function ConfigForm({
               <option value="manual">Manual close</option>
             </select>
           </label>
-          <NumberField name="lock_seconds" label="Lock seconds" value={cfg.lock_seconds} min={5} max={3600} />
+          <div className="grid grid-cols-2 gap-3">
+            <NumberField name="lock_hours" label="Lock hours" value={lockHours} min={0} max={168} />
+            <NumberField name="lock_extra_seconds" label="Extra seconds" value={lockExtraSeconds} min={0} max={3599} />
+          </div>
+        </div>
+        <div className="mt-2 text-xs text-ink-3">
+          Current window: {formatLockDuration(cfg.lock_seconds)}. Use hours for signup-day voting windows; extra seconds are only for fine tuning.
         </div>
         <div className="mt-3 grid gap-2">
           <ToggleField name="downvotes_enabled" label="Downvotes" checked={cfg.downvotes_enabled} sub="Let players spend tokens on a gentle no-thanks." />
@@ -599,6 +607,14 @@ function Notice({ tone, children }: { tone: 'ok' | 'error'; children: ReactNode 
 
 function money(value: number) {
   return `$${Math.round(value).toLocaleString()}`;
+}
+
+function formatLockDuration(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const remainder = seconds % 3600;
+  if (hours > 0 && remainder > 0) return `${hours}h ${remainder}s`;
+  if (hours > 0) return `${hours}h`;
+  return `${seconds}s`;
 }
 
 function normalizePrizeBuckets(value: unknown): PrizeBuckets {

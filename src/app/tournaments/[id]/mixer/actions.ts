@@ -20,6 +20,12 @@ function fieldBool(formData: FormData, key: string): boolean {
   return formData.get(key) === 'on' || formData.get(key) === 'true';
 }
 
+function lockDurationSeconds(formData: FormData): number {
+  const hours = fieldInt(formData, 'lock_hours', 24, 0, 168);
+  const seconds = fieldInt(formData, 'lock_extra_seconds', 0, 0, 3599);
+  return Math.max(5, Math.min(604800, hours * 3600 + seconds));
+}
+
 export async function bindMixerRosterEntry(formData: FormData): Promise<void> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const displayName = fieldString(formData, 'display_name');
@@ -60,7 +66,7 @@ export async function updateMixerConfig(formData: FormData): Promise<void> {
     p_rounds: fieldInt(formData, 'rounds', 5, 1, 50),
     p_courts: fieldInt(formData, 'courts', 3, 1, 16),
     p_lock_mode: fieldString(formData, 'lock_mode') || 'timer',
-    p_lock_seconds: fieldInt(formData, 'lock_seconds', 90, 5, 3600),
+    p_lock_seconds: lockDurationSeconds(formData),
     p_alpha: fieldNumber(formData, 'alpha', 1, 0, 100),
     p_beta: fieldNumber(formData, 'beta', 2.5, 0, 100),
     p_gamma: fieldNumber(formData, 'gamma', 1, 0, 100),
@@ -160,7 +166,7 @@ export async function initializeMixerEvent(formData: FormData): Promise<void> {
     p_starting_chips: 100,
     p_rounds: 5,
     p_courts: 3,
-    p_lock_seconds: 90,
+    p_lock_seconds: 86400,
     p_entry_fee: 20,
     p_betting_enabled: true,
     p_raffle_enabled: true,

@@ -203,7 +203,7 @@ export async function createTournamentClient(input: CreateInput): Promise<Create
       p_starting_chips: 100,
       p_rounds: input.rounds ?? 5,
       p_courts: input.courts ?? 3,
-      p_lock_seconds: input.lockSeconds ?? 90,
+      p_lock_seconds: input.lockSeconds ?? 86400,
       p_entry_fee: input.entryFee ?? 20,
       p_betting_enabled: input.betting ?? true,
       p_raffle_enabled: input.raffle ?? true,

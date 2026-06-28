@@ -87,7 +87,7 @@ export function CreateWizard() {
     betting: true,
     raffle: true,
     downvotes: true,
-    lockSeconds: 90,
+    lockSeconds: 86400,
     rosterMode: 'placeholders',
     players: makePlayers(8),
   });
@@ -806,6 +806,11 @@ function StepMixerVoting({
   data: WizardData;
   set: <K extends keyof WizardData>(k: K, v: WizardData[K]) => void;
 }) {
+  const lockHours = Math.floor(data.lockSeconds / 3600);
+  const lockExtraSeconds = data.lockSeconds % 3600;
+  const setLockHours = (hours: number) => set('lockSeconds', hours * 3600 + lockExtraSeconds);
+  const setLockExtraSeconds = (seconds: number) => set('lockSeconds', lockHours * 3600 + seconds);
+
   return (
     <div>
       <div className="serif mb-1.5 text-[28px] leading-[1.1] text-ink">
@@ -816,7 +821,8 @@ function StepMixerVoting({
       </div>
 
       <Stepper label="Tokens per player" value={data.startTokens} min={4} max={20} onChange={(v) => set('startTokens', v)} />
-      <Stepper label="Voting lock seconds" value={data.lockSeconds} min={30} max={300} onChange={(v) => set('lockSeconds', v)} />
+      <Stepper label="Voting lock hours" value={lockHours} min={0} max={168} onChange={setLockHours} />
+      <Stepper label="Extra seconds" value={lockExtraSeconds} min={0} max={3599} onChange={setLockExtraSeconds} />
       <Stepper label="Rounds" value={data.rounds} min={3} max={12} onChange={(v) => set('rounds', v)} />
       <Stepper label="Courts" value={data.courts} min={1} max={6} onChange={(v) => set('courts', v)} />
 
@@ -977,6 +983,14 @@ const PAIRING_LABEL: Record<PairingId, string> = {
   manual: 'Manual',
 };
 
+function formatLockDuration(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const remainder = seconds % 3600;
+  if (hours > 0 && remainder > 0) return `${hours}h ${remainder}s`;
+  if (hours > 0) return `${hours}h`;
+  return `${seconds}s`;
+}
+
 function StepReview({
   data,
   manualTeams,
@@ -1009,7 +1023,7 @@ function StepReview({
           ? ([['Linked players', `${linked} from existing accounts`]] as Array<[string, string]>)
           : []),
         ['Tokens / player', `${data.startTokens}`],
-        ['Lock timer', `${data.lockSeconds}s`],
+        ['Lock timer', formatLockDuration(data.lockSeconds)],
         ['Entry fee', `$${data.entryFee}`],
         ['Add-ons', [data.betting && 'Betting', data.raffle && 'Raffle', data.downvotes && 'Rather-not'].filter(Boolean).join(' · ') || 'None'],
         ['Courts', `${data.courts}`],
