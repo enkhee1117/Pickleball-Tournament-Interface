@@ -236,10 +236,10 @@ export async function placeMixerBet(formData: FormData): Promise<void> {
     p_pick_player_id: pickPlayerId,
     p_chips: chips,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) redirect(`${mixerPath(tournamentId)}?tab=betting&error=${encodeURIComponent(formatPgError(error))}`);
 
   revalidatePath(mixerPath(tournamentId));
-  redirect(`${mixerPath(tournamentId)}?ok=Bet%20placed`);
+  redirect(`${mixerPath(tournamentId)}?tab=betting&ok=Bet%20placed`);
 }
 
 export async function requestMixerPayment(formData: FormData): Promise<void> {

@@ -36,6 +36,7 @@ import { RecordingsMenu } from '@/components/RecordingsMenu';
 import { ConfirmForm } from '@/components/ui/ConfirmForm';
 import { SubmitButton } from '@/components/ui/SubmitButton';
 import { formatInviteCode } from '@/lib/invite-codes';
+import { currentMixerRound } from '@/lib/mixer-rounds';
 import { MixerModeSwitch } from './mixer/MixerModeSwitch';
 
 type PageProps = {
@@ -167,8 +168,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
             .from('mixer_rounds')
             .select('id,round_no,state,lock_at')
             .eq('tournament_id', id)
-            .order('round_no', { ascending: false })
-            .limit(1),
+            .order('round_no', { ascending: true }),
           supabase
             .from('player_event_state')
             .select('player_id,pairing_pool,tokens_base_remaining,tokens_bought_remaining,chips_remaining,sit_out_count')
@@ -185,7 +185,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
           { data: [] },
         ];
   const mixerCfg = mixerConfig as MixerConfigRow | null;
-  const mixerRound = ((mixerRounds ?? []) as MixerRoundRow[])[0] ?? null;
+  const mixerRound = currentMixerRound((mixerRounds ?? []) as MixerRoundRow[]);
   const mixerStateRows = (mixerStates ?? []) as MixerStateRow[];
   const mixerPaymentRows = (mixerPayments ?? []) as MixerPaymentRow[];
 

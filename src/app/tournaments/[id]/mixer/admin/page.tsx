@@ -7,6 +7,7 @@ import { formatInviteCode } from '@/lib/invite-codes';
 import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
 import { Icons } from '@/components/ui/icons';
+import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 import { ShareCodeCard } from '../../invite/ShareCodeCard';
 import { MixerModeSwitch } from '../MixerModeSwitch';
 import {
@@ -89,6 +90,7 @@ type ScoreRow = {
   court_no: number;
   team_a_score: number;
   team_b_score: number;
+  completed_at: string | null;
 };
 
 type PaymentRow = {
@@ -167,7 +169,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
       ? supabase.from('tournament_members').select('role').eq('tournament_id', id).eq('user_id', user.id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from('event_config').select('*').eq('tournament_id', id).maybeSingle(),
-    supabase.from('mixer_rounds').select('id,round_no,state,lock_at').eq('tournament_id', id).order('round_no', { ascending: false }),
+    supabase.from('mixer_rounds').select('id,round_no,state,lock_at').eq('tournament_id', id).order('round_no', { ascending: true }),
     supabase.from('tournament_players').select('id,display_name,gender,profile_id,withdrawn_at').eq('tournament_id', id).order('created_at', { ascending: true }),
   ]);
 
@@ -179,7 +181,8 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   if (!isManager) notFound();
 
   const cfg = config as ConfigRow | null;
-  const currentRound = ((rounds ?? []) as RoundRow[])[0] ?? null;
+  const roundRows = sortMixerRounds((rounds ?? []) as RoundRow[]);
+  const currentRound = currentMixerRound(roundRows);
   const roster = (players ?? []) as PlayerRow[];
 
   const [{ data: pairings }, { data: scores }, { data: payments }, { data: states }, { data: bets }, { data: snapshot }] = await Promise.all([
@@ -187,7 +190,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
       ? supabase.from('mixer_pairings').select('id,player_a_id,player_b_id,court_no').eq('round_id', currentRound.id).order('court_no', { ascending: true })
       : Promise.resolve({ data: [] }),
     currentRound
-      ? supabase.from('mixer_scores').select('court_no,team_a_score,team_b_score').eq('round_id', currentRound.id)
+      ? supabase.from('mixer_scores').select('court_no,team_a_score,team_b_score,completed_at').eq('round_id', currentRound.id)
       : Promise.resolve({ data: [] }),
     supabase.from('payments').select('id,player_id,type,amount,method,status').eq('tournament_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('player_event_state').select('player_id,pairing_pool,tokens_base_remaining,tokens_bought_remaining,chips_remaining,sit_out_count').eq('tournament_id', id),
@@ -210,6 +213,16 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const finalStandings = Array.isArray(final?.standings) ? final.standings : [];
   const raffleWinner = final?.raffle_winner && !Array.isArray(final.raffle_winner) ? final.raffle_winner as Record<string, unknown> : null;
   const activeTab = getOrganizerTab(sp.tab);
+  const drawStarted = roundRows.some((round) => ['drawing', 'revealed', 'playing', 'done'].includes(round.state));
+  const hasOpenBallots = roundRows.some((round) => round.state === 'open');
+  const hasLockedBallots = roundRows.some((round) => round.state === 'locked');
+  const currentCourtCount = new Set(pairingRows.map((pairing) => pairing.court_no)).size;
+  const scoredCourtCount = scoreRows.filter((score) => score.completed_at).length;
+  const canOpenBallot = !!currentRound && !drawStarted && hasLockedBallots;
+  const canLockBallot = !!currentRound && hasOpenBallots && !drawStarted;
+  const canDraw = currentRound?.state === 'locked';
+  const canStartPlay = currentRound?.state === 'revealed';
+  const canMarkDone = (currentRound?.state === 'playing' || currentRound?.state === 'revealed') && (currentCourtCount === 0 || scoredCourtCount >= currentCourtCount);
 
   return (
     <div className="flex min-h-full flex-col bg-paper">
@@ -268,22 +281,26 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                       <Stat label="Vote window" value={cfg.lock_mode === 'manual' ? 'Manual' : formatLockDuration(cfg.lock_seconds)} />
                       <Stat label="Pool chips" value={betChips} />
                     </div>
+                    <RoundRail rounds={roundRows} activeRoundId={currentRound.id} />
                   </div>
                 </Section>
 
                 <Section title="Run controls">
                   <div className="grid grid-cols-2 gap-2">
-                    <StateButton tournamentId={id} roundId={currentRound.id} state="open" label="Open ballot" />
-                    <StateButton tournamentId={id} roundId={currentRound.id} state="locked" label="Lock ballot" />
+                    <StateButton tournamentId={id} roundId={currentRound.id} state="open" label="Open ballot" disabled={!canOpenBallot} />
+                    <StateButton tournamentId={id} roundId={currentRound.id} state="locked" label="Lock ballot" disabled={!canLockBallot} />
                     <form action={drawMixerRound}>
                       <input type="hidden" name="tournament_id" value={id} />
                       <input type="hidden" name="round_id" value={currentRound.id} />
-                      <button className="w-full rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
+                      <button disabled={!canDraw} className="w-full rounded-2xl px-4 py-3 text-sm font-semibold disabled:opacity-40" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
                         Draw & reveal
                       </button>
                     </form>
-                    <StateButton tournamentId={id} roundId={currentRound.id} state="playing" label="Start play" />
-                    <StateButton tournamentId={id} roundId={currentRound.id} state="done" label="Mark done" />
+                    <StateButton tournamentId={id} roundId={currentRound.id} state="playing" label="Start play" disabled={!canStartPlay} />
+                    <StateButton tournamentId={id} roundId={currentRound.id} state="done" label={currentCourtCount > 0 && scoredCourtCount < currentCourtCount ? `Score ${currentCourtCount - scoredCourtCount} court${currentCourtCount - scoredCourtCount === 1 ? '' : 's'}` : 'Mark done'} disabled={!canMarkDone} />
+                  </div>
+                  <div className="mt-2 rounded-2xl bg-white p-3 text-xs leading-5 text-ink-3" style={{ border: '1px solid var(--line)' }}>
+                    Players vote for every configured round up front. Lock ballot seals all unfinished rounds; each draw then reveals the next unfinished round in order.
                   </div>
                   <form action={finalizeMixerEvent} className="mt-2">
                     <input type="hidden" name="tournament_id" value={id} />
@@ -742,13 +759,39 @@ function PaymentButton({ tournamentId, paymentId, status, label }: { tournamentI
   );
 }
 
-function StateButton({ tournamentId, roundId, state, label }: { tournamentId: string; roundId: string; state: string; label: string }) {
+function RoundRail({ rounds, activeRoundId }: { rounds: RoundRow[]; activeRoundId: string }) {
+  return (
+    <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+      {rounds.map((round) => {
+        const active = round.id === activeRoundId;
+        return (
+          <div
+            key={round.id}
+            className="flex min-w-[76px] flex-col items-center rounded-xl px-3 py-2 text-center"
+            style={{
+              background: active ? 'var(--ink)' : 'var(--paper-2)',
+              color: active ? 'var(--paper)' : 'var(--ink)',
+              border: `1px solid ${active ? 'var(--ink)' : 'var(--line)'}`,
+            }}
+          >
+            <span className="mono text-sm font-bold">R{round.round_no}</span>
+            <span className="mt-0.5 text-[10px] uppercase tracking-[0.08em]" style={{ color: active ? 'oklch(0.82 0.02 95)' : 'var(--ink-3)' }}>
+              {round.state}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StateButton({ tournamentId, roundId, state, label, disabled = false }: { tournamentId: string; roundId: string; state: string; label: string; disabled?: boolean }) {
   return (
     <form action={setMixerRoundState}>
       <input type="hidden" name="tournament_id" value={tournamentId} />
       <input type="hidden" name="round_id" value={roundId} />
       <input type="hidden" name="state" value={state} />
-      <button className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-ink" style={{ border: '1px solid var(--line)' }}>
+      <button disabled={disabled} className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-ink disabled:opacity-40" style={{ border: '1px solid var(--line)' }}>
         {label}
       </button>
     </form>

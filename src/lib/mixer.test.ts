@@ -7,6 +7,7 @@ import {
   type MixerPlayer,
   type MixerVote,
 } from '@/lib/mixer';
+import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 
 describe('mixerPairWeight', () => {
   it('matches the handoff sanity check weights', () => {
@@ -92,5 +93,31 @@ describe('settleParimutuelBets', () => {
       { bettorPlayerId: 'a', marketPlace: 1, payout: 40 },
       { bettorPlayerId: 'b', marketPlace: 1, payout: 60 },
     ]);
+  });
+});
+
+describe('mixer round helpers', () => {
+  it('sorts rounds by round number without mutating the original array', () => {
+    const rounds = [
+      { round_no: 3, state: 'open' },
+      { round_no: 1, state: 'done' },
+      { round_no: 2, state: 'locked' },
+    ];
+
+    expect(sortMixerRounds(rounds).map((round) => round.round_no)).toEqual([1, 2, 3]);
+    expect(rounds.map((round) => round.round_no)).toEqual([3, 1, 2]);
+  });
+
+  it('uses the first unfinished round, or the final round once all are done', () => {
+    expect(currentMixerRound([
+      { round_no: 1, state: 'done' },
+      { round_no: 3, state: 'open' },
+      { round_no: 2, state: 'locked' },
+    ])).toEqual({ round_no: 2, state: 'locked' });
+
+    expect(currentMixerRound([
+      { round_no: 1, state: 'done' },
+      { round_no: 2, state: 'done' },
+    ])).toEqual({ round_no: 2, state: 'done' });
   });
 });
