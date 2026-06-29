@@ -40,6 +40,7 @@ declare
   v_lock_mode text;
   v_lock_seconds int;
   v_raffle_winner jsonb;
+  v_round2_state text;
 begin
   insert into auth.users (
     id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -167,27 +168,67 @@ begin
   end if;
 
   perform public.app_mixer_set_round_state(v_round1, 'locked');
+
+  select id, state into v_round2, v_round2_state
+  from public.mixer_rounds
+  where tournament_id = v_tournament and round_no = 2;
+  if v_round2 is null then
+    raise exception 'round 2 was not created up front';
+  end if;
+  if v_round2_state <> 'locked' then
+    raise exception 'expected round 2 to lock with the upfront ballot, got %', v_round2_state;
+  end if;
+
   v_pairings := public.app_mixer_draw_round(v_round1);
   if v_pairings <> 4 then
     raise exception 'expected 4 pairings, got %', v_pairings;
   end if;
 
-  with ordered as (
-    select
-      mp.*,
-      row_number() over (partition by mp.round_id, mp.court_no order by mp.created_at, mp.id) as team_no
-    from public.mixer_pairings mp
-    where mp.round_id = v_round1
-  )
-  select court_no, team_no into v_court, v_team_no
-  from ordered
-  where player_a_id = v_p1 or player_b_id = v_p1;
+  for v_court in
+    select distinct court_no
+    from public.mixer_pairings
+    where round_id = v_round1
+    order by court_no
+  loop
+    v_team_no := null;
+    with ordered as (
+      select
+        mp.*,
+        row_number() over (partition by mp.round_id, mp.court_no order by mp.created_at, mp.id) as team_no
+      from public.mixer_pairings mp
+      where mp.round_id = v_round1
+    )
+    select team_no into v_team_no
+    from ordered
+    where court_no = v_court
+      and (player_a_id = v_p1 or player_b_id = v_p1);
 
-  if v_team_no = 1 then
-    perform public.app_mixer_score_court(v_round1, v_court, 11, 0);
-  else
-    perform public.app_mixer_score_court(v_round1, v_court, 0, 11);
+    if v_team_no = 1 then
+      perform public.app_mixer_score_court(v_round1, v_court, 11, 0);
+    elsif v_team_no = 2 then
+      perform public.app_mixer_score_court(v_round1, v_court, 0, 11);
+    else
+      perform public.app_mixer_score_court(v_round1, v_court, 7, 11);
+    end if;
+  end loop;
+
+  perform public.app_mixer_set_round_state(v_round1, 'done');
+
+  v_pairings := public.app_mixer_draw_round(v_round2);
+  if v_pairings <> 4 then
+    raise exception 'expected 4 round 2 pairings, got %', v_pairings;
   end if;
+
+  for v_court in
+    select distinct court_no
+    from public.mixer_pairings
+    where round_id = v_round2
+    order by court_no
+  loop
+    perform public.app_mixer_score_court(v_round2, v_court, 8, 11);
+  end loop;
+
+  perform public.app_mixer_set_round_state(v_round2, 'done');
 
   with ordered_pairings as (
     select
@@ -222,20 +263,12 @@ begin
   perform public.app_mixer_place_bet(v_tournament, v_p1, 1, v_winner, 10);
 
   perform set_config('request.jwt.claim.sub', v_owner::text, true);
-  perform public.app_mixer_set_round_state(v_round1, 'done');
 
   select count(*) into v_round_count
   from public.mixer_rounds
   where tournament_id = v_tournament;
   if v_round_count <> 2 then
-    raise exception 'expected next round to be created, got % rounds', v_round_count;
-  end if;
-
-  select id into v_round2
-  from public.mixer_rounds
-  where tournament_id = v_tournament and round_no = 2;
-  if v_round2 is null then
-    raise exception 'round 2 was not created';
+    raise exception 'expected two upfront rounds, got % rounds', v_round_count;
   end if;
 
   perform public.app_mixer_finalize_event(v_tournament);
