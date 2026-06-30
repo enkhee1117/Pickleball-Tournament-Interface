@@ -149,6 +149,24 @@ begin
   perform public.app_mixer_set_vote(v_round1, v_p1, v_p2, 2, 0);
   perform public.app_mixer_set_vote(v_round1, v_p1, v_p4, 1, 0);
 
+  -- Adversarial: per-target upvote cap from migration 0044. The default cap
+  -- is 3; trying to put 4 on a single target must raise.
+  begin
+    perform public.app_mixer_set_vote(v_round1, v_p1, v_p6, 4, 0);
+    raise exception 'expected upvote cap to reject 4 tokens on one target';
+  exception
+    when sqlstate '22023' then null; -- expected
+  end;
+
+  -- Adversarial: anonymity at the API. u2 should not see u1's votes through
+  -- a direct table select; RLS restricts mixer_votes to the voter's own rows.
+  perform set_config('request.jwt.claim.sub', v_u2::text, true);
+  perform 1 from public.mixer_votes where voter_player_id = v_p1;
+  if found then
+    raise exception 'u2 must not be able to read u1 votes (anonymity guardrail)';
+  end if;
+  perform set_config('request.jwt.claim.sub', v_u1::text, true);
+
   select tokens_base_remaining into v_token_count
   from public.player_event_state
   where player_id = v_p1;
@@ -168,6 +186,25 @@ begin
   end if;
 
   perform public.app_mixer_set_round_state(v_round1, 'locked');
+
+  -- Adversarial: betting cutoff from migration 0044. With rounds=2 and the
+  -- default cutoff = last round, locking round 1 also locks round 2 (upfront
+  -- ballot model), which closes betting. A bet attempted now must raise.
+  perform set_config('request.jwt.claim.sub', v_u1::text, true);
+  begin
+    perform public.app_mixer_place_bet(v_tournament, v_p1, 1, v_p2, 5);
+    raise exception 'expected bet cutoff to reject post-lock wager';
+  exception
+    when sqlstate '42501' then null; -- expected: "betting is closed"
+  end;
+  perform set_config('request.jwt.claim.sub', v_owner::text, true);
+
+  -- For the rest of the happy path we want to settle a real winning bet,
+  -- which requires knowing the winner. Raise the cutoff past the final
+  -- round so the historical assertion at the end of the test still holds.
+  update public.event_config
+     set bet_lock_round_no = 50
+   where tournament_id = v_tournament;
 
   select id, state into v_round2, v_round2_state
   from public.mixer_rounds

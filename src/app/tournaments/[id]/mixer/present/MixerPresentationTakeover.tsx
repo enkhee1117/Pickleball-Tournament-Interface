@@ -250,11 +250,24 @@ function WaitingTakeover({ round }: { round: RoundRow | null }) {
 }
 
 function PlayerLine({ player, compact = false }: { player: PlayerRow; compact?: boolean }) {
+  // Reveal moment: the partner name uses Instrument Serif italic in the
+  // court accent (per brand handoff §8 / TourneyPal Implementation Handoff
+  // §2). The compact sit-out list keeps the sans-serif so the editorial
+  // emphasis stays on the partner names players actually care about.
   return (
     <div className={`mt-3 flex items-center gap-3 ${compact ? '' : 'rounded-2xl p-3'}`} style={compact ? undefined : { background: 'oklch(0.215 0.03 264)' }}>
       <Avatar player={mixerAvatarFor(player)} size={compact ? 36 : 54} ring={!compact} />
       <div className="min-w-0">
-        <div className={`truncate font-extrabold ${compact ? 'text-base' : 'text-[28px]'}`}>{player.display_name}</div>
+        <div
+          className={
+            compact
+              ? 'truncate text-base font-extrabold'
+              : 'serif truncate text-[34px] italic leading-tight'
+          }
+          style={compact ? undefined : { color: 'var(--court)' }}
+        >
+          {player.display_name}
+        </div>
       </div>
     </div>
   );

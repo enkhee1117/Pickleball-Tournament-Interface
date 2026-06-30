@@ -470,7 +470,7 @@ function MeTab({
       )}
       <div className="mt-3 rounded-2xl p-5" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
         <div className="serif text-[28px] leading-none">Payments</div>
-        <div className="mt-1 text-xs" style={{ color: 'oklch(0.78 0.028 264)' }}>Manual records only. Organizers confirm them from controls.</div>
+        <div className="mt-1 text-xs" style={{ color: 'oklch(0.78 0.028 264)' }}>The app never processes payment — organizers confirm Zelle / cash on their side.</div>
         <div className="mt-3 grid gap-2">
           {paymentMethodRows(methods).map((m) => (
             <div key={m.key} className="rounded-xl px-3 py-2 text-sm" style={{ background: 'oklch(0.285 0.038 266)' }}>

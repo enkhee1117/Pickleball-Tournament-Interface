@@ -19,6 +19,18 @@ export const DEFAULT_MIXER_CONFIG: MixerFormulaConfig = {
   repeatDecay: 0.2,
 };
 
+// Mirrors event_config.upvote_cap_per_target. Enforced server-side in
+// app_mixer_set_vote (migration 0044); also used here so client UI can
+// preflight the same limit instead of round-tripping for the rejection.
+export const MIXER_UPVOTE_CAP_PER_TARGET = 3;
+
+export function isUpvoteAllocationValid(
+  upTokens: number,
+  cap: number = MIXER_UPVOTE_CAP_PER_TARGET,
+): boolean {
+  return Number.isFinite(upTokens) && upTokens >= 0 && upTokens <= cap;
+}
+
 export type MixerVote = {
   voterPlayerId: string;
   targetPlayerId: string;
@@ -109,9 +121,13 @@ export function mixerPairWeight(
   history: MixerPairingHistory = {},
   config: MixerFormulaConfig = DEFAULT_MIXER_CONFIG,
 ): number {
+  // tau is in the denominator of exp(score/τ). SQL constraints τ ≥ 0.01;
+  // guard here so the TS lib never returns NaN/Infinity if a caller hands
+  // in a bad config.
+  const tau = config.tau > 0 ? config.tau : 0.01;
   const score = mixerPairScore(playerAId, playerBId, votes, config);
   const repeatCount = history[pairKey(playerAId, playerBId)] ?? 0;
-  return Math.exp(score / config.tau) * Math.pow(config.repeatDecay, repeatCount);
+  return Math.exp(score / tau) * Math.pow(config.repeatDecay, repeatCount);
 }
 
 export function chooseMixerSitOuts(players: MixerPlayer[], rng: () => number = Math.random): string[] {
