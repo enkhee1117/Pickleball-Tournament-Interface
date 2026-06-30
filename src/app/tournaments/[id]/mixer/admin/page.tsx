@@ -111,9 +111,10 @@ type StateRow = {
   sit_out_count: number;
 };
 
-type BetRow = {
+type BetSummaryRow = {
   market_place: number;
-  chips: number;
+  total_chips: number;
+  bet_count: number;
 };
 
 type SnapshotRow = {
@@ -185,7 +186,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const currentRound = currentMixerRound(roundRows);
   const roster = (players ?? []) as PlayerRow[];
 
-  const [{ data: pairings }, { data: scores }, { data: payments }, { data: states }, { data: bets }, { data: snapshot }] = await Promise.all([
+  const [{ data: pairings }, { data: scores }, { data: payments }, { data: states }, { data: betsSummary }, { data: snapshot }] = await Promise.all([
     currentRound
       ? supabase.from('mixer_pairings').select('id,player_a_id,player_b_id,court_no').eq('round_id', currentRound.id).order('court_no', { ascending: true })
       : Promise.resolve({ data: [] }),
@@ -194,7 +195,9 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
       : Promise.resolve({ data: [] }),
     supabase.from('payments').select('id,player_id,type,amount,method,status').eq('tournament_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('player_event_state').select('player_id,pairing_pool,tokens_base_remaining,tokens_bought_remaining,chips_remaining,sit_out_count').eq('tournament_id', id),
-    supabase.from('bets').select('market_place,chips').eq('tournament_id', id),
+    // Aggregated server-side via app_mixer_bets_summary so admins never see
+    // per-row (bettor_player_id, chips) — only market liquidity totals.
+    supabase.rpc('app_mixer_bets_summary', { p_tournament_id: id }),
     supabase.from('mixer_final_snapshots').select('standings,raffle_tickets,raffle_winner,bet_settlements').eq('tournament_id', id).maybeSingle(),
   ]);
 
@@ -202,12 +205,12 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const scoreRows = (scores ?? []) as ScoreRow[];
   const paymentRows = (payments ?? []) as PaymentRow[];
   const stateRows = (states ?? []) as StateRow[];
-  const betRows = (bets ?? []) as BetRow[];
+  const betSummaryRows = (betsSummary ?? []) as BetSummaryRow[];
   const final = snapshot as SnapshotRow | null;
   const name = (playerId: string) => roster.find((p) => p.id === playerId)?.display_name ?? 'TBD';
   const paidCount = paymentRows.filter((p) => p.type === 'entry' && p.status === 'confirmed').length;
   const pendingPayments = paymentRows.filter((p) => p.status === 'pending').length;
-  const betChips = betRows.reduce((sum, b) => sum + b.chips, 0);
+  const betChips = betSummaryRows.reduce((sum, b) => sum + b.total_chips, 0);
   const prizeBuckets = normalizePrizeBuckets(cfg?.prize_buckets);
   const paymentMethods = normalizePaymentMethods(cfg?.payment_methods);
   const finalStandings = Array.isArray(final?.standings) ? final.standings : [];

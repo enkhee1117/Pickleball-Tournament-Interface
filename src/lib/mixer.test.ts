@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MIXER_UPVOTE_CAP_PER_TARGET,
   computeRaffleTickets,
   drawMixerPairs,
+  isUpvoteAllocationValid,
+  mixerPairScore,
   mixerPairWeight,
   settleParimutuelBets,
   type MixerPlayer,
@@ -93,6 +96,65 @@ describe('settleParimutuelBets', () => {
       { bettorPlayerId: 'a', marketPlace: 1, payout: 40 },
       { bettorPlayerId: 'b', marketPlace: 1, payout: 60 },
     ]);
+  });
+});
+
+describe('mixer formula edge cases', () => {
+  it('clamps a one-sided downvote spree at the grief floor', () => {
+    // Far below -griefFloor of -4: γ·(d) = -20 would tank weight. The floor
+    // pins the score at -4, so weight = exp(-4/2) ≈ 0.135 — exactly the
+    // "anti-grief" floor the design specifies.
+    const votes: MixerVote[] = [
+      { voterPlayerId: 'a', targetPlayerId: 'b', upTokens: 0, downTokens: 20 },
+    ];
+    expect(mixerPairScore('a', 'b', votes)).toBeCloseTo(-4, 5);
+    expect(mixerPairWeight('a', 'b', votes)).toBeCloseTo(Math.exp(-2), 5);
+  });
+
+  it('does not divide by zero when tau is misconfigured', () => {
+    const weight = mixerPairWeight('a', 'b', [], {}, {
+      alpha: 1, beta: 2.5, gamma: 1, tau: 0, griefFloor: 4, repeatDecay: 0.2,
+    });
+    expect(Number.isFinite(weight)).toBe(true);
+  });
+});
+
+describe('upvote allocation validator', () => {
+  it('rejects more than the per-target cap of 3', () => {
+    expect(isUpvoteAllocationValid(0)).toBe(true);
+    expect(isUpvoteAllocationValid(3)).toBe(true);
+    expect(isUpvoteAllocationValid(4)).toBe(false);
+    expect(isUpvoteAllocationValid(-1)).toBe(false);
+    expect(isUpvoteAllocationValid(Number.NaN)).toBe(false);
+    expect(MIXER_UPVOTE_CAP_PER_TARGET).toBe(3);
+  });
+});
+
+describe('computeRaffleTickets edge cases', () => {
+  it('returns zero tickets when nobody upvoted you and you spent everything', () => {
+    const tickets = computeRaffleTickets({
+      votes: [],
+      states: [{ playerId: 'me', baseTokensRemaining: 0 }],
+    });
+    expect(tickets[0]).toEqual({
+      playerId: 'me',
+      popularityTickets: 0,
+      frugalityTickets: 0,
+      tickets: 0,
+    });
+  });
+});
+
+describe('settleParimutuelBets edge cases', () => {
+  it('returns no payouts when nobody backed the winner', () => {
+    const payouts = settleParimutuelBets({
+      bets: [
+        { marketPlace: 1, bettorPlayerId: 'a', pickPlayerId: 'wrong', chips: 10 },
+        { marketPlace: 1, bettorPlayerId: 'b', pickPlayerId: 'also-wrong', chips: 20 },
+      ],
+      winnersByPlace: { 1: 'real-winner' },
+    });
+    expect(payouts).toEqual([]);
   });
 });
 
