@@ -1,12 +1,15 @@
-# TourneyPal Design System
+# Try to Dink Design System
 
-This document is the source of truth for TourneyPal UI and brand consistency.
-The full visual system, including reference screenshots and prototype JSX, lives
-in `design_handoff_tourneypal/` — keep it in sync with this doc.
+This document is the source of truth for **Try to Dink** UI and brand
+consistency. The full visual system, including reference screenshots and
+prototype JSX, lives in `design_handoff_tourneypal/` (a legacy folder name from
+the pre-rebrand era — the visual system itself carries over unchanged).
 
 ## Brand
 
-- Product name: `TourneyPal`
+- Product name: `Try to Dink` (domain: `trytodink.com`)
+- Legacy name: `TourneyPal` — do not use in new copy; kept only in historical
+  docs and the `TP*` component-name prefixes (renaming those is deferred).
 - Voice: editorial, warm, playful, courtside-confident — short sentences with
   italic emphasis on the second line of headlines.
 - Visual style: **mobile-first, paper-light**, with two intentional dark
@@ -156,7 +159,7 @@ CSS keyframes live in `globals.css`; Tailwind animation aliases live in
 
 Before merging UI changes, verify:
 
-- Branding says `TourneyPal` only.
+- Branding says `Try to Dink` only (never the legacy `TourneyPal`).
 - Colors come from CSS variables / Tailwind tokens (paper / ink / court /
   serve / berry / line / sky).
 - Typography uses `serif` for display, default sans (Geist) for UI, `mono`

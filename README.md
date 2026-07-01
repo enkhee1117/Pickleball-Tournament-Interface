@@ -1,6 +1,10 @@
-# MLP Scoreboard
+# Try to Dink
 
-Pickleball league scoreboard with real auth, invite-only signups, role-based admin, profiles, and realtime chat. Built with **Next.js 15 (App Router)** + **Supabase** (auth, Postgres, storage, realtime), deployed on **Vercel**.
+`trytodink.com` — social pickleball mixers with token voting, live partner
+reveals, pooled betting, and raffle. Built with **Next.js 15 (App Router)** +
+**Supabase** (auth, Postgres, storage, realtime), deployed on **Vercel**.
+(The repo name and older commit history still reference the earlier
+`mlp-scoreboard` / `TourneyPal` names; those are historical only.)
 
 The original vanilla-JS scoreboard is preserved at `public/legacy/` and embedded behind auth at `/scoreboard` while the scoring logic is being ported.
 

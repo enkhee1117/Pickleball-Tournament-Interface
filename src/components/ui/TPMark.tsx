@@ -16,7 +16,7 @@ export function TPWordmark({ size = 18, color = 'var(--ink)', accent = 'var(--co
     <div className="flex items-center gap-2">
       <TPMark size={size + 8} color={color} accent={accent} />
       <span className="serif leading-none tracking-tight" style={{ fontSize: size + 6, color }}>
-        TourneyPal
+        Try to Dink
       </span>
     </div>
   );

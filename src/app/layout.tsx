@@ -5,9 +5,26 @@ import './globals.css';
 import { TabBar } from '@/components/TabBar';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://trytodink.com';
+const IS_PRODUCTION = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production'
+  || process.env.VERCEL_ENV === 'production'
+  || !process.env.VERCEL_ENV;
+
 export const metadata: Metadata = {
-  title: 'TourneyPal',
+  metadataBase: new URL(SITE_URL),
+  title: 'Try to Dink',
   description: 'Run pickleball mixers and tournaments without spreadsheets.',
+  alternates: { canonical: SITE_URL },
+  openGraph: {
+    title: 'Try to Dink',
+    description: 'Run pickleball mixers and tournaments without spreadsheets.',
+    url: SITE_URL,
+    siteName: 'Try to Dink',
+    type: 'website',
+  },
+  // Non-production deploys (preview / branch URLs) stay out of Google so the
+  // canonical stays clean.
+  robots: IS_PRODUCTION ? undefined : { index: false, follow: false },
 };
 
 export const viewport: Viewport = {

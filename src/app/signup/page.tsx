@@ -38,7 +38,7 @@ export default async function SignupPage({
           <span className="italic" style={{ color: 'var(--court)' }}>for yourself.</span>
         </div>
         <div className="mt-[14px] max-w-[280px] text-[14px] leading-[1.45] opacity-70">
-          Join TourneyPal to run tournaments, manage players, and track match history.
+          Join Try to Dink to run tournaments, manage players, and track match history.
         </div>
 
         <SignupForm next={next} />
