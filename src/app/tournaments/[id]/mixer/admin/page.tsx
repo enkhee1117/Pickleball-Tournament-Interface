@@ -63,6 +63,8 @@ type ConfigRow = {
   prize_buckets: unknown;
   payment_methods: unknown;
   raffle_prize: string;
+  upvote_cap_per_target: number | null;
+  bet_lock_round_no: number | null;
 };
 
 type RoundRow = {
@@ -668,15 +670,41 @@ function ConfigForm({
       <details className="mt-4 rounded-2xl bg-paper-2 p-3">
         <summary className="cursor-pointer text-sm font-bold text-ink">Matching formula</summary>
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <NumberField name="alpha" label="Alpha" value={cfg.alpha} min={0} max={100} step="0.1" />
-          <NumberField name="beta" label="Beta" value={cfg.beta} min={0} max={100} step="0.1" />
-          <NumberField name="gamma" label="Gamma" value={cfg.gamma} min={0} max={100} step="0.1" />
-          <NumberField name="tau" label="Tau" value={cfg.tau} min={0.01} max={100} step="0.1" />
-          <NumberField name="grief_floor" label="Grief floor" value={cfg.grief_floor} min={0} max={100} step="0.1" />
+          <NumberField name="alpha" label="Alpha (α)" value={cfg.alpha} min={0} max={100} step="0.1" />
+          <NumberField name="beta" label="Beta (β)" value={cfg.beta} min={0} max={100} step="0.1" />
+          <NumberField name="gamma" label="Gamma (γ)" value={cfg.gamma} min={0} max={100} step="0.1" />
+          <NumberField name="tau" label="Tau (τ)" value={cfg.tau} min={0.01} max={100} step="0.1" />
+          <NumberField name="grief_floor" label="Grief floor (C)" value={cfg.grief_floor} min={0} max={100} step="0.1" />
           <NumberField name="repeat_decay" label="Repeat decay" value={cfg.repeat_decay} min={0} max={1} step="0.05" />
+        </div>
+        <div className="mt-2 text-[11px] text-ink-3">
+          score = α·(u+u′) + β·√(u·u′) − γ·(d+d′), floored at −C, then weight = e<sup>score/τ</sup> · decay<sup>prior pairings</sup>.
+        </div>
+      </details>
+
+      <details className="mt-3 rounded-2xl bg-paper-2 p-3">
+        <summary className="cursor-pointer text-sm font-bold text-ink">Fairness & betting cutoffs</summary>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <NumberField name="upvote_cap_per_target" label="Upvotes / target" value={cfg.upvote_cap_per_target ?? 3} min={1} max={99} />
+          <label className="block">
+            <span className="text-xs font-semibold text-ink-3">Betting closes before round</span>
+            <input
+              name="bet_lock_round_no"
+              type="number"
+              min={1}
+              max={50}
+              defaultValue={cfg.bet_lock_round_no ?? ''}
+              placeholder={`= last (${cfg.rounds})`}
+              className="mt-1 h-11 w-full rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink"
+              style={{ border: '1px solid var(--line)' }}
+            />
+          </label>
           <NumberField name="podium_markets" label="Podium markets" value={cfg.podium_markets} min={1} max={8} />
           <NumberField name="betting_prize_winners" label="Betting winners" value={cfg.betting_prize_winners} min={1} max={20} />
           <NumberField name="betting_rake_pct" label="Rake %" value={Number(cfg.betting_rake_pct) * 100} min={0} max={100} step="1" />
+        </div>
+        <div className="mt-2 text-[11px] text-ink-3">
+          Upvote cap blocks vote farming per target. Betting cutoff round rejects wagers once that round starts play — leave blank to close at the final round.
         </div>
       </details>
 
