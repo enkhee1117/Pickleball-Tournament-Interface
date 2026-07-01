@@ -13,6 +13,7 @@ import { AnonymousMixerJoinButton } from './AnonymousMixerJoinButton';
 import { bindMixerRosterEntry, requestMixerPayment } from './actions';
 import { MixerBettingPanel } from './MixerBettingPanel';
 import { MixerModeSwitch } from './MixerModeSwitch';
+import { MixerRealtimeSync } from './MixerRealtimeSync';
 import { MixerVotePanel } from './MixerVotePanel';
 
 type PageProps = {
@@ -306,6 +307,7 @@ function MixerShell({
   ];
   return (
     <div className="flex min-h-[100dvh] flex-col" style={{ background: 'oklch(0.155 0.024 264)', color: 'oklch(0.975 0.012 264)' }}>
+      <MixerRealtimeSync tournamentId={tournament.id} />
       <TopBar
         dark
         title={tournament.name}

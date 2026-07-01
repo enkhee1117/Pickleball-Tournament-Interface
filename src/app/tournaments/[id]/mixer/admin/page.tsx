@@ -10,6 +10,7 @@ import { Icons } from '@/components/ui/icons';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 import { ShareCodeCard } from '../../invite/ShareCodeCard';
 import { MixerModeSwitch } from '../MixerModeSwitch';
+import { MixerRealtimeSync } from '../MixerRealtimeSync';
 import {
   confirmMixerPayment,
   drawMixerRound,
@@ -229,6 +230,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
 
   return (
     <div className="flex min-h-full flex-col bg-paper">
+      <MixerRealtimeSync tournamentId={id} />
       <div className="bg-ink px-[18px] pb-[18px] text-paper">
         <TopBar
           dark
