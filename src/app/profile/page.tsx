@@ -7,6 +7,7 @@ import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Icons } from '@/components/ui/icons';
 import { ProfileForm } from './ProfileForm';
 import { saveProfile } from './actions';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 
 export default async function ProfilePage({
   searchParams,
@@ -126,6 +127,11 @@ export default async function ProfilePage({
               Add your DUPR ID below to sync ratings.
             </div>
           )}
+        </div>
+
+        <SectionHeader title="Appearance" />
+        <div className="mb-[18px]">
+          <ThemeSwitcher />
         </div>
 
         <SectionHeader title="Settings" />

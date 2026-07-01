@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import { Instrument_Serif, JetBrains_Mono, Geist } from 'next/font/google';
+import { cookies } from 'next/headers';
 import './globals.css';
 import { TabBar } from '@/components/TabBar';
+import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 
 export const metadata: Metadata = {
   title: 'TourneyPal',
@@ -34,10 +36,13 @@ const geist = Geist({
   variable: '--font-geist',
 });
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const store = await cookies();
+  const theme = readThemeFromCookie(store.get(THEME_COOKIE)?.value);
   return (
     <html
       lang="en"
+      data-theme={theme}
       className={`${instrumentSerif.variable} ${jetbrainsMono.variable} ${geist.variable}`}
     >
       <body className="bg-paper text-ink">
