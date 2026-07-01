@@ -44,7 +44,7 @@ export function ShareCodeCard({ inviteCode, rawInviteCode, tournamentId, tournam
       try {
         await navigator.share({
           title: tournamentName,
-          text: `Join "${tournamentName}" on TourneyPal — code ${inviteCode}`,
+          text: `Join "${tournamentName}" on Try to Dink — code ${inviteCode}`,
           url: shareUrl,
         });
         return;

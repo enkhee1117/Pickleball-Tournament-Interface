@@ -183,7 +183,7 @@ function SignedOutHome() {
                 Who you play with is <span className="italic" style={{ color: 'var(--court-deep)' }}>the game.</span>
               </h1>
               <p className="mt-5 max-w-[560px] text-base leading-7 text-ink-2 sm:text-lg">
-                TourneyPal runs social pickleball mixers where players spend tokens to vote for partners, then the draw reveals pairings live. Suspense, light strategy, and a dash of chance. No spreadsheet required.
+                Try to Dink runs social pickleball mixers where players spend tokens to vote for partners, then the draw reveals pairings live. Suspense, light strategy, and a dash of chance. No spreadsheet required.
               </p>
               <div className="mt-7 flex flex-wrap gap-3">
                 <Link href="/signup" className="inline-flex items-center gap-2 rounded-2xl px-5 py-4 text-base font-bold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
@@ -214,7 +214,7 @@ function SignedOutHome() {
                 <LandingEyebrow light>Reveal night</LandingEyebrow>
                 <div className="serif mt-2 text-[34px] leading-none sm:text-[46px]">The moment the draw drops.</div>
                 <p className="mt-2 max-w-[560px] text-sm leading-6 text-white/80 sm:text-base">
-                  Phones up, partners revealed, the room loud. TourneyPal turns pairing into the highlight of the night.
+                  Phones up, partners revealed, the room loud. Try to Dink turns pairing into the highlight of the night.
                 </p>
               </div>
             </div>
