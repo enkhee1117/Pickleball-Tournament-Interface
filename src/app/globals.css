@@ -83,6 +83,16 @@ main:has([data-public-landing]) + [data-app-tabbar] {
   display: none;
 }
 
+/* Full-viewport auth surfaces (login, signup) escape the 480px mobile shell
+   so the desktop layout can breathe. The body background also flips to the
+   surface color the page paints so there's no paper letterboxing. */
+body:has([data-fullscreen]) > div {
+  max-width: none;
+}
+body:has([data-fullscreen='ink']) {
+  background: var(--ink);
+}
+
 button { font-family: inherit; }
 input, textarea, select { font-family: inherit; }
 
