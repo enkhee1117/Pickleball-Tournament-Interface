@@ -87,6 +87,14 @@ export async function updateMixerConfig(formData: FormData): Promise<void> {
     p_prize_buckets: prizeBuckets,
     p_payment_methods: paymentMethods,
     p_raffle_prize: fieldString(formData, 'raffle_prize') || 'Raffle prize',
+    p_upvote_cap: fieldInt(formData, 'upvote_cap_per_target', 3, 1, 99),
+    p_bet_lock_round_no: (() => {
+      const raw = String(formData.get('bet_lock_round_no') ?? '').trim();
+      if (!raw) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 1 ? Math.min(50, Math.trunc(n)) : null;
+    })(),
+    p_clear_bet_lock_round: !String(formData.get('bet_lock_round_no') ?? '').trim(),
   });
   if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
 

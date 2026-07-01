@@ -5,6 +5,7 @@ import { TopBar } from '@/components/ui/TopBar';
 import { Icons } from '@/components/ui/icons';
 import { currentMixerRound } from '@/lib/mixer-rounds';
 import { MixerModeSwitch } from '../MixerModeSwitch';
+import { MixerRealtimeSync } from '../MixerRealtimeSync';
 import { MixerPresentationTakeover } from './MixerPresentationTakeover';
 
 type PageProps = {
@@ -106,6 +107,7 @@ export default async function MixerPresentPage({ params }: PageProps) {
 
   return (
     <div className="relative left-1/2 flex min-h-full w-[calc(100vw-15px)] -translate-x-1/2 flex-col overflow-hidden" style={{ background: 'oklch(0.155 0.024 264)', color: 'oklch(0.975 0.012 264)' }}>
+      <MixerRealtimeSync tournamentId={id} />
       <TopBar
         dark
         title={t.name}
