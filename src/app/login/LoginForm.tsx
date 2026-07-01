@@ -12,12 +12,12 @@ export function LoginForm({ next }: { next: string }) {
       <input type="hidden" name="next" value={next} />
       <input
         name="phone"
-        type="tel"
-        inputMode="tel"
-        autoComplete="tel"
+        type="text"
+        inputMode="email"
+        autoComplete="username"
         required
         autoFocus
-        placeholder="+1 555 123 4567"
+        placeholder="Phone or email"
         className="rounded-2xl px-5 py-[18px] text-base outline-none"
         style={{
           background: 'oklch(0.24 0.02 100)',
