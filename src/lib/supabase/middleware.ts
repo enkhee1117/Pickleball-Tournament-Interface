@@ -4,7 +4,10 @@ import { getSupabasePublicKey, getSupabaseUrl } from './env';
 
 type CookieInput = { name: string; value: string; options?: CookieOptions };
 
-const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/forgot-password', '/t'];
+// /api/auth-debug is a token-gated diagnostic (404s without AUTH_DEBUG_TOKEN);
+// it must be reachable while signed out to diagnose the reset flow. Remove it
+// here when the diagnostic route is removed.
+const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/forgot-password', '/t', '/api/auth-debug'];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
