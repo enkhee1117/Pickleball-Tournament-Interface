@@ -39,6 +39,21 @@ export async function GET(request: NextRequest) {
     options: { redirectTo },
   });
 
+  // With &send=1, actually invoke resetPasswordForEmail — the real send path —
+  // and report its synchronous result. If Supabase's SMTP handoff fails
+  // synchronously (auth failure, connection refused, sender rejected with a
+  // 5xx), the error appears here. If it returns ok but no email arrives, the
+  // rejection is async inside Resend → check the Resend "Emails" tab.
+  let sendResult: { attempted: boolean; ok?: boolean; error?: unknown } = { attempted: false };
+  if (searchParams.get('send') === '1') {
+    const { createClient } = await import('@/lib/supabase/server');
+    const supabase = await createClient();
+    const { error: sendErr } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    sendResult = sendErr
+      ? { attempted: true, ok: false, error: { message: sendErr.message, code: sendErr.code ?? null, status: sendErr.status ?? null } }
+      : { attempted: true, ok: true };
+  }
+
   return NextResponse.json({
     email,
     siteUrlEnvSet: !!process.env.NEXT_PUBLIC_SITE_URL,
@@ -47,6 +62,8 @@ export async function GET(request: NextRequest) {
     generateLinkError: error
       ? { message: error.message, code: error.code ?? null, status: error.status ?? null }
       : null,
+    // Present only with &send=1: the result of the real email-send call.
+    sendResult,
     // Only present when the account exists — a live, one-time recovery link.
     // Paste it into the browser to reset the password without any email.
     recoveryLink: data?.properties?.action_link ?? null,
