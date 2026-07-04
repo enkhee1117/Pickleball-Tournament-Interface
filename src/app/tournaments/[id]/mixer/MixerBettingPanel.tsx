@@ -184,10 +184,12 @@ function EmptyPool() {
 }
 
 function Dink({ pose, size }: { pose: 'token-t' | 'presenting-t'; size: number }) {
+  // Paddle mascot retired — old paddle poses render the ball bust instead.
+  const file = pose === 'token-t' || pose === 'presenting-t' ? 'happy-bust' : pose;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/design-handoff/dink/${pose}.png`}
+      src={`/design-handoff/dink/${file}.png`}
       alt=""
       width={size}
       height={size}
