@@ -1,6 +1,6 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { sendPushToUsers, type PushPayload } from './server';
+import { sendPushBatch, type PushPayload } from './server';
 
 // Lock-screen push, notify.html touchpoint 1: the moment a draw seats a
 // player, push "You're on Court N" to their device — even with the app
@@ -57,25 +57,29 @@ export async function notifySeatedPlayers(tournamentId: string, roundId: string)
 
     const url = `/tournaments/${tournamentId}/mixer?tab=match`;
 
-    await Promise.all(
-      pairingRows.flatMap((pr) => {
-        const opponent = (byCourt.get(pr.court_no) ?? []).find((o) => o !== pr) ?? null;
-        const oppText = opponent ? ` vs. ${team(opponent.player_a_id, opponent.player_b_id)}` : '';
-        return [pr.player_a_id, pr.player_b_id].map(async (playerId) => {
-          const profileId = profileOf.get(playerId);
-          if (!profileId || !checkedIn.has(playerId)) return;
-          const partnerId = playerId === pr.player_a_id ? pr.player_b_id : pr.player_a_id;
-          const payload: PushPayload = {
+    // Build every per-player payload first, then fan out with a single
+    // subscriptions query (sendPushBatch) instead of one query per player.
+    const items: Array<{ userId: string; payload: PushPayload }> = [];
+    for (const pr of pairingRows) {
+      const opponent = (byCourt.get(pr.court_no) ?? []).find((o) => o !== pr) ?? null;
+      const oppText = opponent ? ` vs. ${team(opponent.player_a_id, opponent.player_b_id)}` : '';
+      for (const playerId of [pr.player_a_id, pr.player_b_id]) {
+        const profileId = profileOf.get(playerId);
+        if (!profileId || !checkedIn.has(playerId)) continue;
+        const partnerId = playerId === pr.player_a_id ? pr.player_b_id : pr.player_a_id;
+        items.push({
+          userId: profileId,
+          payload: {
             title: `You're on Court ${pr.court_no} 🏓`,
             body: `Paired with ${first(partnerId)}${oppText}. Head over — round starts when all teams check in.`,
             url,
             tag: `court-call-${tournamentId}`,
             renotify: true,
-          };
-          await sendPushToUsers([profileId], payload);
+          },
         });
-      }),
-    );
+      }
+    }
+    await sendPushBatch(items);
   } catch (err) {
     console.error('[push] notifySeatedPlayers failed', err);
   }

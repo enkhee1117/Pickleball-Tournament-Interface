@@ -13,6 +13,7 @@ import {
   type StandingsMatch,
 } from '@/lib/scoring';
 import { RecordingsMenu } from '@/components/RecordingsMenu';
+import { formatLabelFor } from '@/lib/tournaments';
 import { QuickJoinForm } from '@/app/tournaments/[id]/mixer/QuickJoinForm';
 import { joinPublicTournament } from './actions';
 
@@ -585,17 +586,3 @@ function roundNumber(label: string): number {
   return match ? Number.parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
 }
 
-function formatLabelFor(format: string): string {
-  switch (format) {
-    case 'round_robin':
-      return 'Round Robin';
-    case 'fixed_partners':
-      return 'Fixed Partners';
-    case 'bracket':
-      return 'Bracket';
-    case 'partner_mixer':
-      return 'Partner Mixer';
-    default:
-      return format;
-  }
-}

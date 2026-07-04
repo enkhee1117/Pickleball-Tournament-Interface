@@ -47,3 +47,21 @@ export function generateRoundRobinDrafts(
   }
   return drafts;
 }
+
+
+// Human label for tournaments.format. One source of truth — this was
+// copy-pasted in three pages before (home, public share, hub).
+export function formatLabelFor(format: string): string {
+  switch (format) {
+    case 'round_robin':
+      return 'Round Robin';
+    case 'fixed_partners':
+      return 'Fixed Partners';
+    case 'bracket':
+      return 'Bracket';
+    case 'partner_mixer':
+      return 'Partner Mixer';
+    default:
+      return format;
+  }
+}
