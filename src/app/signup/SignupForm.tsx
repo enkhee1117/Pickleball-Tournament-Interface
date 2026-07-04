@@ -1,11 +1,13 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { signUpWithPassword } from './actions';
 import { emptyFormState } from '@/lib/forms';
+import { GENDER_OPTIONS } from '@/lib/quick-join';
 
 export function SignupForm({ next }: { next: string }) {
   const [state, formAction, pending] = useActionState(signUpWithPassword, emptyFormState);
+  const [gender, setGender] = useState('');
 
   const inputStyle = {
     background: 'oklch(0.24 0.02 100)',
@@ -16,6 +18,7 @@ export function SignupForm({ next }: { next: string }) {
   return (
     <form action={formAction} className="mt-6 grid gap-2.5">
       <input type="hidden" name="next" value={next} />
+      <input type="hidden" name="gender" value={gender} />
       <input
         name="display_name"
         required
@@ -34,6 +37,29 @@ export function SignupForm({ next }: { next: string }) {
         className="rounded-2xl px-5 py-[16px] text-base outline-none"
         style={inputStyle}
       />
+      {/* Gender feeds mixed / same-gender event pairing. Optional — "Skip"
+          keeps the account gender-neutral. */}
+      <div className="grid grid-cols-3 gap-1.5">
+        {GENDER_OPTIONS.map((g) => {
+          const on = gender === g.value;
+          return (
+            <button
+              key={g.value}
+              type="button"
+              onClick={() => setGender(on ? '' : g.value)}
+              aria-pressed={on}
+              className="rounded-2xl py-3 text-[13px] font-semibold"
+              style={{
+                background: on ? 'color-mix(in oklch, var(--court) 22%, oklch(0.24 0.02 100))' : 'oklch(0.24 0.02 100)',
+                color: on ? 'var(--court)' : 'oklch(0.75 0.015 100)',
+                border: `1.5px solid ${on ? 'var(--court)' : 'oklch(0.32 0.02 100)'}`,
+              }}
+            >
+              {g.label}
+            </button>
+          );
+        })}
+      </div>
       <input
         name="password"
         type="password"

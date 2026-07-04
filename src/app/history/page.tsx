@@ -110,7 +110,9 @@ export default async function HistoryPage() {
           'id,tournament_id,round_label,team_a_label,team_b_label,team_a_score,team_b_score,winner_side,completed_at,match_games(team_a_score,team_b_score)',
         )
         .in('tournament_id', tournamentIds)
-        .not('completed_at', 'is', null),
+        .not('completed_at', 'is', null)
+        .order('completed_at', { ascending: false })
+        .limit(500),
       supabase
         .from('tournaments')
         .select('id,owner_user_id,name,format,status,whatsapp_group_url,invite_code,created_at,updated_at')

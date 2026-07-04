@@ -55,7 +55,7 @@ export function DesktopNav({
   return (
     <nav
       role="navigation"
-      className={`sticky top-0 z-40 flex h-[66px] items-center gap-[22px] px-8${liberty ? ' liberty-bar' : ''}`}
+      className={`sticky top-0 z-40 flex h-[66px] items-center gap-3 px-4 sm:gap-[22px] sm:px-8${liberty ? ' liberty-bar' : ''}`}
       style={{
         background: 'color-mix(in oklch, var(--bg) 86%, transparent)',
         backdropFilter: 'blur(12px)',
@@ -64,10 +64,10 @@ export function DesktopNav({
     >
       <div className="flex items-center gap-[9px]" style={{ color: 'var(--text)' }}>
         <BallMark size={30} />
-        <span className="serif text-[21px]" style={{ color: 'var(--text)' }}>
+        <span className="serif whitespace-nowrap text-[21px]" style={{ color: 'var(--text)' }}>
           Try to Dink
         </span>
-        {liberty ? <span className="b250">★ 250</span> : null}
+        {liberty ? <span className="b250 hidden sm:inline-flex">★ 250</span> : null}
       </div>
 
       {event ? (
@@ -128,7 +128,7 @@ export function DesktopNav({
         <button
           type="button"
           onClick={openCommandBar}
-          className="inline-flex h-10 items-center gap-[10px] rounded-[11px] border pl-[14px] pr-3 text-[13.5px]"
+          className="hidden h-10 items-center gap-[10px] rounded-[11px] border pl-[14px] pr-3 text-[13.5px] sm:inline-flex"
           style={{ borderColor: 'var(--line)', background: 'var(--surface-card)', color: 'var(--text3)' }}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
