@@ -273,13 +273,13 @@ function PlayerLine({ player, compact = false }: { player: PlayerRow; compact?: 
   );
 }
 
-function Dink({ size }: { pose: 'presenting-t' | 'wave' | 'winner'; size: number }) {
-  // Paddle mascot retired — every paddle pose now renders the ball bust.
-  const file = 'happy-bust';
+function Dink({ pose, size }: { pose: 'presenting-t' | 'wave' | 'winner'; size: number }) {
+  // Paddle mascot retired — the round "ball" mascot (in /characters) is used now.
+  const file = pose === 'winner' ? 'winner' : 'host';
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/design-handoff/dink/${file}.png`}
+      src={`/design-handoff/characters/${file}.png`}
       alt=""
       width={size}
       height={size}
