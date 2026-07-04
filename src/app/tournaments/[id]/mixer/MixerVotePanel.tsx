@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Icons } from '@/components/ui/icons';
+import { eligibleBallotTargets } from '@/lib/mixer';
 import { setMixerVote } from './actions';
 
 type ConfigRow = {
@@ -67,18 +68,12 @@ export function MixerVotePanel({
 }) {
   const [optimisticVotes, setOptimisticVotes] = useState(votes);
   const [showHow, setShowHow] = useState(false);
-  const poolFor = (player: PlayerRow): 'a' | 'b' => (player.gender === 'f' ? 'b' : 'a');
-  const myPool = states.find((s) => s.player_id === myPlayer.id)?.pairing_pool ?? poolFor(myPlayer);
+  const myPool = states.find((s) => s.player_id === myPlayer.id)?.pairing_pool;
   // Eligible ballot targets follow the event's gender mode: mixed shows the
   // opposite pool (classic mixer), same shows your own gender, open shows
   // everyone. Mirrors the draw's pairing constraints so players never spend
   // tokens on someone they can't be paired with.
-  const targets = roster.filter((p) => {
-    if (p.id === myPlayer.id) return false;
-    if (genderMode === 'same') return (p.gender ?? 'x') === (myPlayer.gender ?? 'x');
-    if (genderMode === 'open') return true;
-    return poolFor(p) !== myPool;
-  });
+  const targets = eligibleBallotTargets(roster, myPlayer, genderMode, myPool);
   const activeVotes = optimisticVotes.filter((v) => v.round_id === round.id);
   const serverSpent = votes.reduce((s, v) => s + v.up_tokens + v.down_tokens, 0);
   const optimisticSpent = optimisticVotes.reduce((s, v) => s + v.up_tokens + v.down_tokens, 0);

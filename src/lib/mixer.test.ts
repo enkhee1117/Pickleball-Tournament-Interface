@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MIXER_UPVOTE_CAP_PER_TARGET,
+  eligibleBallotTargets,
   computeRaffleTickets,
   drawMixerPairs,
   isUpvoteAllocationValid,
@@ -181,5 +182,49 @@ describe('mixer round helpers', () => {
       { round_no: 1, state: 'done' },
       { round_no: 2, state: 'done' },
     ])).toEqual({ round_no: 2, state: 'done' });
+  });
+});
+
+describe('eligibleBallotTargets (0047 gender modes)', () => {
+  const roster = [
+    { id: 'me', gender: 'f' as const },
+    { id: 'm1', gender: 'm' as const },
+    { id: 'm2', gender: 'm' as const },
+    { id: 'f1', gender: 'f' as const },
+    { id: 'x1', gender: null },
+  ];
+  const me = roster[0];
+
+  it('mixed: shows only the opposite pool and never self', () => {
+    const ids = eligibleBallotTargets(roster, me, 'mixed').map((p) => p.id);
+    // me is f → pool b → targets are pool a (males + ungendered)
+    expect(ids).toEqual(['m1', 'm2', 'x1']);
+  });
+
+  it('mixed: a male sees only pool b (women)', () => {
+    const ids = eligibleBallotTargets(roster, roster[1], 'mixed').map((p) => p.id);
+    expect(ids).toEqual(['me', 'f1']);
+  });
+
+  it('mixed: server pool override beats gender-derived pool', () => {
+    // Admin moved me (f) into pool a → my targets flip to pool b.
+    const ids = eligibleBallotTargets(roster, me, 'mixed', 'a').map((p) => p.id);
+    expect(ids).toEqual(['f1']);
+  });
+
+  it('same: only players of my own gender', () => {
+    expect(eligibleBallotTargets(roster, me, 'same').map((p) => p.id)).toEqual(['f1']);
+    expect(eligibleBallotTargets(roster, roster[1], 'same').map((p) => p.id)).toEqual(['m2']);
+    // ungendered pairs with ungendered
+    expect(eligibleBallotTargets(roster, roster[4], 'same').map((p) => p.id)).toEqual([]);
+  });
+
+  it('open: everyone except self', () => {
+    expect(eligibleBallotTargets(roster, me, 'open').map((p) => p.id)).toEqual(['m1', 'm2', 'f1', 'x1']);
+  });
+
+  it('unknown/null modes fall back to mixed', () => {
+    expect(eligibleBallotTargets(roster, me, null).map((p) => p.id)).toEqual(['m1', 'm2', 'x1']);
+    expect(eligibleBallotTargets(roster, me, 'coed').map((p) => p.id)).toEqual(['m1', 'm2', 'x1']);
   });
 });

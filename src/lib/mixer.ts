@@ -252,3 +252,39 @@ export function settleParimutuelBets({
   }
   return settlements;
 }
+
+// ---------------------------------------------------------------------------
+// Ballot target eligibility (0047 gender modes)
+// ---------------------------------------------------------------------------
+
+export type MixerGenderMode = 'mixed' | 'same' | 'open';
+
+export type BallotCandidate = {
+  id: string;
+  gender: 'm' | 'f' | 'x' | null;
+};
+
+// Who can this player spend tokens on? Mirrors the draw's pairing
+// constraints so a ballot can never fund an impossible pairing:
+//   mixed — the opposite gender pool (f→b, everyone else→a)
+//   same  — players of the same gender only
+//   open  — everyone but yourself
+// selfPoolOverride: pass the server-side pairing_pool when known (an admin
+// can re-pool a player, which beats the gender-derived default in mixed).
+export function eligibleBallotTargets<T extends BallotCandidate>(
+  roster: T[],
+  self: BallotCandidate,
+  genderMode: string | null | undefined,
+  selfPoolOverride?: MixerPool,
+): T[] {
+  const mode: MixerGenderMode =
+    genderMode === 'same' || genderMode === 'open' ? genderMode : 'mixed';
+  const poolOf = (p: BallotCandidate): MixerPool => (p.gender === 'f' ? 'b' : 'a');
+  const selfPool = selfPoolOverride ?? poolOf(self);
+  return roster.filter((p) => {
+    if (p.id === self.id) return false;
+    if (mode === 'same') return (p.gender ?? 'x') === (self.gender ?? 'x');
+    if (mode === 'open') return true;
+    return poolOf(p) !== selfPool;
+  });
+}
