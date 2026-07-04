@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
@@ -6,13 +7,19 @@ import { formatInviteCode } from '@/lib/invite-codes';
 import { Chip } from '@/components/ui/Chip';
 import { DesktopSurface, BallMark } from '@/components/desktop';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
+import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import { ShareCodeCard } from '../../invite/ShareCodeCard';
 import { MixerRealtimeSync } from '../MixerRealtimeSync';
+import { ConfirmForm } from '@/components/ui/ConfirmForm';
 import {
   drawMixerRound,
   finalizeMixerEvent,
   initializeMixerEvent,
+  reopenMixerRound,
+  resetMixerEvent,
+  resetMixerRoundVotes,
   scoreMixerCourt,
+  setMixerVotingWindow,
   updateMixerPlayerPool,
 } from '../actions';
 import type {
@@ -168,8 +175,13 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
     }
   })(currentRound?.state);
 
+  const cookieStore = await cookies();
+  const theme = readThemeFromCookie(cookieStore.get(THEME_COOKIE)?.value);
+
   return (
-    <DesktopSurface variant="night" withCommandBar>
+    // Surface tint follows the chosen theme so the cockpit reads as ONE app
+    // edge to edge (previously a hardcoded night body framed light content).
+    <DesktopSurface variant={theme === 'night' ? 'night' : 'default'} withCommandBar>
       <MixerRealtimeSync tournamentId={id} />
       <div className="mx-auto grid w-full max-w-[1440px] grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)]">
         <CockpitSidebar
@@ -242,6 +254,28 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         <StateButton tournamentId={id} roundId={currentRound.id} state="open" label="Open ballot" disabled={!canOpenBallot} />
                         <StateButton tournamentId={id} roundId={currentRound.id} state="locked" label="Lock all ballots" disabled={!canLockBallot} />
                       </div>
+                      {/* Voting window in HOURS — sets config.lock_seconds and
+                          re-arms this round's timer in one tap. */}
+                      <form action={setMixerVotingWindow} className="mt-2.5 flex items-center gap-2">
+                        <input type="hidden" name="tournament_id" value={id} />
+                        <input type="hidden" name="round_id" value={currentRound.id} />
+                        <label className="flex flex-1 items-center gap-2 rounded-xl px-3 py-2" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)' }}>
+                          <span className="mono text-[10.5px] uppercase tracking-[0.08em]" style={{ color: 'var(--text3)' }}>Voting window</span>
+                          <input
+                            name="lock_hours"
+                            type="number"
+                            min={1}
+                            max={168}
+                            defaultValue={Math.max(1, Math.round(cfg.lock_seconds / 3600))}
+                            className="w-16 bg-transparent text-right text-[15px] font-bold outline-none"
+                            style={{ color: 'var(--text)' }}
+                          />
+                          <span className="text-[12px]" style={{ color: 'var(--text3)' }}>hours</span>
+                        </label>
+                        <button className="rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
+                          Start timer
+                        </button>
+                      </form>
                     </div>
 
                     {/* The draw */}
@@ -304,6 +338,35 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
 
                   {/* RIGHT — live read-outs */}
                   <div className="flex flex-col gap-[18px]">
+                    {/* Recovery controls — mistakes happen on live nights. */}
+                    <div className="rounded-[18px] p-5" style={{ border: '1px solid color-mix(in oklch, var(--berry, oklch(0.55 0.2 12)) 35%, var(--line))', background: 'var(--surface-card)' }}>
+                      <h3 className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>Rerun &amp; reset</h3>
+                      <div className="mb-3 text-[12.5px]" style={{ color: 'var(--text3)' }}>
+                        Fix a draw that fired early or start the night over. Roster and payments always survive.
+                      </div>
+                      <div className="grid gap-2">
+                        <ConfirmForm action={reopenMixerRound} confirm={`Reopen round ${currentRound.round_no}? Its pairings are cleared and voting goes live again.`}>
+                          <input type="hidden" name="tournament_id" value={id} />
+                          <input type="hidden" name="round_id" value={currentRound.id} />
+                          <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
+                            Reopen round {currentRound.round_no} (clear draw)
+                          </button>
+                        </ConfirmForm>
+                        <ConfirmForm action={resetMixerRoundVotes} confirm={`Wipe every ballot for round ${currentRound.round_no} and refund the tokens?`}>
+                          <input type="hidden" name="tournament_id" value={id} />
+                          <input type="hidden" name="round_id" value={currentRound.id} />
+                          <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
+                            Reset round {currentRound.round_no} votes (refund tokens)
+                          </button>
+                        </ConfirmForm>
+                        <ConfirmForm action={resetMixerEvent} confirm="Reset the ENTIRE event? All pairings, scores, ballots, and bets are wiped; tokens and chips are restored; every round reopens. Roster and payments are kept.">
+                          <input type="hidden" name="tournament_id" value={id} />
+                          <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-bold" style={{ background: 'color-mix(in oklch, oklch(0.55 0.2 12) 14%, var(--surface-card))', color: 'oklch(0.55 0.2 12)', border: '1px solid color-mix(in oklch, oklch(0.55 0.2 12) 45%, var(--line))' }}>
+                            Reset whole event &amp; rerun
+                          </button>
+                        </ConfirmForm>
+                      </div>
+                    </div>
                     <div className="rounded-[18px] p-5" style={PANEL}>
                       <h3 className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: 'var(--text)' }}>
                         Live courts

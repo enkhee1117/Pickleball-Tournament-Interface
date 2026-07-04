@@ -151,7 +151,7 @@ function Controls({
   return (
     <>
       {/* style switch — top-left, mirrors the reveal aesthetic */}
-      <div className="absolute left-14 top-[26px] z-20 flex items-center gap-1.5 rounded-full p-[5px]"
+      <div className="fixed left-5 top-5 z-30 flex items-center gap-1.5 rounded-full p-[5px]"
         style={{ background: 'oklch(0.16 0.02 264 / .8)', border: '1px solid var(--line-2)' }}
       >
         {(['board', 'stage'] as const).map((v) => (
@@ -173,7 +173,7 @@ function Controls({
       </div>
 
       {/* replay + exit — bottom-right */}
-      <div className="absolute bottom-7 right-14 z-20 flex items-center gap-2.5">
+      <div className="fixed bottom-5 right-5 z-30 flex items-center gap-2.5">
         <Link
           href={`/tournaments/${tournamentId}/mixer/present/between`}
           className="mono rounded-full px-[15px] py-[9px] text-[12px] uppercase tracking-[.1em]"
@@ -192,7 +192,7 @@ function Controls({
       </div>
       <Link
         href={`/tournaments/${tournamentId}`}
-        className="mono absolute bottom-7 left-14 z-20 rounded-full px-[15px] py-[9px] text-[12px] uppercase tracking-[.1em]"
+        className="mono fixed bottom-5 left-5 z-30 rounded-full px-[15px] py-[9px] text-[12px] uppercase tracking-[.1em]"
         style={{ background: 'color-mix(in oklch, var(--bg2) 70%, transparent)', border: '1px solid var(--line-2)', color: 'var(--text3)' }}
       >
         ← Exit
@@ -694,6 +694,10 @@ export function MixerReveal({
         Skip to content
       </a>
       <MixerRealtimeSync tournamentId={tournamentId} />
+      {/* Chrome lives OUTSIDE the JS-scaled 1920×1080 stage: absolute inside a
+          transformed ancestor would scale off-screen on laptop viewports,
+          which made the Exit button unreachable. */}
+      <Controls tournamentId={tournamentId} variant={variant} onReplay={() => setRunId((x) => x + 1)} />
       <div className="fixed inset-0 grid place-items-center overflow-hidden" style={{ background: isStage ? '#04050a' : '#06070c' }}>
         <div
           ref={stageRef}
@@ -728,7 +732,6 @@ export function MixerReveal({
           )}
 
           <TopBar eventName={eventName} roundNo={roundNo} />
-          <Controls tournamentId={tournamentId} variant={variant} onReplay={() => setRunId((x) => x + 1)} />
 
           <div className="absolute inset-x-0 bottom-[210px] top-24 z-[5]">
             {isStage ? (

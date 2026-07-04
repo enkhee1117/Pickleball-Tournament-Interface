@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────────────────────
-   THEME TOKENS — three themes applied by data-theme on <html>,
+   THEME TOKENS — two themes (Bright / Dark) applied by data-theme on <html>,
    cookie-persisted (see lib/theme.ts). Values are the source of
    truth from the desktop handoff's tokens.css. Each block declares
    the FULL set so nothing leaks across themes.
@@ -75,36 +75,6 @@
   --text3: var(--ink-3);
 }
 
-:root[data-theme='arcade'] {
-  color-scheme: dark;
-  --paper: oklch(0.17 0.05 300);
-  --paper-2: oklch(0.28 0.07 300);
-  --card: oklch(0.22 0.06 300);
-  --ink: oklch(0.98 0.01 320);
-  --ink-2: oklch(0.82 0.04 320);
-  --ink-3: oklch(0.68 0.06 320);
-  --line: oklch(0.34 0.07 300);
-  --line-2: oklch(0.46 0.09 302);
-  --court: oklch(0.86 0.2 140);
-  --court-deep: oklch(0.86 0.2 140);
-  --court-soft: oklch(0.4 0.12 150);
-  --serve: oklch(0.78 0.19 30);
-  --berry: oklch(0.68 0.24 8);
-  --sky: oklch(0.8 0.16 320);
-  --amber: oklch(0.85 0.16 78);
-  --accent: oklch(0.86 0.2 140);
-  --accent-ink: oklch(0.2 0.07 150);
-  --bg: oklch(0.17 0.05 300);
-  --bg2: oklch(0.22 0.06 300);
-  --bg3: oklch(0.28 0.07 300);
-  --surface-nav: oklch(0.2 0.055 300);
-  --surface-card: oklch(0.22 0.06 300);
-  --surface-inset: oklch(0.185 0.05 300);
-  --surface-raise: oklch(0.28 0.07 300);
-  --text: var(--ink);
-  --text2: var(--ink-2);
-  --text3: var(--ink-3);
-}
 
 /* Fixed projector show theme — the present/projector screen is a shared STAGE,
    not a personal setting, so it always uses this high-contrast dark palette

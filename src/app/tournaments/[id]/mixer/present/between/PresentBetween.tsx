@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { GALAXY_BG } from '@/lib/demo-roster';
 import { BallMark } from '@/components/desktop/BallMark';
@@ -105,6 +106,23 @@ export function PresentBetween({
     <div className="theme-show" data-fullscreen="show">
       <a href="#main" className="skip-link">Skip to content</a>
       <MixerRealtimeSync tournamentId={tournamentId} />
+      {/* Viewport-pinned chrome — inside the scaled stage these would drift
+          off-screen on laptop viewports. */}
+      <Link
+        href={`/tournaments/${tournamentId}`}
+        className="mono fixed bottom-5 left-5 z-30 rounded-full px-[15px] py-[9px] text-[12px] uppercase tracking-[.1em]"
+        style={{ background: 'oklch(0.16 0.02 264 / .8)', border: '1px solid var(--line-2)', color: 'var(--text3)' }}
+      >
+        ← Exit
+      </Link>
+      <button
+        type="button"
+        onClick={() => setPhase((p) => (p === 'standings' ? 'holding' : 'standings'))}
+        className="mono fixed bottom-5 right-5 z-30 rounded-full px-[15px] py-[9px] text-[12px] uppercase tracking-[.1em]"
+        style={{ background: 'oklch(0.16 0.02 264 / .8)', border: '1px solid var(--line-2)', color: 'var(--text2)' }}
+      >
+        ↻ Cycle view
+      </button>
       <div className="fixed inset-0 grid place-items-center overflow-hidden" style={{ background: '#06070c' }}>
         <div
           ref={stageRef}
@@ -255,17 +273,6 @@ export function PresentBetween({
             </div>
           </div>
 
-          {/* cycle button */}
-          <div className="absolute bottom-6 right-14 z-20">
-            <button
-              type="button"
-              onClick={() => setPhase((p) => (p === 'standings' ? 'holding' : 'standings'))}
-              className="mono rounded-full px-[15px] py-[9px] text-[12px] uppercase tracking-[.1em]"
-              style={{ background: 'color-mix(in oklch, var(--bg2) 70%, transparent)', border: '1px solid var(--line-2)', color: 'var(--text2)' }}
-            >
-              ↻ Cycle view
-            </button>
-          </div>
         </div>
       </div>
     </div>
