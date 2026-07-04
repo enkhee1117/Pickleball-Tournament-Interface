@@ -16,8 +16,8 @@ export function MixerModeSwitch({ tournamentId, active, dark = true }: { tournam
       aria-label="Mixer view switcher"
       className="mx-[18px] mb-3 rounded-2xl p-1"
       style={{
-        background: dark ? 'oklch(0.215 0.03 264)' : 'var(--paper-2)',
-        border: dark ? '1px solid oklch(0.36 0.04 266)' : '1px solid var(--line)',
+        background: dark ? 'var(--night-card)' : 'var(--paper-2)',
+        border: dark ? '1px solid var(--night-line)' : '1px solid var(--line)',
       }}
     >
       <div className="grid grid-cols-4 gap-1">
@@ -32,7 +32,7 @@ export function MixerModeSwitch({ tournamentId, active, dark = true }: { tournam
               className="flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-1.5 py-2.5 text-center text-[12px] font-bold"
               style={{
                 background: on ? 'var(--court)' : 'transparent',
-                color: on ? 'oklch(0.2 0.04 140)' : dark ? 'oklch(0.78 0.028 264)' : 'var(--ink-3)',
+                color: on ? 'var(--night-court-ink)' : dark ? 'var(--night-text2)' : 'var(--ink-3)',
               }}
             >
               <span className="inline-flex shrink-0">{item.icon}</span>

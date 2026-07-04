@@ -121,8 +121,10 @@
   --night-card: oklch(0.215 0.03 264);
   --night-card-glass: oklch(0.215 0.03 264 / 0.96);
   --night-inset: oklch(0.285 0.038 266);
+  --night-inset-glass: oklch(0.285 0.038 266 / 0.92);
   --night-line: oklch(0.36 0.04 266);
   --night-line-2: oklch(0.42 0.045 266);
+  --night-line-3: oklch(0.47 0.06 266); /* lighter border on reveal team cards */
   --night-text: oklch(0.975 0.012 264);
   --night-text2: oklch(0.78 0.028 264);
   --night-text3: oklch(0.7 0.03 264);
@@ -131,6 +133,8 @@
   --night-scrim: oklch(0.155 0.024 264 / 0.94);
   --night-court-ink: oklch(0.2 0.04 140); /* ink on court-green fills */
   --night-court-ink-soft: oklch(0.2 0.04 140 / 0.22);
+  --night-court-tint: oklch(0.44 0.15 142 / 0.34); /* court-green radial tint over --night-card (reveal) */
+  --night-court-tint-bright: oklch(0.82 0.2 142 / 0.35); /* brighter court-green radial tint (raffle/final) */
   --night-serve-deep: oklch(0.62 0.19 40);
   --night-serve-bg: oklch(0.16 0.03 40);
   --night-cream: oklch(0.98 0.02 90);
@@ -151,6 +155,15 @@
   --show-text-dim: oklch(0.6 0.02 264);
   --show-stage-veil: radial-gradient(ellipse 60% 55% at 50% 42%, oklch(0.2 0.03 264 / .82), oklch(0.13 0.02 264 / .92) 70%, oklch(0.06 0.03 264 / .96) 100%);
   --show-galaxy-veil: radial-gradient(ellipse 90% 60% at 50% -8%, color-mix(in oklch, var(--accent) 14%, transparent), transparent 60%), radial-gradient(ellipse 70% 50% at 50% 118%, color-mix(in oklch, var(--sky) 10%, transparent), transparent 55%), linear-gradient(180deg, oklch(0.11 0.05 270 / .8), oklch(0.09 0.05 265 / .9));
+}
+
+/* Admin cockpit one-offs — light-surface tints on the organizer admin
+   pages that read the same in every theme (the Notice banner fills and the
+   muted label on an active/dark round chip). Fixed values, not night. */
+:root {
+  --note-ok-bg: oklch(0.96 0.04 140);   /* success Notice fill */
+  --note-err-bg: oklch(0.96 0.04 12);   /* error Notice fill */
+  --chip-on-label: oklch(0.82 0.02 95); /* muted label on an active dark chip */
 }
 
 /* Liberty 250 — seasonal, opt-in. Theme-independent celebration chrome. */

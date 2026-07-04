@@ -147,7 +147,7 @@ export function ConfigForm({
         </div>
       </details>
 
-      <button className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
+      <button className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>
         Save event settings
       </button>
     </form>

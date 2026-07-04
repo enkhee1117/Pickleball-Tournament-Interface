@@ -18,7 +18,7 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
       type="submit"
       disabled={pending || disabled}
       className="mt-1 w-full rounded-2xl px-5 py-[16px] text-center text-base font-semibold tracking-tight disabled:opacity-60"
-      style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}
+      style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}
     >
       {pending ? 'Joining…' : 'Enter the mixer'}
     </button>
