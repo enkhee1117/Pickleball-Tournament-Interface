@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { fieldInt, fieldString, formatPgError } from '@/lib/forms';
@@ -300,8 +301,9 @@ export async function drawMixerRound(formData: FormData): Promise<void> {
 
   // notify.html touchpoint 1 — the draw just seated players, so fire the
   // lock-screen "You're on Court N" push. Best-effort and quiet-hours aware
-  // (only checked-in players in a live event); never blocks the redirect.
-  await notifySeatedPlayers(tournamentId, roundId);
+  // (only checked-in players in a live event). Runs AFTER the response is
+  // sent so a slow push service never delays the organizer's redirect.
+  after(() => notifySeatedPlayers(tournamentId, roundId));
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);

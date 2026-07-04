@@ -8,6 +8,7 @@ import { Icons } from '@/components/ui/icons';
 import { DesktopNav, DesktopSurface } from '@/components/desktop';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import type { Tournament } from '@/lib/types';
+import { formatLabelFor } from '@/lib/tournaments';
 import { HomeGreeting } from './HomeGreeting';
 import { MarketingLanding } from './MarketingLanding';
 
@@ -426,17 +427,3 @@ function playersFromLabel(label: string) {
   return parts.slice(0, 2).map((s) => playerFromName(s));
 }
 
-function formatLabelFor(format: string): string {
-  switch (format) {
-    case 'round_robin':
-      return 'Round Robin';
-    case 'fixed_partners':
-      return 'Fixed Partners';
-    case 'bracket':
-      return 'Bracket';
-    case 'partner_mixer':
-      return 'Partner Mixer';
-    default:
-      return format;
-  }
-}

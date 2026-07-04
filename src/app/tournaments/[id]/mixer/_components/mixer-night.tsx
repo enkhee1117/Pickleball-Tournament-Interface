@@ -6,7 +6,9 @@ import type { PlayerRow } from '../_types';
 // tabs, empty states). Kept independent of the page so each tab component
 // can pull just what it needs.
 
-export function Dink({ pose, size }: { pose: 'token-t' | 'presenting-t'; size: number }) {
+export type DinkPose = 'token-t' | 'presenting-t' | 'wave' | 'coach' | 'idle';
+
+export function Dink({ pose, size }: { pose: DinkPose; size: number }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -69,7 +71,7 @@ function hashString(value: string) {
   return Math.abs(hash);
 }
 
-export function mixerAvatarFor(player: PlayerRow, selfId?: string) {
+export function mixerAvatarFor(player: Pick<PlayerRow, 'id' | 'display_name'>, selfId?: string) {
   if (selfId && player.id === selfId) {
     return playerFromName(player.display_name, '/design-handoff/avatars/me.png');
   }

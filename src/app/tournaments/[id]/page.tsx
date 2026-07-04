@@ -10,6 +10,7 @@ import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Icons } from '@/components/ui/icons';
 import { DesktopNav, DesktopSurface } from '@/components/desktop';
 import { SAMPLE_PLAYERS } from '@/lib/sample-data';
+import { formatLabelFor } from '@/lib/tournaments';
 import {
   ALL_PLAYOFF_LABELS,
   PLAYOFF_ROUND_LABELS,
@@ -989,20 +990,6 @@ function roundNumber(label: string): number {
   return match ? Number.parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
 }
 
-function formatLabelFor(format: string): string {
-  switch (format) {
-    case 'round_robin':
-      return 'Round Robin';
-    case 'fixed_partners':
-      return 'Fixed Partners';
-    case 'bracket':
-      return 'Bracket';
-    case 'partner_mixer':
-      return 'Partner Mixer';
-    default:
-      return format;
-  }
-}
 
 function RealMatchCard({ tournamentId, row }: { tournamentId: string; row: MatchRow }) {
   const a = playersFromLabel(row.team_a_label);

@@ -67,7 +67,9 @@ export async function signUpWithPassword(_prev: FormState, formData: FormData): 
   // Optional gender lands on the profile (the handle_new_user trigger has
   // already created the row) so mixed / same-gender events can seat them.
   if (gender) {
-    await admin.from('profiles').update({ gender }).eq('id', created.user.id);
+    const { error: genderErr } = await admin.from('profiles').update({ gender }).eq('id', created.user.id);
+    // Non-fatal — the account works without it — but don't lose it silently.
+    if (genderErr) console.error('[signup] failed to persist gender', genderErr.message);
   }
 
   const supabase = await createClient();

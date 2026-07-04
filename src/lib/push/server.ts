@@ -47,41 +47,51 @@ type SubscriptionRow = {
   auth: string;
 };
 
-// Deliver one payload to every endpoint owned by the given users. Best-effort:
-// per-endpoint failures are swallowed, and endpoints the push service reports
-// as gone (404/410) are pruned so we stop trying them. Returns how many
-// endpoints accepted the push.
-export async function sendPushToUsers(userIds: string[], payload: PushPayload): Promise<number> {
-  const targets = Array.from(new Set(userIds.filter(Boolean)));
-  if (targets.length === 0) return 0;
+// Deliver per-user payloads with ONE subscriptions query for the whole
+// batch (a draw fans out to every seated player — per-user queries were an
+// N+1). Best-effort: per-endpoint failures are swallowed, and endpoints the
+// push service reports as gone (404/410) are pruned so we stop trying them.
+// Returns how many endpoints accepted a push.
+export async function sendPushBatch(items: Array<{ userId: string; payload: PushPayload }>): Promise<number> {
+  const clean = items.filter((i) => i.userId);
+  if (clean.length === 0) return 0;
   if (!ensureConfigured()) {
-    console.warn('[push] VAPID keys not configured — skipping send to', targets.length, 'user(s)');
+    console.warn('[push] VAPID keys not configured — skipping send to', clean.length, 'user(s)');
     return 0;
   }
 
   const admin = createAdminClient();
+  const userIds = Array.from(new Set(clean.map((i) => i.userId)));
   const { data, error } = await admin
     .from('push_subscriptions')
-    .select('endpoint,p256dh,auth')
-    .in('user_id', targets);
+    .select('user_id,endpoint,p256dh,auth')
+    .in('user_id', userIds);
   if (error || !data || data.length === 0) return 0;
 
-  const body = JSON.stringify(payload);
+  const byUser = new Map<string, SubscriptionRow[]>();
+  for (const row of data as (SubscriptionRow & { user_id: string })[]) {
+    byUser.set(row.user_id, [...(byUser.get(row.user_id) ?? []), row]);
+  }
+
   const stale: string[] = [];
   let delivered = 0;
 
   await Promise.all(
-    (data as SubscriptionRow[]).map(async (row) => {
-      try {
-        await webpush.sendNotification(
-          { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } },
-          body,
-        );
-        delivered += 1;
-      } catch (err) {
-        const status = (err as { statusCode?: number }).statusCode;
-        if (status === 404 || status === 410) stale.push(row.endpoint);
-      }
+    clean.flatMap(({ userId, payload }) => {
+      const subs = byUser.get(userId) ?? [];
+      const body = JSON.stringify(payload);
+      return subs.map(async (row) => {
+        try {
+          await webpush.sendNotification(
+            { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } },
+            body,
+          );
+          delivered += 1;
+        } catch (err) {
+          const status = (err as { statusCode?: number }).statusCode;
+          if (status === 404 || status === 410) stale.push(row.endpoint);
+        }
+      });
     }),
   );
 
@@ -89,4 +99,9 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload): 
     await admin.from('push_subscriptions').delete().in('endpoint', stale);
   }
   return delivered;
+}
+
+// Single-user convenience wrapper.
+export async function sendPushToUsers(userIds: string[], payload: PushPayload): Promise<number> {
+  return sendPushBatch(userIds.map((userId) => ({ userId, payload })));
 }

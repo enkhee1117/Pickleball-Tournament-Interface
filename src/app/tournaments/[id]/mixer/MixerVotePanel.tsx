@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Avatar, playerFromName } from '@/components/ui/Avatar';
+import { Avatar } from '@/components/ui/Avatar';
 import { Icons } from '@/components/ui/icons';
 import { eligibleBallotTargets } from '@/lib/mixer';
+import { Dink, mixerAvatarFor } from './_components/mixer-night';
 import { setMixerVote } from './actions';
 
 // Player ballot — rebuilt to the handoff player.html spec: candidate cards
@@ -542,32 +543,5 @@ function TokenDot({ active }: { active: boolean }) {
   );
 }
 
-function Dink({ pose, size }: { pose: 'wave' | 'token-t' | 'presenting-t'; size: number }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`/design-handoff/dink/${pose}.png`}
-      alt=""
-      width={size}
-      height={size}
-      className="mx-auto shrink-0 object-contain"
-      style={{ width: size, height: size }}
-    />
-  );
-}
 
-function mixerAvatarFor(player: PlayerRow, selfId?: string) {
-  if (selfId && player.id === selfId) {
-    return playerFromName(player.display_name, '/design-handoff/avatars/me.png');
-  }
-  const n = 2 + (hashString(player.id || player.display_name) % 11);
-  return playerFromName(player.display_name, `/design-handoff/avatars/p${n}.png`);
-}
 
-function hashString(value: string) {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
