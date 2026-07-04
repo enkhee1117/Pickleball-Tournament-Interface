@@ -54,12 +54,10 @@ const swatch: React.CSSProperties = {
 
 function swatchPaper(t: string): string {
   if (t === 'night') return 'oklch(0.155 0.024 264)';
-  if (t === 'arcade') return 'oklch(0.96 0.022 320)';
   return 'oklch(0.97 0.008 95)';
 }
 
 function swatchInk(t: string): string {
   if (t === 'night') return 'oklch(0.96 0.008 95)';
-  if (t === 'arcade') return 'oklch(0.22 0.06 320)';
   return 'oklch(0.18 0.01 80)';
 }

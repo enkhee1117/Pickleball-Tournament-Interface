@@ -214,6 +214,79 @@ export async function initializeMixerEvent(formData: FormData): Promise<void> {
   redirect(`${mixerPath(tournamentId)}/admin?ok=Mixer%20initialized`);
 }
 
+// Quick voting-window control on the Run Event tab: set the lock window in
+// HOURS and re-arm the current round's timer in one tap. Uses the partial
+// update semantics of app_update_mixer_config (0045: null params keep their
+// current values) so nothing else in the config is touched.
+export async function setMixerVotingWindow(formData: FormData): Promise<void> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  const roundId = fieldString(formData, 'round_id');
+  const hours = fieldInt(formData, 'lock_hours', 24, 1, 168);
+  if (!tournamentId || !roundId) redirect('/tournaments');
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_update_mixer_config', {
+    p_tournament_id: tournamentId,
+    p_lock_seconds: hours * 3600,
+  });
+  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+
+  // Reopen (or re-arm) the round so lock_at picks up the new window.
+  const { error: stateError } = await supabase.rpc('app_mixer_set_round_state', {
+    p_round_id: roundId,
+    p_state: 'open',
+  });
+  if (stateError) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(stateError))}`);
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  redirect(`${mixerPath(tournamentId)}/admin?ok=${encodeURIComponent(`Voting open for ${hours}h`)}`);
+}
+
+// Organizer recovery controls (migration 0048) — reopen a drawn round,
+// wipe & refund a round's ballots, or reset the whole event for a rerun.
+export async function reopenMixerRound(formData: FormData): Promise<void> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  const roundId = fieldString(formData, 'round_id');
+  if (!tournamentId || !roundId) redirect('/tournaments');
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_mixer_reopen_round', { p_round_id: roundId });
+  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  redirect(`${mixerPath(tournamentId)}/admin?ok=${encodeURIComponent('Round reopened — pairings cleared, voting is live again')}`);
+}
+
+export async function resetMixerRoundVotes(formData: FormData): Promise<void> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  const roundId = fieldString(formData, 'round_id');
+  if (!tournamentId || !roundId) redirect('/tournaments');
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_mixer_reset_round_votes', { p_round_id: roundId });
+  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  redirect(`${mixerPath(tournamentId)}/admin?ok=${encodeURIComponent('Ballots wiped and tokens refunded for this round')}`);
+}
+
+export async function resetMixerEvent(formData: FormData): Promise<void> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  if (!tournamentId) redirect('/tournaments');
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_mixer_reset_event', { p_tournament_id: tournamentId });
+  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  revalidatePath(`${mixerPath(tournamentId)}/present`);
+  redirect(`${mixerPath(tournamentId)}/admin?ok=${encodeURIComponent('Event reset — all rounds reopened, tokens and chips restored')}`);
+}
+
 export async function drawMixerRound(formData: FormData): Promise<void> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const roundId = fieldString(formData, 'round_id');
