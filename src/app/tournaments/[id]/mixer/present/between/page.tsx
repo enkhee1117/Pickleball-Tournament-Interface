@@ -25,7 +25,7 @@ export default async function MixerPresentBetweenPage({ params }: PageProps) {
   const supabase = await createClient();
 
   const [{ data: tournament }, { data: rounds }, { data: players }] = await Promise.all([
-    supabase.from('tournaments').select('id,name,format,status,invite_code,owner_user_id').eq('id', id).single(),
+    supabase.from('tournaments').select('id,name,format,status,invite_code,owner_user_id,gender_mode').eq('id', id).single(),
     supabase.from('mixer_rounds').select('id,round_no,state,lock_at').eq('tournament_id', id).order('round_no', { ascending: true }),
     supabase.from('tournament_players').select('id,display_name,gender,profile_id,withdrawn_at').eq('tournament_id', id).order('created_at', { ascending: true }),
   ]);

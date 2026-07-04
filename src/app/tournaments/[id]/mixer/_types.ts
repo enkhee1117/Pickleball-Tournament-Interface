@@ -9,6 +9,8 @@ export type TournamentRow = {
   status: string;
   invite_code: string;
   owner_user_id: string;
+  // 'mixed' | 'same' | 'open' — drives who can pair with (and vote for) whom.
+  gender_mode?: string | null;
 };
 
 export type ConfigRow = {

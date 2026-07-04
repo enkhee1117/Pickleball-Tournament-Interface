@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   canGenerateMatches,
+  genderModeFor,
+  isGenderMode,
   dbFormat,
   defaultPairingForFormat,
   isFixedPartners,
@@ -202,4 +204,39 @@ describe('full wizard scenario coverage', () => {
       });
     }
   }
+});
+
+describe('genderModeFor with mixer override (0047)', () => {
+  it('mixer defaults to mixed when no override given', () => {
+    expect(genderModeFor('mixer')).toBe('mixed');
+    expect(genderModeFor('partner_mixer')).toBe('mixed');
+  });
+
+  it('mixer honors the chosen mode', () => {
+    expect(genderModeFor('mixer', 'same')).toBe('same');
+    expect(genderModeFor('mixer', 'open')).toBe('open');
+    expect(genderModeFor('mixer', 'mixed')).toBe('mixed');
+    expect(genderModeFor('partner_mixer', 'open')).toBe('open');
+  });
+
+  it('mixer ignores junk overrides', () => {
+    expect(genderModeFor('mixer', 'coed')).toBe('mixed');
+    expect(genderModeFor('mixer', null)).toBe('mixed');
+    expect(genderModeFor('mixer', undefined)).toBe('mixed');
+  });
+
+  it('classic formats ignore the override entirely', () => {
+    expect(genderModeFor('rr-same', 'open')).toBe('same');
+    expect(genderModeFor('rr-mixed', 'same')).toBe('mixed');
+    expect(genderModeFor('fp-mixed', 'open')).toBe('mixed');
+    expect(genderModeFor('round_robin', 'same')).toBe('open');
+  });
+
+  it('isGenderMode guards the three valid values', () => {
+    expect(isGenderMode('open')).toBe(true);
+    expect(isGenderMode('mixed')).toBe(true);
+    expect(isGenderMode('same')).toBe(true);
+    expect(isGenderMode('coed')).toBe(false);
+    expect(isGenderMode(null)).toBe(false);
+  });
 });

@@ -3,8 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { isValidInviteCode, normalizeInviteCode } from '@/lib/invite-codes';
 import { fieldString, formatPgError } from '@/lib/forms';
+import { resolveIdentifier } from '@/lib/identifier';
+import { validatePassword } from '@/lib/validation';
+import { duprForSkill, normalizeGender } from '@/lib/quick-join';
 
 export async function joinPublicTournament(formData: FormData): Promise<void> {
   const code = normalizeInviteCode(String(formData.get('code') ?? ''));
@@ -27,30 +31,25 @@ export async function joinPublicTournament(formData: FormData): Promise<void> {
   redirect(`/tournaments/${tournamentId}/mixer`);
 }
 
-// cold-join.html step 3 — a rough skill band captured in the 15-second quick
-// profile. Mapped to a representative DUPR so teammates see a level and the
-// draw has a rating to work with. Kept coarse on purpose; the player can
-// refine it later from their profile.
-const SKILL_TO_DUPR: Record<string, number> = {
-  new: 2.75,
-  mid: 3.25, // 3.0–3.5
-  high: 4.25, // 4.0+
-};
-
-// Anonymous mixer join — combines sign-in and the quick-profile bind in one
-// server-side step so the two halves succeed or fail together. Persists name +
-// skill onto the anonymous session (roster entry AND profiles row) via
-// app_mixer_join_with_profile, so the 15-second profile survives an in-place
-// account upgrade. Error redirects use the public /t/[code] landing when an
-// invite code is present, otherwise the mixer page itself (covers users who
-// landed on /tournaments/[id]/mixer directly without going through QR/code).
-export async function joinMixerAsAnonymous(formData: FormData): Promise<void> {
+// Cold-join quick account (cold-join.html steps 3-4, revised). Instead of an
+// anonymous session, the 15-second profile now asks for a real email (or
+// phone) + password up front — so the player has a durable login from tap
+// one, their history follows them, and there's no risky anonymous→permanent
+// upgrade path later. The account is auto-confirmed at creation (same policy
+// as /signup) so nothing blocks them from playing right now; email
+// verification only matters later when they want to organize their own event.
+//
+// If the identifier already has an account, we try the supplied password —
+// a returning player can re-join any event straight from this form.
+export async function joinMixerWithQuickAccount(formData: FormData): Promise<void> {
   const rawCode = String(formData.get('code') ?? '');
   const code = rawCode ? normalizeInviteCode(rawCode) : '';
   const tournamentId = fieldString(formData, 'tournament_id');
   const displayName = fieldString(formData, 'display_name').slice(0, 60);
-  const skill = fieldString(formData, 'skill_level');
-  const dupr = skill in SKILL_TO_DUPR ? SKILL_TO_DUPR[skill] : null;
+  const dupr = duprForSkill(fieldString(formData, 'skill_level'));
+  const gender = normalizeGender(fieldString(formData, 'gender'));
+  const identifier = fieldString(formData, 'identifier');
+  const password = String(formData.get('password') ?? '');
 
   if (!tournamentId) {
     redirect(code ? `/t/${encodeURIComponent(code)}?error=Tournament%20not%20found` : '/tournaments');
@@ -59,20 +58,59 @@ export async function joinMixerAsAnonymous(formData: FormData): Promise<void> {
   const back = code
     ? `/t/${encodeURIComponent(code)}`
     : `/tournaments/${tournamentId}/mixer`;
-  if (!displayName) {
-    redirect(`${back}?error=${encodeURIComponent('Pick a display name to join')}`);
-  }
+  const fail = (message: string): never =>
+    redirect(`${back}?error=${encodeURIComponent(message)}`);
+
+  if (!displayName) fail('Pick a display name to join');
+  const resolved = resolveIdentifier(identifier);
+  if (!resolved) fail('Enter a valid email or phone number.');
+  const passCheck = validatePassword(password);
+  if (!passCheck.ok) fail(passCheck.error);
 
   const supabase = await createClient();
-  const { error: signInError } = await supabase.auth.signInAnonymously();
-  if (signInError) {
-    redirect(`${back}?error=${encodeURIComponent(signInError.message)}`);
+  const admin = createAdminClient();
+  const createPayload =
+    resolved!.kind === 'phone'
+      ? {
+          phone: resolved!.phone,
+          email: resolved!.email,
+          password,
+          phone_confirm: true,
+          email_confirm: true,
+          user_metadata: { display_name: displayName },
+        }
+      : {
+          email: resolved!.email,
+          password,
+          email_confirm: true,
+          user_metadata: { display_name: displayName },
+        };
+  const { error: createErr } = await admin.auth.admin.createUser(createPayload);
+  if (createErr) {
+    const msg = createErr.message?.toLowerCase() ?? '';
+    const exists = msg.includes('already') || msg.includes('exists') || msg.includes('registered');
+    if (!exists) fail(createErr.message);
+    // Existing account: the supplied password must match — then this is
+    // just a sign-in + join, which is exactly what a returning player wants.
+  }
+
+  const { error: signInErr } = await supabase.auth.signInWithPassword({
+    email: resolved!.email,
+    password,
+  });
+  if (signInErr) {
+    fail(
+      createErr
+        ? 'That email already has an account and the password didn’t match. Sign in instead.'
+        : signInErr.message,
+    );
   }
 
   const { error: bindError } = await supabase.rpc('app_mixer_join_with_profile', {
     p_tournament_id: tournamentId,
     p_display_name: displayName,
     p_dupr: dupr,
+    p_gender: gender,
   });
   if (bindError) {
     redirect(`${back}?error=${encodeURIComponent(formatPgError(bindError))}`);
