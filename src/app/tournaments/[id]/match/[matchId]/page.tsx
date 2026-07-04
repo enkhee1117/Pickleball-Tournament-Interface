@@ -65,7 +65,8 @@ export default async function MatchPage({ params }: PageProps) {
       .from('matches')
       .select('id,round_label,completed_at')
       .eq('tournament_id', id)
-      .order('created_at', { ascending: true }),
+      .order('created_at', { ascending: true })
+      .limit(400),
     supabase
       .from('tournament_players')
       .select('id,display_name,profile_id')

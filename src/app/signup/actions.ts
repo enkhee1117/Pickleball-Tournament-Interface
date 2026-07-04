@@ -7,6 +7,7 @@ import { fieldString, type FormState } from '@/lib/forms';
 import { validatePassword } from '@/lib/validation';
 import { safeNext } from '@/lib/auth-redirect';
 import { resolveIdentifier } from '@/lib/identifier';
+import { normalizeGender } from '@/lib/quick-join';
 
 // Signup accepts either a real email or a phone number.
 //   - Email path: the account is created with the user's real email so
@@ -22,6 +23,7 @@ export async function signUpWithPassword(_prev: FormState, formData: FormData): 
   const resolved = resolveIdentifier(raw);
   const password = String(formData.get('password') ?? '');
   const display_name = fieldString(formData, 'display_name');
+  const gender = normalizeGender(fieldString(formData, 'gender'));
   const next = safeNext(fieldString(formData, 'next') || '/');
 
   if (!display_name || display_name.length < 1) {
@@ -60,6 +62,12 @@ export async function signUpWithPassword(_prev: FormState, formData: FormData): 
   }
   if (!created.user) {
     return { error: 'Could not create the account. Try again in a moment.' };
+  }
+
+  // Optional gender lands on the profile (the handle_new_user trigger has
+  // already created the row) so mixed / same-gender events can seat them.
+  if (gender) {
+    await admin.from('profiles').update({ gender }).eq('id', created.user.id);
   }
 
   const supabase = await createClient();

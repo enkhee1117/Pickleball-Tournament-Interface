@@ -1,11 +1,12 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getProfile } from '@/lib/auth';
-import { TPMark, TPWordmark } from '@/components/ui/TPMark';
 import { Chip } from '@/components/ui/Chip';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
-import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Icons } from '@/components/ui/icons';
+import { DesktopNav, DesktopSurface } from '@/components/desktop';
+import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import type { Tournament } from '@/lib/types';
 import { HomeGreeting } from './HomeGreeting';
 import { MarketingLanding } from './MarketingLanding';
@@ -30,6 +31,8 @@ export default async function HomePage() {
   }
 
   const supabase = await createClient();
+  const cookieStore = await cookies();
+  const theme = readThemeFromCookie(cookieStore.get(THEME_COOKIE)?.value);
   const greetingName = profile.display_name?.split(' ')[0] ?? 'Player';
 
   // Pull every tournament the user belongs to, then pick the most relevant
@@ -81,61 +84,115 @@ export default async function HomePage() {
     heroPlayerCount = heroRoster?.count ?? null;
   }
 
+  // Desktop-primary Today surface (handoff hub/overview pattern): shared
+  // DesktopNav chrome, then a two-column lg grid — editorial greeting, hero
+  // event card, and the live rail on the left; quick actions + recent events
+  // on the right. Below lg it collapses to the familiar single column.
   return (
-    <div className="flex min-h-full flex-col bg-paper">
-      <div className="flex items-center justify-between px-[18px] pt-3.5 pb-3">
-        <TPWordmark size={14} />
-        <Link
-          href="/history"
-          aria-label="History"
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-ink"
-        >
-          {Icons.history}
-        </Link>
-      </div>
-
-      <div className="flex-1">
-        <div className="px-[18px] pt-2 pb-[18px]">
-          <HomeGreeting name={greetingName} />
-          <Headline tournaments={tournaments} liveMatches={liveMatches} />
-        </div>
-
-        <div className="px-[18px] pb-[18px]">
-          {hero ? (
-            <HeroTournament
-              tournament={hero}
-              playerCount={heroPlayerCount}
-              liveCount={heroLiveCount}
-            />
-          ) : (
-            <EmptyHero />
-          )}
-        </div>
-
-        {liveMatches.length > 0 && (
-          <>
-            <SectionHeader
-              title="On court right now"
-              action={<Link href="/tournaments">See all</Link>}
-            />
-            <div className="grid gap-3 px-[18px]">
-              {liveMatches.slice(0, 6).map((m) => (
-                <LiveMatchCard key={m.id} m={m} />
-              ))}
+    <DesktopSurface withCommandBar>
+      <DesktopNav
+        theme={theme}
+        active="Today"
+        live={activeTournaments.length > 0}
+        event={activeTournaments[0]?.name}
+        primaryAction="＋ New event"
+        primaryHref="/tournaments/new"
+      />
+      <main id="main" className="mx-auto w-full max-w-[1180px] px-[18px] pb-24 pt-4 sm:px-6 lg:px-8 lg:pt-9">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-10">
+          <div className="min-w-0">
+            <div className="pb-[18px] pt-2">
+              <HomeGreeting name={greetingName} />
+              <Headline tournaments={tournaments} liveMatches={liveMatches} />
             </div>
-          </>
-        )}
 
-        <SectionHeader title="Quick start" />
-        <div className="grid grid-cols-2 gap-2.5 px-[18px]">
-          <QuickAction href="/tournaments/new" tone="ink" icon={Icons.plus} label="New tournament" />
-          <QuickAction href="/join" icon={Icons.qr} label="Join with code" />
-          <QuickAction href="/history" icon={Icons.bars} label="My stats" />
-          <QuickAction href="/tournaments" icon={Icons.trophy} label="Browse" />
+            <div className="pb-[18px]">
+              {hero ? (
+                <HeroTournament
+                  tournament={hero}
+                  playerCount={heroPlayerCount}
+                  liveCount={heroLiveCount}
+                />
+              ) : (
+                <EmptyHero />
+              )}
+            </div>
+
+            {liveMatches.length > 0 && (
+              <>
+                <HomeSectionHeader
+                  title="On court right now"
+                  action={<Link href="/tournaments">See all</Link>}
+                />
+                <div className="grid gap-3 xl:grid-cols-2">
+                  {liveMatches.slice(0, 6).map((m) => (
+                    <LiveMatchCard key={m.id} m={m} />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          <aside className="min-w-0 lg:pt-2">
+            <HomeSectionHeader title="Quick start" />
+            <div className="grid grid-cols-2 gap-2.5">
+              <QuickAction href="/tournaments/new" tone="ink" icon={Icons.plus} label="New tournament" />
+              <QuickAction href="/join" icon={Icons.qr} label="Join with code" />
+              <QuickAction href="/history" icon={Icons.bars} label="My stats" />
+              <QuickAction href="/tournaments" icon={Icons.trophy} label="Browse" />
+            </div>
+
+            {tournaments.length > 0 && (
+              <>
+                <HomeSectionHeader title="Your events" action={<Link href="/tournaments">All events</Link>} />
+                <div className="grid gap-2">
+                  {tournaments.slice(0, 4).map((t) => (
+                    <Link
+                      key={t.id}
+                      href={`/tournaments/${t.id}`}
+                      className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3"
+                      style={{ border: '1px solid var(--line)' }}
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-[14px] font-semibold text-ink">{t.name}</div>
+                        <div className="mt-0.5 text-[11.5px] text-ink-3">{formatLabelFor(t.format)}</div>
+                      </div>
+                      <Chip tone={t.status === 'active' ? 'live' : t.status === 'draft' ? 'ghost' : 'court'}>
+                        {t.status.toUpperCase()}
+                      </Chip>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/design-handoff/dink/wave.png"
+              alt=""
+              width={120}
+              height={120}
+              className="mx-auto mt-8 hidden lg:block"
+              style={{ width: 120, height: 120, objectFit: 'contain' }}
+            />
+          </aside>
         </div>
+      </main>
+    </DesktopSurface>
+  );
+}
 
-        <div className="h-24" />
-      </div>
+// Local section header without the mobile-shell horizontal padding baked into
+// the shared SectionHeader — the Today grid manages its own gutters.
+function HomeSectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between pt-4 pb-2.5">
+      <div className="text-[18px] font-semibold tracking-tight text-ink">{title}</div>
+      {action && (
+        <div className="text-[13px] font-semibold" style={{ color: 'var(--court-deep)' }}>
+          {action}
+        </div>
+      )}
     </div>
   );
 }
