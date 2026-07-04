@@ -315,7 +315,7 @@ function MixerShell({
         </aside>
 
         {/* Main column — constrained on tablet, full on desktop */}
-        <div className="mx-auto w-full max-w-[560px] lg:max-w-[860px] lg:px-6">
+        <div className="mx-auto w-full max-w-[560px] lg:max-w-[1080px] lg:px-6">
           <div className="lg:hidden">
             <TopBar
               dark

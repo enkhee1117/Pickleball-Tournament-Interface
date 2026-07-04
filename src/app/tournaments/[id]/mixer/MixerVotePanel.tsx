@@ -1,16 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Icons } from '@/components/ui/icons';
 import { eligibleBallotTargets } from '@/lib/mixer';
 import { setMixerVote } from './actions';
 
+// Player ballot — rebuilt to the handoff player.html spec: candidate cards
+// with − n + steppers and a "rather not" toggle, a desktop ballot rail with
+// the live allocation summary, and a plain-language "how the draw works"
+// fairness card. Votes stay blind; everything here is the caller's own data.
+
 type ConfigRow = {
   starting_tokens: number;
   rounds: number;
   downvotes_enabled: boolean;
+  alpha?: number;
+  beta?: number;
+  gamma?: number;
 };
 
 type RoundRow = {
@@ -40,6 +48,11 @@ type VoteRow = {
   up_tokens: number;
   down_tokens: number;
 };
+
+const NIGHT_CARD = 'oklch(0.215 0.03 264)';
+const NIGHT_LINE = 'oklch(0.36 0.04 266)';
+const NIGHT_TEXT2 = 'oklch(0.78 0.028 264)';
+const NIGHT_TEXT3 = 'oklch(0.7 0.03 264)';
 
 export function MixerVotePanel({
   tournamentId,
@@ -77,10 +90,12 @@ export function MixerVotePanel({
   const activeVotes = optimisticVotes.filter((v) => v.round_id === round.id);
   const serverSpent = votes.reduce((s, v) => s + v.up_tokens + v.down_tokens, 0);
   const optimisticSpent = optimisticVotes.reduce((s, v) => s + v.up_tokens + v.down_tokens, 0);
+  const roundSpent = activeVotes.reduce((s, v) => s + v.up_tokens + v.down_tokens, 0);
   const serverRemaining = (myState?.tokens_base_remaining ?? config.starting_tokens) + (myState?.tokens_bought_remaining ?? 0);
   const budget = Math.max(config.starting_tokens, serverRemaining + serverSpent);
   const left = Math.max(0, budget - optimisticSpent);
   const locked = round.state !== 'open' || (round.lock_at ? new Date(round.lock_at).getTime() <= Date.now() : false);
+  const nameOf = (id: string) => roster.find((p) => p.id === id)?.display_name ?? '—';
 
   useEffect(() => setOptimisticVotes(votes), [votes]);
   useEffect(() => {
@@ -106,8 +121,8 @@ export function MixerVotePanel({
   };
 
   return (
-    <div className="px-[18px]">
-      {showHow && <HowItWorks budget={budget} rounds={eventRoundCount} onClose={closeHow} />}
+    <div className="px-[18px] lg:px-0">
+      {showHow && <FirstVoteCoach budget={budget} rounds={eventRoundCount} onClose={closeHow} />}
       <RoundSelector
         tournamentId={tournamentId}
         rounds={rounds}
@@ -115,118 +130,269 @@ export function MixerVotePanel({
         eventRoundCount={eventRoundCount}
         votes={optimisticVotes}
       />
+
+      {/* header — serif ask + blind note (player.html) */}
       <div
-        className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs"
-        style={{ background: 'oklch(0.215 0.03 264)', border: '1px dashed oklch(0.42 0.045 266)', color: 'oklch(0.78 0.028 264)' }}
+        className="mb-3 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-2xl p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
+        style={{ background: 'linear-gradient(120deg, color-mix(in oklch, var(--sky) 12%, oklch(0.215 0.03 264)), oklch(0.215 0.03 264) 65%)', border: `1px solid ${NIGHT_LINE}` }}
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ color: 'var(--court)', flexShrink: 0 }} aria-hidden>
-          <path d="M4 4l16 16M9.5 9.6A2.6 2.6 0 0012 14.6M6.2 6.7C3.9 8.2 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.6 0 3-.45 4.2-1.1M10 5.8c.65-.13 1.3-.2 2-.2 6 0 9.5 6.4 9.5 6.4a17 17 0 01-2.3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-        <span>Blind ballot — no one sees your picks, <b style={{ color: 'oklch(0.975 0.012 264)' }}>not even the admin</b>.</span>
-      </div>
-      <div className="sticky top-0 z-10 mb-3 grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264 / 0.96)', border: '1px solid oklch(0.36 0.04 266)', backdropFilter: 'blur(12px)' }}>
+        <Dink pose="wave" size={54} />
         <div className="min-w-0">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>Token budget</div>
-            <div className="mono text-[22px] font-bold" style={{ color: 'var(--court)' }}>{left}/{budget}</div>
+          <div className="serif text-[24px] leading-[1.05]">
+            Who do you want to <em className="italic" style={{ color: 'var(--court)' }}>play with?</em>
           </div>
-          <TokenMeter left={left} total={budget} />
-          <div className="mt-3 flex items-center justify-between gap-3 text-xs leading-5" style={{ color: 'oklch(0.78 0.028 264)' }}>
-            <span>{locked ? 'Ballot is sealed for this round.' : `Spend across all ${eventRoundCount} rounds.`}</span>
-            <button type="button" onClick={() => setShowHow(true)} className="shrink-0 rounded-full px-3 py-1 text-[11px] font-bold" style={{ border: '1px solid oklch(0.36 0.04 266)' }}>
-              How it works
-            </button>
+          <div className="mt-1 text-[12.5px]" style={{ color: NIGHT_TEXT2 }}>
+            Spend tokens on the partners you&apos;d love to draw. Stack them to boost your odds.
           </div>
         </div>
-        <Dink pose="token-t" size={78} />
+        <div
+          className="hidden max-w-[220px] items-center gap-2 rounded-xl px-3 py-2 text-[11.5px] sm:flex"
+          style={{ border: `1px dashed ${NIGHT_LINE}`, color: NIGHT_TEXT2 }}
+        >
+          <span aria-hidden style={{ color: 'var(--court)' }}>{Icons.spark}</span>
+          Blind — no one sees your picks, not even the admin.
+        </div>
       </div>
-      {locked && (
-        <div className="mb-3 grid grid-cols-[auto_1fr] items-center gap-3 rounded-2xl p-3 text-sm" style={{ background: 'oklch(0.215 0.03 264)', color: 'oklch(0.78 0.028 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
-          <Dink pose="presenting-t" size={58} />
-          <div>
-            <div className="font-bold" style={{ color: 'oklch(0.975 0.012 264)' }}>Your picks are in</div>
-            <div className="mt-1 text-xs leading-5">Voting is locked. Your choices are sealed; no raw tallies are exposed.</div>
-          </div>
-        </div>
-      )}
-      <div className="grid gap-2.5">
-        {targets.map((p) => {
-          const vote = activeVotes.find((v) => v.target_player_id === p.id) ?? { up_tokens: 0, down_tokens: 0 };
-          const up = vote.up_tokens;
-          const down = vote.down_tokens;
-          return (
-            <div
-              key={p.id}
-              className="rounded-2xl p-3 transition"
-              style={{
-                background: up > 0
-                  ? 'color-mix(in oklch, var(--court) 10%, oklch(0.215 0.03 264))'
-                  : 'oklch(0.215 0.03 264)',
-                border: up > 0
-                  ? '1px solid color-mix(in oklch, var(--court) 55%, oklch(0.36 0.04 266))'
-                  : '1px solid oklch(0.36 0.04 266)',
-                opacity: down > 0 ? 0.68 : 1,
-              }}
-            >
-              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
-                <Avatar player={mixerAvatarFor(p, myPlayer.id)} size={48} ring={up > 0} />
-                <div className="min-w-0">
-                  <div className="truncate text-[16px] font-bold">{p.display_name}</div>
-                  <div className="mt-1 flex min-w-0 items-center gap-2">
-                    <span className="mono text-[11px]" style={{ color: 'oklch(0.7 0.03 264)' }}>DUPR {p.dupr ?? '-'}</span>
-                    {up > 0 && <TokenCount tone="up" count={up} />}
-                    {down > 0 && <TokenCount tone="down" count={down} />}
-                  </div>
-                </div>
+
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-4">
+        {/* LEFT — budget + candidate cards */}
+        <div className="min-w-0">
+          <div className="sticky top-0 z-10 mb-3 grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264 / 0.96)', border: `1px solid ${NIGHT_LINE}`, backdropFilter: 'blur(12px)' }}>
+            <div className="min-w-0">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: NIGHT_TEXT3 }}>Token budget</div>
+                <div className="mono text-[22px] font-bold" style={{ color: 'var(--court)' }}>{left}/{budget}</div>
               </div>
-              <div className="mt-3 flex items-center gap-2">
-                {(up > 0 || down > 0) && (
-                  <VoteSubmit
-                    action={submitVote}
-                    label="Clear"
-                    tournamentId={tournamentId}
-                    roundId={round.id}
-                    voterPlayerId={myPlayer.id}
-                    targetPlayerId={p.id}
-                    upTokens={0}
-                    downTokens={0}
-                    returnRound={round.round_no}
-                    disabled={locked}
-                    tone="clear"
-                  />
-                )}
-                {config.downvotes_enabled && (
-                  <VoteSubmit
-                    action={submitVote}
-                    label={down > 0 ? `-${down}` : 'No thanks'}
-                    tournamentId={tournamentId}
-                    roundId={round.id}
-                    voterPlayerId={myPlayer.id}
-                    targetPlayerId={p.id}
-                    upTokens={0}
-                    downTokens={down + 1}
-                    returnRound={round.round_no}
-                    disabled={locked || (left <= 0 && up === 0)}
-                    tone="down"
-                  />
-                )}
-                <VoteSubmit
-                  action={submitVote}
-                  label={up > 0 ? `+${up}` : "Want 'em"}
+              <TokenMeter left={left} total={budget} />
+              <div className="mt-3 flex items-center justify-between gap-3 text-xs leading-5" style={{ color: NIGHT_TEXT2 }}>
+                <span>{locked ? 'Ballot is sealed for this round.' : `Spend across all ${eventRoundCount} rounds.`}</span>
+                <button type="button" onClick={() => setShowHow(true)} className="shrink-0 rounded-full px-3 py-1 text-[11px] font-bold" style={{ border: `1px solid ${NIGHT_LINE}` }}>
+                  How it works
+                </button>
+              </div>
+            </div>
+            <Dink pose="token-t" size={78} />
+          </div>
+
+          {locked && (
+            <div className="mb-3 grid grid-cols-[auto_1fr] items-center gap-3 rounded-2xl p-3 text-sm" style={{ background: NIGHT_CARD, color: NIGHT_TEXT2, border: `1px solid ${NIGHT_LINE}` }}>
+              <Dink pose="presenting-t" size={58} />
+              <div>
+                <div className="font-bold" style={{ color: 'oklch(0.975 0.012 264)' }}>Your picks are in</div>
+                <div className="mt-1 text-xs leading-5">Voting is locked. Your choices are sealed; no raw tallies are exposed.</div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-2.5 sm:grid-cols-2 2xl:grid-cols-3">
+            {targets.map((p) => {
+              const vote = activeVotes.find((v) => v.target_player_id === p.id) ?? { up_tokens: 0, down_tokens: 0 };
+              return (
+                <CandidateCard
+                  key={p.id}
+                  player={p}
+                  selfId={myPlayer.id}
+                  up={vote.up_tokens}
+                  down={vote.down_tokens}
+                  locked={locked}
+                  left={left}
+                  downvotesEnabled={config.downvotes_enabled}
                   tournamentId={tournamentId}
                   roundId={round.id}
                   voterPlayerId={myPlayer.id}
-                  targetPlayerId={p.id}
-                  upTokens={up + 1}
-                  downTokens={0}
                   returnRound={round.round_no}
-                  disabled={locked || (left <= 0 && down === 0)}
-                  tone="up"
+                  action={submitVote}
                 />
-              </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* RIGHT — ballot summary + fairness (desktop rail; stacks below on mobile) */}
+        <aside className="mt-4 grid gap-3 lg:sticky lg:top-4 lg:mt-0">
+          <div className="rounded-2xl p-4" style={{ background: NIGHT_CARD, border: `1px solid ${NIGHT_LINE}` }}>
+            <div className="flex items-center justify-between">
+              <div className="text-[14px] font-bold">Your ballot</div>
+              <span className="mono rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.08em]" style={{ border: `1px solid ${NIGHT_LINE}`, color: NIGHT_TEXT3 }}>
+                Round {round.round_no}
+              </span>
             </div>
-          );
-        })}
+            <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ background: 'oklch(0.285 0.038 266)' }}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${budget ? Math.min(100, Math.round((optimisticSpent / budget) * 100)) : 0}%`, background: 'linear-gradient(90deg, var(--court), var(--serve))' }} />
+            </div>
+            <div className="mono mt-1.5 flex justify-between text-[11px]" style={{ color: NIGHT_TEXT3 }}>
+              <span>{roundSpent} on this round · {optimisticSpent} spent</span>
+              <span>{left} left</span>
+            </div>
+            <div className="mt-3 grid gap-1.5">
+              {activeVotes.length === 0 && (
+                <div className="text-[12.5px]" style={{ color: NIGHT_TEXT3 }}>No tokens on anyone yet — tap ＋ on a player.</div>
+              )}
+              {activeVotes.map((v) => (
+                <div key={v.target_player_id} className="flex items-center justify-between gap-2 text-[13px]">
+                  <span className="truncate">{nameOf(v.target_player_id)}</span>
+                  {v.up_tokens > 0 ? (
+                    <span className="mono font-bold" style={{ color: 'var(--court)' }}>+{v.up_tokens}</span>
+                  ) : (
+                    <span className="mono font-bold" style={{ color: 'oklch(0.7 0.16 12)' }}>−{v.down_tokens}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <FairnessCard config={config} />
+
+          <div className="mono rounded-2xl px-4 py-3 text-[11px] leading-5" style={{ border: `1px dashed ${NIGHT_LINE}`, color: NIGHT_TEXT3 }}>
+            🔒 Set a ballot per round — all {eventRoundCount} lock together.
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+// Candidate card (player.html): avatar + name + DUPR, − n ＋ stepper, and a
+// "rather not" toggle. Green ring when boosted, muted berry when avoided.
+function CandidateCard({
+  player,
+  selfId,
+  up,
+  down,
+  locked,
+  left,
+  downvotesEnabled,
+  tournamentId,
+  roundId,
+  voterPlayerId,
+  returnRound,
+  action,
+}: {
+  player: PlayerRow;
+  selfId: string;
+  up: number;
+  down: number;
+  locked: boolean;
+  left: number;
+  downvotesEnabled: boolean;
+  tournamentId: string;
+  roundId: string;
+  voterPlayerId: string;
+  returnRound: number;
+  action: (formData: FormData) => Promise<void>;
+}) {
+  const boosted = up > 0;
+  const avoided = down > 0;
+  const hidden = (upTokens: number, downTokens: number) => (
+    <>
+      <input type="hidden" name="tournament_id" value={tournamentId} />
+      <input type="hidden" name="round_id" value={roundId} />
+      <input type="hidden" name="voter_player_id" value={voterPlayerId} />
+      <input type="hidden" name="target_player_id" value={player.id} />
+      <input type="hidden" name="up_tokens" value={upTokens} />
+      <input type="hidden" name="down_tokens" value={downTokens} />
+      <input type="hidden" name="return_round" value={returnRound} />
+    </>
+  );
+  const stepBtn = 'grid h-9 w-9 place-items-center rounded-[10px] text-[18px] font-bold disabled:opacity-35';
+
+  return (
+    <div
+      className="rounded-2xl p-3.5 transition"
+      style={{
+        background: boosted ? 'color-mix(in oklch, var(--court) 10%, oklch(0.215 0.03 264))' : NIGHT_CARD,
+        border: boosted
+          ? '1.5px solid color-mix(in oklch, var(--court) 60%, oklch(0.36 0.04 266))'
+          : avoided
+            ? '1.5px solid color-mix(in oklch, oklch(0.6 0.18 12) 55%, oklch(0.36 0.04 266))'
+            : `1px solid ${NIGHT_LINE}`,
+        opacity: avoided ? 0.75 : 1,
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <Avatar player={mixerAvatarFor(player, selfId)} size={44} ring={boosted} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[15px] font-bold">{player.display_name}</div>
+          <div className="mono text-[11px]" style={{ color: NIGHT_TEXT3 }}>{player.dupr != null ? `${Number(player.dupr).toFixed(2)} DUPR` : 'DUPR —'}</div>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <form action={action}>
+          {hidden(Math.max(0, up - 1), 0)}
+          <button disabled={locked || up === 0} aria-label={`Remove a token from ${player.display_name}`} className={stepBtn} style={{ border: `1px solid ${NIGHT_LINE}`, color: 'oklch(0.975 0.012 264)' }}>
+            −
+          </button>
+        </form>
+        <div className="mono min-w-9 text-center text-[17px] font-bold" style={{ color: boosted ? 'var(--court)' : NIGHT_TEXT3 }}>
+          {up}
+        </div>
+        <form action={action}>
+          {hidden(up + 1, 0)}
+          <button
+            disabled={locked || left <= 0}
+            aria-label={`Add a token to ${player.display_name}`}
+            className={stepBtn}
+            style={{ background: 'color-mix(in oklch, var(--court) 16%, transparent)', border: '1px solid color-mix(in oklch, var(--court) 45%, transparent)', color: 'var(--court)' }}
+          >
+            ＋
+          </button>
+        </form>
+        <div className="flex-1" />
+        {downvotesEnabled && (
+          <form action={action}>
+            {hidden(0, avoided ? 0 : 1)}
+            <button
+              disabled={locked || (!avoided && left <= 0 && up === 0)}
+              className="rounded-full px-3 py-1.5 text-[11.5px] font-semibold"
+              style={
+                avoided
+                  ? { background: 'color-mix(in oklch, oklch(0.6 0.18 12) 20%, transparent)', color: 'oklch(0.75 0.14 12)', border: '1px solid color-mix(in oklch, oklch(0.6 0.18 12) 50%, transparent)' }
+                  : { color: NIGHT_TEXT3, border: `1px solid ${NIGHT_LINE}` }
+              }
+            >
+              {avoided ? '✓ rather not' : 'rather not'}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// "How the draw works" — plain-language fairness card (ux-activation.html):
+// the event's actual weighting plus the no-peeking guarantee.
+function FairnessCard({ config }: { config: ConfigRow }) {
+  const a = Math.max(0, config.alpha ?? 1);
+  const b = Math.max(0, config.beta ?? 2.5);
+  const g = Math.max(0, config.gamma ?? 1);
+  const total = a + b + g || 1;
+  const pct = (x: number) => Math.round((x / total) * 100);
+  const segs: Array<[string, number, string]> = [
+    ['Votes', pct(a), 'var(--court)'],
+    ['Skill', pct(b), 'var(--sky)'],
+    ['Novelty', Math.max(0, 100 - pct(a) - pct(b)), 'var(--serve)'],
+  ];
+  return (
+    <div className="rounded-2xl p-4" style={{ background: NIGHT_CARD, border: `1px solid ${NIGHT_LINE}` }}>
+      <div className="text-[14px] font-bold">How the draw works</div>
+      <div className="mt-1.5 text-[12px] leading-[1.5]" style={{ color: NIGHT_TEXT2 }}>
+        Every round, all tokens go into one weighted draw. More tokens on someone = better odds you&apos;re paired.
+      </div>
+      <div className="mt-3 flex h-2.5 overflow-hidden rounded-full">
+        {segs.map(([label, w, color]) => (
+          <div key={label} style={{ width: `${w}%`, background: color }} />
+        ))}
+      </div>
+      <div className="mono mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10.5px]" style={{ color: NIGHT_TEXT3 }}>
+        {segs.map(([label, w, color]) => (
+          <span key={label} className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+            {w}% {label.toLowerCase()}
+          </span>
+        ))}
+      </div>
+      <div className="mt-3 rounded-xl px-3 py-2 text-[11.5px] leading-[1.45]" style={{ background: 'color-mix(in oklch, var(--sky) 10%, transparent)', border: '1px solid color-mix(in oklch, var(--sky) 30%, transparent)', color: NIGHT_TEXT2 }}>
+        Nobody can peek or tip the scales — picks stay hidden from players and the organizer until the draw runs.
       </div>
     </div>
   );
@@ -260,7 +426,7 @@ function RoundSelector({
   };
   return (
     <div className="mb-3">
-      <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.1em]" style={{ color: 'oklch(0.7 0.03 264)' }}>
+      <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.1em]" style={{ color: NIGHT_TEXT3 }}>
         Ballot for
         <span className="mono font-bold" style={{ color: 'var(--court)' }}>Round {activeRound.round_no}</span>
       </div>
@@ -276,7 +442,7 @@ function RoundSelector({
               <span className="text-sm font-bold" style={{ color: active ? 'oklch(0.2 0.04 140)' : 'oklch(0.975 0.012 264)' }}>Round {roundNo}</span>
               <span
                 className="mt-1 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.06em]"
-                style={{ color: active ? 'oklch(0.2 0.04 140)' : 'oklch(0.78 0.028 264)' }}
+                style={{ color: active ? 'oklch(0.2 0.04 140)' : NIGHT_TEXT2 }}
               >
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: active ? 'oklch(0.2 0.04 140)' : status.dot }} />
                 {status.label}
@@ -285,10 +451,10 @@ function RoundSelector({
           );
           const style = {
             minWidth: 118,
-            background: active ? 'var(--court)' : 'oklch(0.215 0.03 264)',
+            background: active ? 'var(--court)' : NIGHT_CARD,
             border: active
               ? '1.5px solid var(--court)'
-              : `1.5px solid ${status.kind === 'voting' ? 'color-mix(in oklch, var(--serve) 40%, oklch(0.36 0.04 266))' : 'oklch(0.36 0.04 266)'}`,
+              : `1.5px solid ${status.kind === 'voting' ? 'color-mix(in oklch, var(--serve) 40%, oklch(0.36 0.04 266))' : NIGHT_LINE}`,
           };
           if (!round) {
             return (
@@ -313,89 +479,40 @@ function RoundSelector({
   );
 }
 
-function VoteSubmit({
-  action,
-  label,
-  tournamentId,
-  roundId,
-  voterPlayerId,
-  targetPlayerId,
-  upTokens,
-  downTokens,
-  returnRound,
-  disabled,
-  tone,
-}: {
-  action: (formData: FormData) => Promise<void>;
-  label: string;
-  tournamentId: string;
-  roundId: string;
-  voterPlayerId: string;
-  targetPlayerId: string;
-  upTokens: number;
-  downTokens: number;
-  returnRound: number;
-  disabled: boolean;
-  tone: 'up' | 'down' | 'clear';
-}) {
-  const primary = tone === 'up';
-  const negative = tone === 'down';
+// First-run coach (ux-activation.html UX1·a): one card, three plain-language
+// points, then "Cast my first vote". Centered and desktop-safe.
+function FirstVoteCoach({ budget, rounds, onClose }: { budget: number; rounds: number; onClose: () => void }) {
+  const points: Array<[string, string]> = [
+    ['Spend tokens on people you want', `You've got ${budget} for the night. Stack more on a favourite to boost your odds.`],
+    ['Nobody sees your picks', 'Not other players. Not even the organizer. It stays blind until the draw.'],
+    ['The draw does the rest', `Tokens become teams live on the big screen, round by round for all ${rounds} rounds.`],
+  ];
   return (
-    <form action={action} className={primary ? 'ml-auto' : ''}>
-      <input type="hidden" name="tournament_id" value={tournamentId} />
-      <input type="hidden" name="round_id" value={roundId} />
-      <input type="hidden" name="voter_player_id" value={voterPlayerId} />
-      <input type="hidden" name="target_player_id" value={targetPlayerId} />
-      <input type="hidden" name="up_tokens" value={upTokens} />
-      <input type="hidden" name="down_tokens" value={downTokens} />
-      <input type="hidden" name="return_round" value={returnRound} />
-      <button
-        disabled={disabled}
-        className="h-10 rounded-xl px-3 text-xs font-extrabold disabled:opacity-40"
-        style={{
-          minWidth: primary ? 92 : negative ? 78 : 54,
-          background: primary
-            ? 'var(--court)'
-            : negative
-              ? 'oklch(0.285 0.038 266)'
-              : 'transparent',
-          color: primary
-            ? 'oklch(0.2 0.04 140)'
-            : negative
-              ? 'oklch(0.975 0.012 264)'
-              : 'oklch(0.7 0.03 264)',
-          border: primary ? 'none' : negative ? '1px solid oklch(0.42 0.045 266)' : '1px solid transparent',
-        }}
-      >
-        {label}
-      </button>
-    </form>
-  );
-}
-
-function HowItWorks({ budget, rounds, onClose }: { budget: number; rounds: number; onClose: () => void }) {
-  const steps = useMemo(() => [
-    ['wave', 'Pick your dream partners', "Tap Want 'em on anyone you want beside you. Mutual interest makes that pairing more likely."],
-    ['token-t', `${budget} tokens total`, `Spend them across all ${rounds} rounds up front. You can stack tokens or spread them around.`],
-    ['presenting-t', 'Then watch the draw', 'When the organizer locks the ballot, Dink reveals one round at a time. Votes stay blind.'],
-  ] as const, [budget, rounds]);
-  const [index, setIndex] = useState(0);
-  const step = steps[index];
-  const last = index === steps.length - 1;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'oklch(0.155 0.024 264 / 0.94)' }}>
-      <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'oklch(0.285 0.038 266)', color: 'oklch(0.78 0.028 264)' }}>
-        {Icons.close}
-      </button>
-      <div className="max-w-[360px] text-center">
-        <Dink pose={step[0]} size={146} />
-        <div className="serif mt-4 text-[36px] leading-none">{step[1]}</div>
-        <div className="mt-3 text-sm leading-6" style={{ color: 'oklch(0.78 0.028 264)' }}>{step[2]}</div>
-        <div className="mt-7 flex justify-center gap-1.5">
-          {steps.map((_, i) => <span key={i} className="h-1.5 rounded-full" style={{ width: i === index ? 24 : 7, background: i === index ? 'var(--court)' : 'oklch(0.36 0.04 266)' }} />)}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: 'oklch(0.155 0.024 264 / 0.94)' }}>
+      <div className="relative w-full max-w-[420px] rounded-[22px] p-6" style={{ background: NIGHT_CARD, border: `1px solid ${NIGHT_LINE}` }}>
+        <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'oklch(0.285 0.038 266)', color: NIGHT_TEXT2 }}>
+          {Icons.close}
+        </button>
+        <Dink pose="wave" size={104} />
+        <div className="serif mt-2 text-center text-[34px] leading-none">
+          Your first <em className="italic" style={{ color: 'var(--court)' }}>vote.</em>
         </div>
-        <button type="button" onClick={() => last ? onClose() : setIndex(index + 1)} className="mt-6 w-full rounded-2xl px-5 py-4 text-sm font-extrabold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
-          {last ? "Let's vote" : 'Next'}
+        <div className="mt-1.5 text-center text-[13px]" style={{ color: NIGHT_TEXT2 }}>Three things and you&apos;re a pro.</div>
+        <div className="mt-5 grid gap-3.5">
+          {points.map(([title, body], i) => (
+            <div key={title} className="flex items-start gap-3">
+              <span className="mono grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[12px] font-bold" style={{ background: 'color-mix(in oklch, var(--court) 16%, transparent)', color: 'var(--court)' }}>
+                {i + 1}
+              </span>
+              <div>
+                <div className="text-[14px] font-bold">{title}</div>
+                <div className="mt-0.5 text-[12.5px] leading-[1.45]" style={{ color: NIGHT_TEXT2 }}>{body}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button type="button" onClick={onClose} className="mt-6 w-full rounded-2xl px-5 py-4 text-[15px] font-extrabold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
+          Cast my first vote
         </button>
       </div>
     </div>
@@ -412,12 +529,12 @@ function TokenMeter({ left, total }: { left: number; total: number }) {
   );
 }
 
-function TokenDot({ active, tone = 'up' }: { active: boolean; tone?: 'up' | 'down' }) {
+function TokenDot({ active }: { active: boolean }) {
   return (
     <span
       className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full"
       style={{
-        background: active ? (tone === 'up' ? 'var(--court)' : 'oklch(0.285 0.038 266)') : 'transparent',
+        background: active ? 'var(--court)' : 'transparent',
         border: active ? 'none' : '1.5px dashed oklch(0.36 0.04 266)',
         boxShadow: active ? 'inset 0 -2px 4px oklch(0.2 0.04 140 / 0.22), inset 0 2px 3px rgba(255,255,255,0.25)' : 'none',
       }}
@@ -425,23 +542,11 @@ function TokenDot({ active, tone = 'up' }: { active: boolean; tone?: 'up' | 'dow
   );
 }
 
-function TokenCount({ count, tone }: { count: number; tone: 'up' | 'down' }) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      {Array.from({ length: Math.min(count, 3) }).map((_, i) => (
-        <TokenDot key={i} active tone={tone} />
-      ))}
-      {count > 3 && <span className="mono text-[11px]" style={{ color: tone === 'up' ? 'var(--court)' : 'oklch(0.78 0.028 264)' }}>+{count - 3}</span>}
-    </span>
-  );
-}
-
 function Dink({ pose, size }: { pose: 'wave' | 'token-t' | 'presenting-t'; size: number }) {
-  const file = pose === 'wave' ? 'wave' : pose;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/design-handoff/dink/${file}.png`}
+      src={`/design-handoff/dink/${pose}.png`}
       alt=""
       width={size}
       height={size}
