@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from 'next';
-import { Instrument_Serif, JetBrains_Mono, Geist } from 'next/font/google';
+import { Instrument_Serif, JetBrains_Mono, Geist, Archivo } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
 import { TabBar } from '@/components/TabBar';
+import { ToastProvider } from '@/components/desktop/ToastProvider';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://trytodink.com';
@@ -53,6 +54,13 @@ const geist = Geist({
   variable: '--font-geist',
 });
 
+// Archivo — display face for big numbers, court numbers, board names.
+const archivo = Archivo({
+  subsets: ['latin'],
+  weight: ['600', '700', '800', '900'],
+  variable: '--font-archivo',
+});
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const store = await cookies();
   const theme = readThemeFromCookie(store.get(THEME_COOKIE)?.value);
@@ -60,13 +68,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html
       lang="en"
       data-theme={theme}
-      className={`${instrumentSerif.variable} ${jetbrainsMono.variable} ${geist.variable}`}
+      className={`${instrumentSerif.variable} ${jetbrainsMono.variable} ${geist.variable} ${archivo.variable}`}
     >
       <body className="bg-paper text-ink">
-        <div className="mx-auto flex min-h-[100dvh] max-w-[480px] flex-col">
-          <main className="flex flex-1 flex-col">{children}</main>
-          <TabBar />
-        </div>
+        <ToastProvider>
+          <div className="mx-auto flex min-h-[100dvh] max-w-[480px] flex-col">
+            <main className="flex flex-1 flex-col">{children}</main>
+            <TabBar />
+          </div>
+        </ToastProvider>
       </body>
     </html>
   );
