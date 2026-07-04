@@ -192,7 +192,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
             <div className="serif text-[30px] leading-none text-ink">Claim a roster spot</div>
             <div className="mt-2 text-sm text-ink-3">We will bind this account to one tournament roster entry.</div>
             <input name="display_name" placeholder="Your display name" className="mt-4 w-full rounded-xl bg-white px-3 py-3 text-sm outline-none" style={{ border: '1px solid var(--line)' }} />
-            <button className="mt-3 w-full rounded-2xl px-5 py-4 text-base font-semibold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
+            <button className="mt-3 w-full rounded-2xl px-5 py-4 text-base font-semibold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>
               Claim and vote
             </button>
           </div>
@@ -271,25 +271,25 @@ function MixerShell({
   // below lg the bottom tab bar drives; at lg+ a sticky sidebar takes over and
   // the mobile top chrome hides. Night surface throughout; escapes the shell.
   return (
-    <div data-fullscreen="night" className="min-h-[100dvh]" style={{ background: 'oklch(0.155 0.024 264)', color: 'oklch(0.975 0.012 264)' }}>
+    <div data-fullscreen="night" className="min-h-[100dvh]" style={{ background: 'var(--night-bg)', color: 'var(--night-text)' }}>
       <MixerRealtimeSync tournamentId={tournament.id} />
       <a href="#main" className="skip-link">Skip to content</a>
       <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
         {/* Sidebar — desktop only */}
         <aside
           className="hidden lg:flex lg:h-screen lg:flex-col lg:gap-1 lg:sticky lg:top-0 lg:p-4"
-          style={{ borderRight: '1px solid oklch(0.36 0.04 266)', background: 'oklch(0.175 0.026 264)' }}
+          style={{ borderRight: '1px solid var(--night-line)', background: 'var(--night-nav)' }}
         >
           <div className="flex items-center gap-2.5 px-2 pb-4 pt-1.5">
             <BallMark size={26} />
             <span className="serif text-[20px]">Try to Dink</span>
           </div>
-          <div className="mb-2 rounded-xl px-3 py-2.5" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+          <div className="mb-2 rounded-xl px-3 py-2.5" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
             <div className="flex items-center gap-2 text-[13px] font-semibold">
               <Chip tone={currentRound.state === 'open' ? 'court' : 'ghost'}>{currentRound.state}</Chip>
               <span className="truncate">{tournament.name}</span>
             </div>
-            <div className="mono mt-1 text-[10.5px] tracking-[0.06em]" style={{ color: 'oklch(0.7 0.03 264)' }}>
+            <div className="mono mt-1 text-[10.5px] tracking-[0.06em]" style={{ color: 'var(--night-text3)' }}>
               ROUND {currentRound.round_no}{player ? ` · ${player.display_name.toUpperCase()}` : ''}
             </div>
           </div>
@@ -298,18 +298,18 @@ function MixerShell({
               key={id}
               href={href(id)}
               className="rounded-[11px] px-3 py-2.5 text-[14px] font-medium"
-              style={tab === id ? { background: 'var(--court)', color: 'oklch(0.2 0.04 140)', fontWeight: 600 } : { color: 'oklch(0.82 0.02 264)' }}
+              style={tab === id ? { background: 'var(--court)', color: 'var(--night-court-ink)', fontWeight: 600 } : { color: 'var(--night-nav-link)' }}
             >
               {label}
             </Link>
           ))}
           <div className="flex-1" />
           {isManager && (
-            <Link href={`${base}/admin`} className="rounded-[11px] px-3 py-2.5 text-[13px] font-semibold" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)', color: 'oklch(0.9 0.02 264)' }}>
+            <Link href={`${base}/admin`} className="rounded-[11px] px-3 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)', color: 'var(--night-nav-link-strong)' }}>
               Organizer mode →
             </Link>
           )}
-          <Link href={`/tournaments/${tournament.id}`} className="rounded-[11px] px-3 py-2.5 text-[13px] font-medium" style={{ color: 'oklch(0.7 0.03 264)' }}>
+          <Link href={`/tournaments/${tournament.id}`} className="rounded-[11px] px-3 py-2.5 text-[13px] font-medium" style={{ color: 'var(--night-text3)' }}>
             ← Back to hub
           </Link>
         </aside>
@@ -326,17 +326,17 @@ function MixerShell({
             {isManager && <MixerModeSwitch tournamentId={tournament.id} active="player" />}
           </div>
           <div id="main" className="px-[18px] pb-3 pt-4 lg:px-0">
-            <div className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+            <div className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
               <div>
                 <Chip tone={currentRound.state === 'open' ? 'court' : 'ghost'}>{currentRound.state}</Chip>
                 <div className="serif mt-2 text-[28px] leading-none">Blind partner vote</div>
-                <div className="mt-1 text-xs" style={{ color: 'oklch(0.78 0.028 264)' }}>
+                <div className="mt-1 text-xs" style={{ color: 'var(--night-text2)' }}>
                   {player ? `Playing as ${player.display_name}` : `Code ${formatInviteCode(tournament.invite_code)}`}
                 </div>
               </div>
               <div className="text-right">
                 <div className="mono text-[22px] font-bold" style={{ color: 'var(--court)' }}>R{currentRound.round_no}</div>
-                <div className="text-[10px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>No tallies</div>
+                <div className="text-[10px] uppercase tracking-[0.08em]" style={{ color: 'var(--night-text3)' }}>No tallies</div>
               </div>
             </div>
           </div>
@@ -345,11 +345,11 @@ function MixerShell({
       </div>
 
       {/* Bottom tab bar — mobile only */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 mx-auto grid max-w-md grid-cols-4 gap-1 p-2 lg:hidden" style={{ background: 'oklch(0.155 0.024 264)', borderTop: '1px solid oklch(0.36 0.04 266)' }}>
+      <div className="fixed bottom-0 left-0 right-0 z-30 mx-auto grid max-w-md grid-cols-4 gap-1 p-2 lg:hidden" style={{ background: 'var(--night-bg)', borderTop: '1px solid var(--night-line)' }}>
         {tabs.map(([id, label]) => (
           <Link key={id} href={href(id)} className="rounded-xl py-3 text-center text-[12px] font-bold" style={{
             background: tab === id ? 'var(--court)' : 'transparent',
-            color: tab === id ? 'oklch(0.2 0.04 140)' : 'oklch(0.78 0.028 264)',
+            color: tab === id ? 'var(--night-court-ink)' : 'var(--night-text2)',
           }}>
             {label}
           </Link>
@@ -367,7 +367,7 @@ function MissingSetup({ tournamentId, tournamentName }: { tournamentId: string; 
         <div className="rounded-2xl bg-white p-5 text-center" style={{ border: '1px dashed var(--line)' }}>
           <div className="text-[15px] font-semibold text-ink">Mixer setup is missing</div>
           <div className="mt-1 text-xs text-ink-3">Open organizer controls to initialize the event config.</div>
-          <Link href={`/tournaments/${tournamentId}/mixer/admin`} className="mt-3 inline-flex rounded-full px-4 py-2 text-[13px] font-semibold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
+          <Link href={`/tournaments/${tournamentId}/mixer/admin`} className="mt-3 inline-flex rounded-full px-4 py-2 text-[13px] font-semibold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>
             Open controls →
           </Link>
         </div>

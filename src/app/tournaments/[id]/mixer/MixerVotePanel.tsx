@@ -50,10 +50,10 @@ type VoteRow = {
   down_tokens: number;
 };
 
-const NIGHT_CARD = 'oklch(0.215 0.03 264)';
-const NIGHT_LINE = 'oklch(0.36 0.04 266)';
-const NIGHT_TEXT2 = 'oklch(0.78 0.028 264)';
-const NIGHT_TEXT3 = 'oklch(0.7 0.03 264)';
+const NIGHT_CARD = 'var(--night-card)';
+const NIGHT_LINE = 'var(--night-line)';
+const NIGHT_TEXT2 = 'var(--night-text2)';
+const NIGHT_TEXT3 = 'var(--night-text3)';
 
 export function MixerVotePanel({
   tournamentId,
@@ -135,7 +135,7 @@ export function MixerVotePanel({
       {/* header — serif ask + blind note (player.html) */}
       <div
         className="mb-3 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-2xl p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
-        style={{ background: 'linear-gradient(120deg, color-mix(in oklch, var(--sky) 12%, oklch(0.215 0.03 264)), oklch(0.215 0.03 264) 65%)', border: `1px solid ${NIGHT_LINE}` }}
+        style={{ background: 'linear-gradient(120deg, color-mix(in oklch, var(--sky) 12%, var(--night-card)), var(--night-card) 65%)', border: `1px solid ${NIGHT_LINE}` }}
       >
         <Dink pose="wave" size={54} />
         <div className="min-w-0">
@@ -158,7 +158,7 @@ export function MixerVotePanel({
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-4">
         {/* LEFT — budget + candidate cards */}
         <div className="min-w-0">
-          <div className="sticky top-0 z-10 mb-3 grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264 / 0.96)', border: `1px solid ${NIGHT_LINE}`, backdropFilter: 'blur(12px)' }}>
+          <div className="sticky top-0 z-10 mb-3 grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl p-4" style={{ background: 'var(--night-card-glass)', border: `1px solid ${NIGHT_LINE}`, backdropFilter: 'blur(12px)' }}>
             <div className="min-w-0">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: NIGHT_TEXT3 }}>Token budget</div>
@@ -179,7 +179,7 @@ export function MixerVotePanel({
             <div className="mb-3 grid grid-cols-[auto_1fr] items-center gap-3 rounded-2xl p-3 text-sm" style={{ background: NIGHT_CARD, color: NIGHT_TEXT2, border: `1px solid ${NIGHT_LINE}` }}>
               <Dink pose="presenting-t" size={58} />
               <div>
-                <div className="font-bold" style={{ color: 'oklch(0.975 0.012 264)' }}>Your picks are in</div>
+                <div className="font-bold" style={{ color: 'var(--night-text)' }}>Your picks are in</div>
                 <div className="mt-1 text-xs leading-5">Voting is locked. Your choices are sealed; no raw tallies are exposed.</div>
               </div>
             </div>
@@ -218,7 +218,7 @@ export function MixerVotePanel({
                 Round {round.round_no}
               </span>
             </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ background: 'oklch(0.285 0.038 266)' }}>
+            <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ background: 'var(--night-inset)' }}>
               <div className="h-full rounded-full transition-all" style={{ width: `${budget ? Math.min(100, Math.round((optimisticSpent / budget) * 100)) : 0}%`, background: 'linear-gradient(90deg, var(--court), var(--serve))' }} />
             </div>
             <div className="mono mt-1.5 flex justify-between text-[11px]" style={{ color: NIGHT_TEXT3 }}>
@@ -235,7 +235,7 @@ export function MixerVotePanel({
                   {v.up_tokens > 0 ? (
                     <span className="mono font-bold" style={{ color: 'var(--court)' }}>+{v.up_tokens}</span>
                   ) : (
-                    <span className="mono font-bold" style={{ color: 'oklch(0.7 0.16 12)' }}>−{v.down_tokens}</span>
+                    <span className="mono font-bold" style={{ color: 'var(--night-down-num)' }}>−{v.down_tokens}</span>
                   )}
                 </div>
               ))}
@@ -301,11 +301,11 @@ function CandidateCard({
     <div
       className="rounded-2xl p-3.5 transition"
       style={{
-        background: boosted ? 'color-mix(in oklch, var(--court) 10%, oklch(0.215 0.03 264))' : NIGHT_CARD,
+        background: boosted ? 'color-mix(in oklch, var(--court) 10%, var(--night-card))' : NIGHT_CARD,
         border: boosted
-          ? '1.5px solid color-mix(in oklch, var(--court) 60%, oklch(0.36 0.04 266))'
+          ? '1.5px solid color-mix(in oklch, var(--court) 60%, var(--night-line))'
           : avoided
-            ? '1.5px solid color-mix(in oklch, oklch(0.6 0.18 12) 55%, oklch(0.36 0.04 266))'
+            ? '1.5px solid color-mix(in oklch, var(--night-down) 55%, var(--night-line))'
             : `1px solid ${NIGHT_LINE}`,
         opacity: avoided ? 0.75 : 1,
       }}
@@ -320,7 +320,7 @@ function CandidateCard({
       <div className="mt-3 flex items-center gap-2">
         <form action={action}>
           {hidden(Math.max(0, up - 1), 0)}
-          <button disabled={locked || up === 0} aria-label={`Remove a token from ${player.display_name}`} className={stepBtn} style={{ border: `1px solid ${NIGHT_LINE}`, color: 'oklch(0.975 0.012 264)' }}>
+          <button disabled={locked || up === 0} aria-label={`Remove a token from ${player.display_name}`} className={stepBtn} style={{ border: `1px solid ${NIGHT_LINE}`, color: 'var(--night-text)' }}>
             −
           </button>
         </form>
@@ -347,7 +347,7 @@ function CandidateCard({
               className="rounded-full px-3 py-1.5 text-[11.5px] font-semibold"
               style={
                 avoided
-                  ? { background: 'color-mix(in oklch, oklch(0.6 0.18 12) 20%, transparent)', color: 'oklch(0.75 0.14 12)', border: '1px solid color-mix(in oklch, oklch(0.6 0.18 12) 50%, transparent)' }
+                  ? { background: 'color-mix(in oklch, var(--night-down) 20%, transparent)', color: 'var(--night-down-text)', border: '1px solid color-mix(in oklch, var(--night-down) 50%, transparent)' }
                   : { color: NIGHT_TEXT3, border: `1px solid ${NIGHT_LINE}` }
               }
             >
@@ -417,13 +417,13 @@ function RoundSelector({
   // Per-round status → dot + label (handoff round strip):
   //   voting-now (serve) · set/played (accent) · not-set (grey)
   const statusOf = (round: RoundRow | undefined, spent: number) => {
-    if (!round) return { kind: 'notset' as const, dot: 'oklch(0.42 0.045 266)', label: 'Pending' };
+    if (!round) return { kind: 'notset' as const, dot: 'var(--night-line-2)', label: 'Pending' };
     if (round.state === 'open') return { kind: 'voting' as const, dot: 'var(--serve)', label: 'Voting now' };
     const played = ['playing', 'done'].includes(round.state);
     if (spent > 0 || played || ['locked', 'revealed'].includes(round.state)) {
       return { kind: 'set' as const, dot: 'var(--court)', label: played ? 'Set · played' : 'Set' };
     }
-    return { kind: 'notset' as const, dot: 'oklch(0.42 0.045 266)', label: 'Not set' };
+    return { kind: 'notset' as const, dot: 'var(--night-line-2)', label: 'Not set' };
   };
   return (
     <div className="mb-3">
@@ -440,12 +440,12 @@ function RoundSelector({
           const status = statusOf(round, spent);
           const inner = (
             <>
-              <span className="text-sm font-bold" style={{ color: active ? 'oklch(0.2 0.04 140)' : 'oklch(0.975 0.012 264)' }}>Round {roundNo}</span>
+              <span className="text-sm font-bold" style={{ color: active ? 'var(--night-court-ink)' : 'var(--night-text)' }}>Round {roundNo}</span>
               <span
                 className="mt-1 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.06em]"
-                style={{ color: active ? 'oklch(0.2 0.04 140)' : NIGHT_TEXT2 }}
+                style={{ color: active ? 'var(--night-court-ink)' : NIGHT_TEXT2 }}
               >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: active ? 'oklch(0.2 0.04 140)' : status.dot }} />
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: active ? 'var(--night-court-ink)' : status.dot }} />
                 {status.label}
               </span>
             </>
@@ -455,7 +455,7 @@ function RoundSelector({
             background: active ? 'var(--court)' : NIGHT_CARD,
             border: active
               ? '1.5px solid var(--court)'
-              : `1.5px solid ${status.kind === 'voting' ? 'color-mix(in oklch, var(--serve) 40%, oklch(0.36 0.04 266))' : NIGHT_LINE}`,
+              : `1.5px solid ${status.kind === 'voting' ? 'color-mix(in oklch, var(--serve) 40%, var(--night-line))' : NIGHT_LINE}`,
           };
           if (!round) {
             return (
@@ -489,9 +489,9 @@ function FirstVoteCoach({ budget, rounds, onClose }: { budget: number; rounds: n
     ['The draw does the rest', `Tokens become teams live on the big screen, round by round for all ${rounds} rounds.`],
   ];
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: 'oklch(0.155 0.024 264 / 0.94)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ background: 'var(--night-scrim)' }}>
       <div className="relative w-full max-w-[420px] rounded-[22px] p-6" style={{ background: NIGHT_CARD, border: `1px solid ${NIGHT_LINE}` }}>
-        <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'oklch(0.285 0.038 266)', color: NIGHT_TEXT2 }}>
+        <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--night-inset)', color: NIGHT_TEXT2 }}>
           {Icons.close}
         </button>
         <Dink pose="wave" size={104} />
@@ -512,7 +512,7 @@ function FirstVoteCoach({ budget, rounds, onClose }: { budget: number; rounds: n
             </div>
           ))}
         </div>
-        <button type="button" onClick={onClose} className="mt-6 w-full rounded-2xl px-5 py-4 text-[15px] font-extrabold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
+        <button type="button" onClick={onClose} className="mt-6 w-full rounded-2xl px-5 py-4 text-[15px] font-extrabold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>
           Cast my first vote
         </button>
       </div>
@@ -536,8 +536,8 @@ function TokenDot({ active }: { active: boolean }) {
       className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full"
       style={{
         background: active ? 'var(--court)' : 'transparent',
-        border: active ? 'none' : '1.5px dashed oklch(0.36 0.04 266)',
-        boxShadow: active ? 'inset 0 -2px 4px oklch(0.2 0.04 140 / 0.22), inset 0 2px 3px rgba(255,255,255,0.25)' : 'none',
+        border: active ? 'none' : '1.5px dashed var(--night-line)',
+        boxShadow: active ? 'inset 0 -2px 4px var(--night-court-ink-soft), inset 0 2px 3px rgba(255,255,255,0.25)' : 'none',
       }}
     />
   );

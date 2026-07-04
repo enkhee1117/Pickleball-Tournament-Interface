@@ -43,8 +43,8 @@ export function MatchTab({
         <div
           className="relative overflow-hidden rounded-[18px] p-5"
           style={{
-            background: 'radial-gradient(ellipse 120% 80% at 50% 0%, color-mix(in oklch, var(--serve) 30%, transparent), transparent 60%), oklch(0.16 0.03 40)',
-            border: '1px solid color-mix(in oklch, var(--serve) 45%, oklch(0.36 0.04 266))',
+            background: 'radial-gradient(ellipse 120% 80% at 50% 0%, color-mix(in oklch, var(--serve) 30%, transparent), transparent 60%), var(--night-serve-bg)',
+            border: '1px solid color-mix(in oklch, var(--serve) 45%, var(--night-line))',
           }}
         >
           <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--serve)' }}>
@@ -65,17 +65,17 @@ export function MatchTab({
           </div>
         </div>
       ) : (
-        <div className="rounded-[18px] p-5" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+        <div className="rounded-[18px] p-5" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
           <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--court)' }}>Your team</div>
           <div className="serif mt-2 text-[32px] leading-none">{yourTeam}</div>
-          <div className="mt-2 text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>Court {myPairing.court_no}</div>
+          <div className="mt-2 text-sm" style={{ color: 'var(--night-text2)' }}>Court {myPairing.court_no}</div>
           {oppTeam && (
-            <div className="mt-3 text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>vs {oppTeam}</div>
+            <div className="mt-3 text-sm" style={{ color: 'var(--night-text2)' }}>vs {oppTeam}</div>
           )}
         </div>
       )}
-      <div className="mt-3 rounded-[18px] p-5 text-center" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
-        <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>Score</div>
+      <div className="mt-3 rounded-[18px] p-5 text-center" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
+        <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--night-text3)' }}>Score</div>
         <div className="mono mt-2 text-[54px] font-bold" style={{ color: 'var(--court)' }}>{myScore}-{theirScore}</div>
       </div>
       <StandingsMini roster={roster} pairings={pairings} scores={scores} />
@@ -105,7 +105,7 @@ function StandingsMini({ roster, pairings, scores }: { roster: PlayerRow[]; pair
   const rows = [...points.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   if (rows.length === 0) return null;
   return (
-    <div className="mt-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+    <div className="mt-3 rounded-2xl p-4" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
       <div className="serif mb-2 text-[24px]">Live standings</div>
       {rows.map(([id, pts], i) => (
         <div key={id} className="flex items-center justify-between py-2">
@@ -120,18 +120,18 @@ function StandingsMini({ roster, pairings, scores }: { roster: PlayerRow[]; pair
 function FinalStandingsNight({ standings, myPlayer }: { standings: StandingItem[]; myPlayer: PlayerRow }) {
   return (
     <div className="px-[18px]">
-      <div className="mb-3 rounded-2xl p-5" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+      <div className="mb-3 rounded-2xl p-5" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
         <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--court)' }}>Final standings</div>
         <div className="serif mt-2 text-[34px] leading-none">Mixer complete</div>
-        <div className="mt-1 text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>Podium markets and raffle are settled from these results.</div>
+        <div className="mt-1 text-sm" style={{ color: 'var(--night-text2)' }}>Podium markets and raffle are settled from these results.</div>
       </div>
       <div className="grid gap-2">
         {standings.slice(0, 12).map((row) => {
           const me = row.playerId === myPlayer.id;
           return (
-            <div key={row.playerId} className="flex items-center justify-between rounded-2xl p-3" style={{ background: me ? 'color-mix(in oklch, var(--court) 18%, oklch(0.215 0.03 264))' : 'oklch(0.215 0.03 264)', border: me ? '1px solid var(--court)' : '1px solid oklch(0.36 0.04 266)' }}>
+            <div key={row.playerId} className="flex items-center justify-between rounded-2xl p-3" style={{ background: me ? 'color-mix(in oklch, var(--court) 18%, var(--night-card))' : 'var(--night-card)', border: me ? '1px solid var(--court)' : '1px solid var(--night-line)' }}>
               <div>
-                <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>{ordinal(row.rank)}</div>
+                <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--night-text3)' }}>{ordinal(row.rank)}</div>
                 <div className="text-sm font-bold">{me ? 'You' : row.displayName}</div>
               </div>
               <div className="mono text-xl font-bold" style={{ color: 'var(--court)' }}>{row.points}</div>
