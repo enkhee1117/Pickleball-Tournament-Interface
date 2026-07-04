@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Theme } from '@/lib/theme';
 import { BallMark } from './BallMark';
 import { ThemeToggleButton } from './ThemeToggleButton';
+import { AccountMenu } from './AccountMenu';
 
 /* Shared desktop nav — the React port of the handoff chrome.js TTD.mountNav:
    brand + optional event switcher + nav links + primary action + ⌘K search +
@@ -25,7 +26,6 @@ export interface DesktopNavProps {
   onPrimary?: () => void;
   liberty?: boolean;
   theme: Theme;
-  avatarSrc?: string;
   onEventClick?: () => void;
 }
 
@@ -45,7 +45,6 @@ export function DesktopNav({
   onPrimary,
   liberty = true,
   theme,
-  avatarSrc,
   onEventClick,
 }: DesktopNavProps) {
   function openCommandBar() {
@@ -146,9 +145,7 @@ export function DesktopNav({
 
         <ThemeToggleButton theme={theme} />
 
-        <span className="av h-10 w-10">
-          {avatarSrc ? <img src={avatarSrc} alt="Your account" /> : null}
-        </span>
+        <AccountMenu theme={theme} />
       </div>
     </nav>
   );
