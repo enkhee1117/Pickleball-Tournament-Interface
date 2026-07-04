@@ -27,10 +27,21 @@ export async function joinPublicTournament(formData: FormData): Promise<void> {
   redirect(`/tournaments/${tournamentId}/mixer`);
 }
 
-// Anonymous mixer join — combines sign-in and roster bind in one server-side
-// step so the two halves succeed or fail together. Replaces the prior client
-// component that round-tripped twice and hardcoded "Guest player" as the
-// display name. Error redirects use the public /t/[code] landing when an
+// cold-join.html step 3 — a rough skill band captured in the 15-second quick
+// profile. Mapped to a representative DUPR so teammates see a level and the
+// draw has a rating to work with. Kept coarse on purpose; the player can
+// refine it later from their profile.
+const SKILL_TO_DUPR: Record<string, number> = {
+  new: 2.75,
+  mid: 3.25, // 3.0–3.5
+  high: 4.25, // 4.0+
+};
+
+// Anonymous mixer join — combines sign-in and the quick-profile bind in one
+// server-side step so the two halves succeed or fail together. Persists name +
+// skill onto the anonymous session (roster entry AND profiles row) via
+// app_mixer_join_with_profile, so the 15-second profile survives an in-place
+// account upgrade. Error redirects use the public /t/[code] landing when an
 // invite code is present, otherwise the mixer page itself (covers users who
 // landed on /tournaments/[id]/mixer directly without going through QR/code).
 export async function joinMixerAsAnonymous(formData: FormData): Promise<void> {
@@ -38,6 +49,8 @@ export async function joinMixerAsAnonymous(formData: FormData): Promise<void> {
   const code = rawCode ? normalizeInviteCode(rawCode) : '';
   const tournamentId = fieldString(formData, 'tournament_id');
   const displayName = fieldString(formData, 'display_name').slice(0, 60);
+  const skill = fieldString(formData, 'skill_level');
+  const dupr = skill in SKILL_TO_DUPR ? SKILL_TO_DUPR[skill] : null;
 
   if (!tournamentId) {
     redirect(code ? `/t/${encodeURIComponent(code)}?error=Tournament%20not%20found` : '/tournaments');
@@ -56,9 +69,10 @@ export async function joinMixerAsAnonymous(formData: FormData): Promise<void> {
     redirect(`${back}?error=${encodeURIComponent(signInError.message)}`);
   }
 
-  const { error: bindError } = await supabase.rpc('app_mixer_bind_roster_entry', {
+  const { error: bindError } = await supabase.rpc('app_mixer_join_with_profile', {
     p_tournament_id: tournamentId,
     p_display_name: displayName,
+    p_dupr: dupr,
   });
   if (bindError) {
     redirect(`${back}?error=${encodeURIComponent(formatPgError(bindError))}`);
