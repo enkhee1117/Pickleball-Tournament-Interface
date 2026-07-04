@@ -21,6 +21,7 @@ import {
   scoreMixerCourt,
   setMixerVotingWindow,
   updateMixerPlayerPool,
+  updateMixerPlayerGender,
 } from '../actions';
 import type {
   ConfigRow,
@@ -464,7 +465,18 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                             </div>
                             <Chip tone={pool === 'a' ? 'court' : 'ghost'}>Pool {pool.toUpperCase()}</Chip>
                           </div>
-                          <form action={updateMixerPlayerPool} className="mt-3 flex items-center gap-2">
+                          <form action={updateMixerPlayerGender} className="mt-3 flex items-center gap-2">
+                            <input type="hidden" name="tournament_id" value={id} />
+                            <input type="hidden" name="player_id" value={p.id} />
+                            <select name="gender" defaultValue={p.gender ?? ''} className="h-10 flex-1 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink" aria-label={`Gender for ${p.display_name}`}>
+                              <option value="">Gender —</option>
+                              <option value="f">Woman</option>
+                              <option value="m">Man</option>
+                              <option value="x">Nonbinary</option>
+                            </select>
+                            <button className="h-10 rounded-xl px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Save</button>
+                          </form>
+                          <form action={updateMixerPlayerPool} className="mt-2 flex items-center gap-2">
                             <input type="hidden" name="tournament_id" value={id} />
                             <input type="hidden" name="player_id" value={p.id} />
                             <select name="pairing_pool" defaultValue={pool} className="h-10 flex-1 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink">

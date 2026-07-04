@@ -171,7 +171,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     return (
       <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={null} isManager={isManager}>
         <div className="px-[18px] pt-6">
-          <div className="rounded-2xl bg-white p-5" style={{ border: '1px solid var(--line)' }}>
+          <div className="rounded-2xl bg-surface-card p-5" style={{ border: '1px solid var(--line)' }}>
             <div className="mono text-[10px] uppercase tracking-[0.1em] text-ink-3">You&apos;re in · {t.name}</div>
             <div className="mt-4"><QuickJoinForm tournamentId={id} inviteCode={t.invite_code} /></div>
             <Link href={`/login?next=${encodeURIComponent(`/tournaments/${id}/mixer`)}`} className="mt-3 block text-center text-[13px] font-semibold text-ink-3">
@@ -188,10 +188,10 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
       <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={null} isManager={isManager}>
         <form action={bindMixerRosterEntry} className="px-[18px] pt-6">
           <input type="hidden" name="tournament_id" value={id} />
-          <div className="rounded-2xl bg-white p-5" style={{ border: '1px solid var(--line)' }}>
+          <div className="rounded-2xl bg-surface-card p-5" style={{ border: '1px solid var(--line)' }}>
             <div className="serif text-[30px] leading-none text-ink">Claim a roster spot</div>
             <div className="mt-2 text-sm text-ink-3">We will bind this account to one tournament roster entry.</div>
-            <input name="display_name" placeholder="Your display name" className="mt-4 w-full rounded-xl bg-white px-3 py-3 text-sm outline-none" style={{ border: '1px solid var(--line)' }} />
+            <input name="display_name" placeholder="Your display name" className="mt-4 w-full rounded-xl bg-paper-2 px-3 py-3 text-sm outline-none" style={{ border: '1px solid var(--line)' }} />
             <button className="mt-3 w-full rounded-2xl px-5 py-4 text-base font-semibold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>
               Claim and vote
             </button>
@@ -269,9 +269,11 @@ function MixerShell({
   const href = (id: string) => (id === 'vote' ? base : `${base}?tab=${id}`);
   // Player mode is mobile-primary and widens on desktop (handoff player.html):
   // below lg the bottom tab bar drives; at lg+ a sticky sidebar takes over and
-  // the mobile top chrome hides. Night surface throughout; escapes the shell.
+  // the mobile top chrome hides. The player surface follows the user's theme
+  // (mixer-themed remaps --night-* to the live theme tokens); a bare
+  // data-fullscreen keeps the themed --paper body instead of forcing dark.
   return (
-    <div data-fullscreen="night" className="min-h-[100dvh]" style={{ background: 'var(--night-bg)', color: 'var(--night-text)' }}>
+    <div data-fullscreen className="mixer-themed min-h-[100dvh]" style={{ background: 'var(--night-bg)', color: 'var(--night-text)' }}>
       <MixerRealtimeSync tournamentId={tournament.id} />
       <a href="#main" className="skip-link">Skip to content</a>
       <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -364,7 +366,7 @@ function MissingSetup({ tournamentId, tournamentName }: { tournamentId: string; 
     <div className="flex min-h-full flex-col bg-paper">
       <TopBar title={tournamentName} left={<Link href={`/tournaments/${tournamentId}`}>{Icons.back}</Link>} />
       <div className="px-[18px] pt-6">
-        <div className="rounded-2xl bg-white p-5 text-center" style={{ border: '1px dashed var(--line)' }}>
+        <div className="rounded-2xl bg-surface-card p-5 text-center" style={{ border: '1px dashed var(--line)' }}>
           <div className="text-[15px] font-semibold text-ink">Mixer setup is missing</div>
           <div className="mt-1 text-xs text-ink-3">Open organizer controls to initialize the event config.</div>
           <Link href={`/tournaments/${tournamentId}/mixer/admin`} className="mt-3 inline-flex rounded-full px-4 py-2 text-[13px] font-semibold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>

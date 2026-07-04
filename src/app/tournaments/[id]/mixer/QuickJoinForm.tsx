@@ -74,7 +74,7 @@ export function QuickJoinForm({
           autoComplete="name"
           maxLength={60}
           placeholder="e.g. Sam Rivera"
-          className="w-full rounded-xl bg-white px-4 py-3 text-[15px] font-semibold text-ink outline-none"
+          className="w-full rounded-xl bg-paper-2 px-4 py-3 text-[15px] font-semibold text-ink outline-none"
           style={{ borderWidth: 1.5, borderStyle: 'solid', borderColor: nameOk ? 'color-mix(in oklch, var(--court) 50%, transparent)' : 'var(--line)' }}
           required
         />
@@ -126,7 +126,7 @@ export function QuickJoinForm({
           autoComplete="email"
           inputMode="email"
           placeholder="sam@example.com or +1 555 010 1234"
-          className="w-full rounded-xl bg-white px-4 py-3 text-[15px] text-ink outline-none"
+          className="w-full rounded-xl bg-paper-2 px-4 py-3 text-[15px] text-ink outline-none"
           style={{ borderWidth: 1.5, borderStyle: 'solid', borderColor: 'var(--line)' }}
           required
         />
@@ -142,7 +142,7 @@ export function QuickJoinForm({
           autoComplete="new-password"
           minLength={8}
           placeholder="8+ characters"
-          className="w-full rounded-xl bg-white px-4 py-3 text-[15px] text-ink outline-none"
+          className="w-full rounded-xl bg-paper-2 px-4 py-3 text-[15px] text-ink outline-none"
           style={{ borderWidth: 1.5, borderStyle: 'solid', borderColor: 'var(--line)' }}
           required
         />

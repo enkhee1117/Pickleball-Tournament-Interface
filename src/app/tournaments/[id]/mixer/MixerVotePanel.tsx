@@ -155,6 +155,8 @@ export function MixerVotePanel({
         </div>
       </div>
 
+      <BallotScopeNote genderMode={genderMode} selfGender={myPlayer.gender} targetCount={targets.length} />
+
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-4">
         {/* LEFT — budget + candidate cards */}
         <div className="min-w-0">
@@ -176,11 +178,24 @@ export function MixerVotePanel({
           </div>
 
           {locked && (
-            <div className="mb-3 grid grid-cols-[auto_1fr] items-center gap-3 rounded-2xl p-3 text-sm" style={{ background: NIGHT_CARD, color: NIGHT_TEXT2, border: `1px solid ${NIGHT_LINE}` }}>
+            <div
+              className="mb-3 grid grid-cols-[auto_1fr] items-center gap-3 rounded-2xl p-3 text-sm"
+              style={{
+                background: NIGHT_CARD,
+                color: NIGHT_TEXT2,
+                border: `1px solid ${roundSpent > 0 ? 'color-mix(in oklch, var(--court) 45%, var(--night-line))' : NIGHT_LINE}`,
+              }}
+            >
               <Dink pose="presenting-t" size={58} />
               <div>
-                <div className="font-bold" style={{ color: 'var(--night-text)' }}>Your picks are in</div>
-                <div className="mt-1 text-xs leading-5">Voting is locked. Your choices are sealed; no raw tallies are exposed.</div>
+                <div className="font-bold" style={{ color: 'var(--night-text)' }}>
+                  {roundSpent > 0 ? 'Your picks are in' : 'Voting closed for this round'}
+                </div>
+                <div className="mt-1 text-xs leading-5">
+                  {roundSpent > 0
+                    ? 'Voting is locked. Your choices are sealed; no raw tallies are exposed.'
+                    : "Voting is locked and you didn't spend any tokens — the draw will pair you at random."}
+                </div>
               </div>
             </div>
           )}
@@ -227,7 +242,9 @@ export function MixerVotePanel({
             </div>
             <div className="mt-3 grid gap-1.5">
               {activeVotes.length === 0 && (
-                <div className="text-[12.5px]" style={{ color: NIGHT_TEXT3 }}>No tokens on anyone yet — tap ＋ on a player.</div>
+                <div className="text-[12.5px]" style={{ color: NIGHT_TEXT3 }}>
+                  {locked ? 'No tokens spent this round.' : 'No tokens on anyone yet — tap ＋ on a player.'}
+                </div>
               )}
               {activeVotes.map((v) => (
                 <div key={v.target_player_id} className="flex items-center justify-between gap-2 text-[13px]">
@@ -360,6 +377,48 @@ function CandidateCard({
   );
 }
 
+// Ballot scope note — in gender-constrained draws (mixed/same) the ballot only
+// shows the partners you can actually be paired with, which surprises players
+// ("why only women?"). Name the rule, show how they're marked, and point at the
+// fix so a wrong/missing gender is self-service rather than a silent mystery.
+function BallotScopeNote({
+  genderMode,
+  selfGender,
+  targetCount,
+}: {
+  genderMode: string;
+  selfGender: 'm' | 'f' | 'x' | null;
+  targetCount: number;
+}) {
+  const mode = genderMode === 'same' || genderMode === 'open' ? genderMode : 'mixed';
+  if (mode === 'open') return null; // gender doesn't constrain an open draw
+  const selfLabel =
+    selfGender === 'f' ? 'a woman' : selfGender === 'm' ? 'a man' : selfGender === 'x' ? 'nonbinary' : null;
+  const headline = mode === 'mixed' ? 'This is a mixed draw' : 'This is a same-gender draw';
+  const body =
+    mode === 'mixed'
+      ? 'Your ballot only shows partners on the other side of the draw — the people you could actually be paired with.'
+      : 'Your ballot only shows players in your own group — the people you could actually be paired with.';
+  return (
+    <div
+      className="mb-3 flex items-start gap-2.5 rounded-2xl px-3.5 py-3 text-[12.5px] leading-[1.5]"
+      style={{ background: 'color-mix(in oklch, var(--sky) 10%, transparent)', border: '1px solid color-mix(in oklch, var(--sky) 30%, transparent)', color: NIGHT_TEXT2 }}
+    >
+      <span aria-hidden style={{ color: 'var(--sky)' }}>{Icons.spark}</span>
+      <div>
+        <span className="font-bold" style={{ color: 'var(--night-text)' }}>{headline}.</span>{' '}
+        {body}{' '}
+        {selfLabel ? (
+          <>You&apos;re marked as <span className="font-semibold">{selfLabel}</span>. Wrong? Ask your organizer to update your gender in the roster.</>
+        ) : (
+          <span style={{ color: 'var(--amber)' }}>Your gender isn&apos;t set, so you&apos;ve been placed by default — ask your organizer to set it so you see the right partners.</span>
+        )}
+        {targetCount === 0 && ' (No eligible partners yet — the roster may still be filling up.)'}
+      </div>
+    </div>
+  );
+}
+
 // "How the draw works" — plain-language fairness card (ux-activation.html):
 // the event's actual weighting plus the no-peeking guarantee.
 function FairnessCard({ config }: { config: ConfigRow }) {
@@ -420,9 +479,12 @@ function RoundSelector({
     if (!round) return { kind: 'notset' as const, dot: 'var(--night-line-2)', label: 'Pending' };
     if (round.state === 'open') return { kind: 'voting' as const, dot: 'var(--serve)', label: 'Voting now' };
     const played = ['playing', 'done'].includes(round.state);
-    if (spent > 0 || played || ['locked', 'revealed'].includes(round.state)) {
-      return { kind: 'set' as const, dot: 'var(--court)', label: played ? 'Set · played' : 'Set' };
-    }
+    const closed = played || ['locked', 'revealed'].includes(round.state);
+    // Green only when THIS player actually set a ballot; a closed round they
+    // skipped is amber "No ballot" so an abstained round never masquerades as
+    // a submitted one.
+    if (spent > 0) return { kind: 'set' as const, dot: 'var(--court)', label: played ? 'Set · played' : 'Set' };
+    if (closed) return { kind: 'set' as const, dot: 'var(--amber)', label: played ? 'Played · no ballot' : 'No ballot' };
     return { kind: 'notset' as const, dot: 'var(--night-line-2)', label: 'Not set' };
   };
   return (

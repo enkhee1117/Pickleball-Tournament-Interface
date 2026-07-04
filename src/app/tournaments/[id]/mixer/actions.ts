@@ -169,8 +169,49 @@ export async function setMixerVote(formData: FormData): Promise<void> {
   });
   if (error) redirect(`${returnPath}${returnPath.includes('?') ? '&' : '?'}error=${encodeURIComponent(formatPgError(error))}`);
 
+  // No redirect on success: the ballot updates optimistically on the client and
+  // via realtime sync, so a redirect here would reload the whole page on every
+  // single token tap. revalidatePath refreshes the server data in place.
   revalidatePath(mixerPath(tournamentId));
-  redirect(returnPath);
+}
+
+export async function updateMixerPlayerGender(formData: FormData): Promise<void> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  const playerId = fieldString(formData, 'player_id');
+  const raw = fieldString(formData, 'gender').toLowerCase();
+  const gender = raw === 'm' || raw === 'f' || raw === 'x' ? raw : null;
+  if (!tournamentId || !playerId) redirect('/tournaments');
+
+  const supabase = await createClient();
+  // app_update_tournament_player overwrites every column, so read the current
+  // row and change ONLY gender — a gender-only edit must not wipe email/phone/dupr.
+  const { data: cur } = await supabase
+    .from('tournament_players')
+    .select('display_name,email,phone,dupr')
+    .eq('id', playerId)
+    .single();
+  const { error } = await supabase.rpc('app_update_tournament_player', {
+    p_player_id: playerId,
+    p_display_name: cur?.display_name ?? 'Player',
+    p_email: cur?.email ?? null,
+    p_gender: gender,
+    p_phone: cur?.phone ?? null,
+    p_dupr: cur?.dupr ?? null,
+  });
+  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+
+  // Re-pool to match the corrected gender so the ballot (which keys off the
+  // server pairing_pool) shows the right side of a mixed draw. f → pool b, else a.
+  if (gender) {
+    await supabase.rpc('app_mixer_update_player_pool', {
+      p_player_id: playerId,
+      p_pairing_pool: gender === 'f' ? 'b' : 'a',
+    });
+  }
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  redirect(`${mixerPath(tournamentId)}/admin?ok=Player%20gender%20updated`);
 }
 
 export async function setMixerRoundState(formData: FormData): Promise<void> {
