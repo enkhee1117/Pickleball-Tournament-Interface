@@ -3,12 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { isValidInviteCode, normalizeInviteCode } from '@/lib/invite-codes';
 import { fieldString, formatPgError } from '@/lib/forms';
 import { resolveIdentifier } from '@/lib/identifier';
 import { validatePassword } from '@/lib/validation';
 import { duprForSkill, normalizeGender } from '@/lib/quick-join';
+import { createConfirmedAccount } from '@/lib/create-account';
 
 export async function joinPublicTournament(formData: FormData): Promise<void> {
   const code = normalizeInviteCode(String(formData.get('code') ?? ''));
@@ -68,31 +68,11 @@ export async function joinMixerWithQuickAccount(formData: FormData): Promise<voi
   if (!passCheck.ok) fail(passCheck.error);
 
   const supabase = await createClient();
-  const admin = createAdminClient();
-  const createPayload =
-    resolved!.kind === 'phone'
-      ? {
-          phone: resolved!.phone,
-          email: resolved!.email,
-          password,
-          phone_confirm: true,
-          email_confirm: true,
-          user_metadata: { display_name: displayName },
-        }
-      : {
-          email: resolved!.email,
-          password,
-          email_confirm: true,
-          user_metadata: { display_name: displayName },
-        };
-  const { error: createErr } = await admin.auth.admin.createUser(createPayload);
-  if (createErr) {
-    const msg = createErr.message?.toLowerCase() ?? '';
-    const exists = msg.includes('already') || msg.includes('exists') || msg.includes('registered');
-    if (!exists) fail(createErr.message);
-    // Existing account: the supplied password must match — then this is
-    // just a sign-in + join, which is exactly what a returning player wants.
-  }
+  const account = await createConfirmedAccount({ resolved: resolved!, password, displayName });
+  if (account.error) fail(account.error);
+  // Existing account (`account.existed`): the supplied password must match —
+  // then this is just a sign-in + join, which is exactly what a returning
+  // player wants.
 
   const { error: signInErr } = await supabase.auth.signInWithPassword({
     email: resolved!.email,
@@ -100,7 +80,7 @@ export async function joinMixerWithQuickAccount(formData: FormData): Promise<voi
   });
   if (signInErr) {
     fail(
-      createErr
+      account.existed
         ? 'That email already has an account and the password didn’t match. Sign in instead.'
         : signInErr.message,
     );
