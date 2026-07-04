@@ -3,15 +3,35 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import type { Profile } from '@/lib/types';
 
-// React's `cache()` dedupes calls within the same request, so any number of
-// server components / actions calling getCurrentUser() during one render
-// share a single Supabase Auth round-trip.
-export const getCurrentUser = cache(async () => {
+export type CurrentUser = { id: string; email: string | null };
+
+// Read the signed-in user for Server Components / read paths.
+//
+// Previously every page called supabase.auth.getUser(), which makes a network
+// round-trip to the Auth server to validate the JWT. Middleware
+// (src/lib/supabase/middleware.ts) already does exactly that on every matched
+// request, so pages were paying for a SECOND auth round-trip on every
+// navigation — a major reason transitions felt like full reloads rather than
+// instant SPA changes.
+//
+// getClaims() instead verifies the JWT locally against the project's JWKS
+// (cached process-wide across requests with a TTL) when asymmetric JWT signing
+// keys are enabled, so there's no per-navigation network call. With legacy
+// symmetric JWT secrets it transparently falls back to getUser(), so this is
+// never slower than before, and the token is authenticated either way.
+//
+// React's `cache()` dedupes this to a single call per request, so layout +
+// page + child components share one read. Server Actions that mutate data
+// still call supabase.auth.getUser() directly for defence in depth.
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (!claims?.sub) return null;
+  return {
+    id: claims.sub,
+    email: typeof claims.email === 'string' ? claims.email : null,
+  };
 });
 
 export async function requireUser() {

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { TopBar } from '@/components/ui/TopBar';
 import { Icons } from '@/components/ui/icons';
@@ -30,14 +31,9 @@ export default async function PersonalInvitePage({ params }: PageProps) {
   }
 
   const supabase = await createClient();
-  const [
-    { data: payload, error },
-    {
-      data: { user },
-    },
-  ] = await Promise.all([
+  const [{ data: payload, error }, user] = await Promise.all([
     supabase.rpc('app_get_public_tournament_by_code', { p_code: code }),
-    supabase.auth.getUser(),
+    getCurrentUser(),
   ]);
 
   if (error || !payload) {
