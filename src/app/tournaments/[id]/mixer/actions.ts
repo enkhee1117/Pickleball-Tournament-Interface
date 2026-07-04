@@ -338,7 +338,18 @@ export async function drawMixerRound(formData: FormData): Promise<void> {
   const { error } = await supabase.rpc('app_mixer_draw_round', {
     p_round_id: roundId,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) {
+    // A redundant/stale "Run the draw" submission on a round that's already
+    // been drawn is harmless — the pairings exist. Show a calm confirmation
+    // (not a red error) and just re-surface the reveal. See migration 0050:
+    // this precondition raises SQLSTATE 55000, not a permission code.
+    if (error.code === '55000' && /already been drawn/i.test(error.message ?? '')) {
+      revalidatePath(mixerPath(tournamentId));
+      revalidatePath(`${mixerPath(tournamentId)}/admin`);
+      redirect(`${mixerPath(tournamentId)}/admin?ok=${encodeURIComponent('This round is already drawn')}`);
+    }
+    redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+  }
 
   // notify.html touchpoint 1 — the draw just seated players, so fire the
   // lock-screen "You're on Court N" push. Best-effort and quiet-hours aware
