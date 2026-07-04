@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { fieldInt, fieldString, formatPgError } from '@/lib/forms';
+import type { ConfigRow } from './_types';
 
 function mixerPath(tournamentId: string) {
   return `/tournaments/${tournamentId}/mixer`;
@@ -305,4 +306,74 @@ export async function finalizeMixerEvent(formData: FormData): Promise<void> {
   revalidatePath(`${mixerPath(tournamentId)}/present`);
   revalidatePath(`/tournaments/${tournamentId}`);
   redirect(`${mixerPath(tournamentId)}/admin?ok=Final%20snapshot%20created`);
+}
+
+// Toggle a single add-on flag from the dedicated Setup surface. Re-saves the
+// full config with the current values so nothing else resets — only the one
+// boolean flips. (updateMixerConfig reads every field, so a partial post
+// would clobber the rest; this fetch-and-resave path is the safe one.)
+const ADDON_COLUMN: Record<string, 'pay_to_play_enabled' | 'betting_enabled' | 'raffle_enabled' | 'downvotes_enabled'> = {
+  boosts: 'pay_to_play_enabled',
+  betting: 'betting_enabled',
+  raffle: 'raffle_enabled',
+  downvotes: 'downvotes_enabled',
+};
+
+export async function setMixerAddon(formData: FormData): Promise<void> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  if (!tournamentId) redirect('/tournaments');
+  const setupPath = `${mixerPath(tournamentId)}/setup`;
+  const column = ADDON_COLUMN[fieldString(formData, 'addon')];
+  if (!column) redirect(setupPath);
+  const enabled = fieldBool(formData, 'enabled');
+
+  const supabase = await createClient();
+  const { data } = await supabase.from('event_config').select('*').eq('tournament_id', tournamentId).maybeSingle();
+  if (!data) redirect(`${setupPath}?error=${encodeURIComponent('Mixer config is not initialized yet')}`);
+  const c = data as ConfigRow;
+  const flags = {
+    pay_to_play_enabled: c.pay_to_play_enabled,
+    betting_enabled: c.betting_enabled,
+    raffle_enabled: c.raffle_enabled,
+    downvotes_enabled: c.downvotes_enabled,
+    [column]: enabled,
+  };
+
+  const { error } = await supabase.rpc('app_update_mixer_config', {
+    p_tournament_id: tournamentId,
+    p_starting_tokens: c.starting_tokens,
+    p_starting_chips: c.starting_chips,
+    p_rounds: c.rounds,
+    p_courts: c.courts,
+    p_lock_mode: c.lock_mode,
+    p_lock_seconds: c.lock_seconds,
+    p_alpha: c.alpha,
+    p_beta: c.beta,
+    p_gamma: c.gamma,
+    p_tau: c.tau,
+    p_grief_floor: c.grief_floor,
+    p_repeat_decay: c.repeat_decay,
+    p_entry_fee: c.entry_fee,
+    p_pay_to_play_enabled: flags.pay_to_play_enabled,
+    p_boost_tokens: c.boost_tokens,
+    p_boost_price: c.boost_price,
+    p_boost_limit: c.boost_limit,
+    p_betting_enabled: flags.betting_enabled,
+    p_raffle_enabled: flags.raffle_enabled,
+    p_downvotes_enabled: flags.downvotes_enabled,
+    p_podium_markets: c.podium_markets,
+    p_betting_prize_winners: c.betting_prize_winners,
+    p_betting_rake_pct: c.betting_rake_pct,
+    p_prize_buckets: c.prize_buckets,
+    p_payment_methods: c.payment_methods,
+    p_raffle_prize: c.raffle_prize,
+    p_upvote_cap: c.upvote_cap_per_target ?? 3,
+    p_bet_lock_round_no: c.bet_lock_round_no,
+    p_clear_bet_lock_round: c.bet_lock_round_no == null,
+  });
+  if (error) redirect(`${setupPath}?error=${encodeURIComponent(formatPgError(error))}`);
+
+  revalidatePath(setupPath);
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  redirect(`${setupPath}?ok=${encodeURIComponent('Add-on updated')}`);
 }
