@@ -99,8 +99,8 @@ export default async function HomePage() {
         primaryAction="＋ New event"
         primaryHref="/tournaments/new"
       />
-      <main id="main" className="mx-auto w-full max-w-[1180px] px-[18px] pb-24 pt-4 sm:px-6 lg:px-8 lg:pt-9">
-        <div className="lg:grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-10">
+      <main id="main" className="mx-auto w-full max-w-[1440px] px-[18px] pb-24 pt-4 sm:px-6 lg:px-14 lg:pt-10">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_480px] lg:items-start lg:gap-14">
           <div className="min-w-0">
             <div className="pb-[18px] pt-2">
               <HomeGreeting name={greetingName} />
@@ -136,7 +136,7 @@ export default async function HomePage() {
 
           <aside className="min-w-0 lg:pt-2">
             <HomeSectionHeader title="Quick start" />
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-3.5">
               <QuickAction href="/tournaments/new" tone="ink" icon={Icons.plus} label="New tournament" />
               <QuickAction href="/join" icon={Icons.qr} label="Join with code" />
               <QuickAction href="/history" icon={Icons.bars} label="My stats" />
@@ -151,16 +151,32 @@ export default async function HomePage() {
                     <Link
                       key={t.id}
                       href={`/tournaments/${t.id}`}
-                      className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3"
-                      style={{ border: '1px solid var(--line)' }}
+                      className="flex items-center gap-3.5 rounded-[18px] px-[22px] py-[18px] transition-transform duration-200 hover:translate-x-0.5"
+                      style={{ background: 'var(--card)', border: '1px solid var(--line)' }}
                     >
-                      <div className="min-w-0">
+                      <div
+                        className="flex h-11 w-11 flex-none items-center justify-center rounded-[12px] font-display text-[17px] font-bold"
+                        style={{ background: 'var(--court-soft)', color: 'var(--court-deep)' }}
+                      >
+                        {t.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
                         <div className="truncate text-[14px] font-semibold text-ink">{t.name}</div>
                         <div className="mt-0.5 text-[11.5px] text-ink-3">{formatLabelFor(t.format)}</div>
                       </div>
-                      <Chip tone={t.status === 'active' ? 'live' : t.status === 'draft' ? 'ghost' : 'court'}>
+                      <div
+                        className="mono flex-none text-[10px] font-bold tracking-[0.08em]"
+                        style={{
+                          color:
+                            t.status === 'active'
+                              ? 'var(--serve)'
+                              : t.status === 'draft'
+                                ? 'var(--ink-3)'
+                                : 'var(--court-deep)',
+                        }}
+                      >
                         {t.status.toUpperCase()}
-                      </Chip>
+                      </div>
                     </Link>
                   ))}
                 </div>
@@ -169,12 +185,12 @@ export default async function HomePage() {
 
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/design-handoff/dink/wave.png"
+              src="/design-handoff/characters/host.png"
               alt=""
-              width={120}
-              height={120}
-              className="mx-auto mt-8 hidden lg:block"
-              style={{ width: 120, height: 120, objectFit: 'contain' }}
+              width={168}
+              height={168}
+              className="mx-auto mt-10 hidden animate-floatY lg:block"
+              style={{ width: 168, height: 168, objectFit: 'contain' }}
             />
           </aside>
         </div>
@@ -188,7 +204,7 @@ export default async function HomePage() {
 function HomeSectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between pt-4 pb-2.5">
-      <div className="text-[18px] font-semibold tracking-tight text-ink">{title}</div>
+      <div className="font-display text-[21px] font-bold tracking-tight text-ink">{title}</div>
       {action && (
         <div className="text-[13px] font-semibold" style={{ color: 'var(--court-deep)' }}>
           {action}
@@ -208,7 +224,7 @@ function Headline({
   if (liveMatches.length > 0) {
     const courts = new Set(liveMatches.map((m) => m.court_label).filter(Boolean)).size;
     return (
-      <div className="serif mt-1 text-[40px] leading-[1.05] tracking-tight text-ink">
+      <div className="serif mt-1 text-[40px] leading-[1.05] tracking-tight text-ink lg:text-[58px] lg:leading-[0.98]">
         {courts > 0 ? `${courts} court${courts === 1 ? '' : 's'} hot.` : 'Game on.'}
         <br />
         <span className="italic" style={{ color: 'var(--court-deep)' }}>
@@ -219,7 +235,7 @@ function Headline({
   }
   if (tournaments.some((t) => t.status === 'active')) {
     return (
-      <div className="serif mt-1 text-[40px] leading-[1.05] tracking-tight text-ink">
+      <div className="serif mt-1 text-[40px] leading-[1.05] tracking-tight text-ink lg:text-[58px] lg:leading-[0.98]">
         Tournament&apos;s
         <br />
         <span className="italic" style={{ color: 'var(--court-deep)' }}>under way.</span>
@@ -228,7 +244,7 @@ function Headline({
   }
   if (tournaments.length === 0) {
     return (
-      <div className="serif mt-1 text-[40px] leading-[1.05] tracking-tight text-ink">
+      <div className="serif mt-1 text-[40px] leading-[1.05] tracking-tight text-ink lg:text-[58px] lg:leading-[0.98]">
         Spin up your
         <br />
         <span className="italic" style={{ color: 'var(--court-deep)' }}>first tournament.</span>
@@ -236,7 +252,7 @@ function Headline({
     );
   }
   return (
-    <div className="serif mt-1 text-[40px] leading-[1.05] tracking-tight text-ink">
+    <div className="serif mt-1 text-[40px] leading-[1.05] tracking-tight text-ink lg:text-[58px] lg:leading-[0.98]">
       Ready when
       <br />
       <span className="italic" style={{ color: 'var(--court-deep)' }}>you are.</span>
@@ -263,13 +279,13 @@ function HeroTournament({
   return (
     <Link
       href={`/tournaments/${tournament.id}`}
-      className="relative block overflow-hidden rounded-[22px] p-5 text-paper"
-      style={{ background: 'linear-gradient(140deg, oklch(0.22 0.04 140), oklch(0.16 0.02 100))' }}
+      className="group relative flex min-h-[268px] flex-col justify-between overflow-hidden rounded-[26px] p-6 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_rgba(0,0,0,0.20)] lg:p-8 lg:pb-7"
+      style={{ background: 'linear-gradient(140deg, oklch(0.22 0.04 140), oklch(0.16 0.02 100))', color: 'oklch(0.96 0.01 95)' }}
     >
       <svg
-        className="pointer-events-none absolute -right-[30px] -top-[10px] opacity-15"
-        width="180"
-        height="180"
+        className="pointer-events-none absolute -right-[24px] -top-[6px] opacity-15"
+        width="210"
+        height="210"
         viewBox="0 0 180 180"
         aria-hidden
       >
@@ -280,7 +296,7 @@ function HeroTournament({
       </svg>
       <div className="relative">
         <Chip tone={tournament.status === 'active' ? 'live' : 'court'}>{statusChip}</Chip>
-        <div className="serif mt-2.5 pb-2 text-[28px] leading-[1.25]">{tournament.name}</div>
+        <div className="serif mt-3 pb-2 text-[30px] leading-[1.12] lg:text-[40px]">{tournament.name}</div>
         <div className="mt-2 text-xs" style={{ color: 'oklch(0.85 0.04 140)' }}>
           {playerCount === null ? '—' : `${playerCount} player${playerCount === 1 ? '' : 's'}`}{' '}
           · {formatLabel}
@@ -290,7 +306,9 @@ function HeroTournament({
         <div className="text-[12px]" style={{ color: 'oklch(0.85 0.04 140)' }}>
           {tournament.format === 'partner_mixer' ? 'Open event home' : 'Open scoreboard'}
         </div>
-        <span style={{ color: 'var(--court)' }}>{Icons.arrow}</span>
+        <span className="transition-transform duration-200 group-hover:translate-x-1" style={{ color: 'var(--court)' }}>
+          {Icons.arrow}
+        </span>
       </div>
     </Link>
   );
@@ -300,11 +318,11 @@ function EmptyHero() {
   return (
     <Link
       href="/tournaments/new"
-      className="relative block overflow-hidden rounded-[22px] p-5 text-paper"
-      style={{ background: 'linear-gradient(140deg, oklch(0.22 0.04 140), oklch(0.16 0.02 100))' }}
+      className="group relative flex min-h-[268px] flex-col justify-center overflow-hidden rounded-[26px] p-6 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_rgba(0,0,0,0.20)] lg:p-8"
+      style={{ background: 'linear-gradient(140deg, oklch(0.22 0.04 140), oklch(0.16 0.02 100))', color: 'oklch(0.96 0.01 95)' }}
     >
-      <Chip tone="court">START HERE</Chip>
-      <div className="serif mt-2.5 text-[24px] leading-[1.2]">
+      <div><Chip tone="court">START HERE</Chip></div>
+      <div className="serif mt-3 text-[26px] leading-[1.15] lg:text-[34px]">
         No tournaments yet — create one in under a minute.
       </div>
       <div className="mt-3 text-[12px]" style={{ color: 'oklch(0.85 0.04 140)' }}>
@@ -329,15 +347,19 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="flex min-h-[88px] flex-col items-start gap-4 rounded-2xl p-3.5"
+      className="flex min-h-[140px] flex-col items-start justify-between gap-4 rounded-[20px] p-5 transition-transform duration-200 hover:-translate-y-0.5"
       style={{
-        background: ink ? 'var(--ink)' : '#fff',
-        color: ink ? 'var(--paper)' : 'var(--ink)',
+        // The primary tile stays fixed-dark in both themes (handoff rule) so the
+        // main action reads identically day or night — like the event hero.
+        background: ink
+          ? 'linear-gradient(150deg, oklch(0.24 0.04 142), oklch(0.17 0.02 120))'
+          : 'var(--card)',
+        color: ink ? 'oklch(0.96 0.01 95)' : 'var(--ink)',
         border: ink ? 'none' : '1px solid var(--line)',
       }}
     >
       <div
-        className="flex h-8 w-8 items-center justify-center rounded-[10px]"
+        className="flex h-11 w-11 items-center justify-center rounded-[13px]"
         style={{
           background: ink ? 'oklch(0.28 0.04 140)' : 'var(--paper-2)',
           color: ink ? 'var(--court)' : 'var(--ink-2)',
@@ -345,7 +367,7 @@ function QuickAction({
       >
         {icon}
       </div>
-      <div className="text-sm font-semibold tracking-tight">{label}</div>
+      <div className="text-[15px] font-semibold tracking-tight">{label}</div>
     </Link>
   );
 }
@@ -360,8 +382,8 @@ function LiveMatchCard({ m }: { m: LiveMatch }) {
   return (
     <Link
       href={`/tournaments/${m.tournament_id}/match/${m.id}`}
-      className="relative block overflow-hidden rounded-[18px] bg-white p-3.5"
-      style={{ border: '1px solid var(--line)' }}
+      className="relative block overflow-hidden rounded-[18px] p-3.5"
+      style={{ background: 'var(--card)', border: '1px solid var(--line)' }}
     >
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
