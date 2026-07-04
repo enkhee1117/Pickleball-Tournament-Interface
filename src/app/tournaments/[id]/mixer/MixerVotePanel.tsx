@@ -109,6 +109,15 @@ export function MixerVotePanel({
         eventRoundCount={eventRoundCount}
         votes={optimisticVotes}
       />
+      <div
+        className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs"
+        style={{ background: 'oklch(0.215 0.03 264)', border: '1px dashed oklch(0.42 0.045 266)', color: 'oklch(0.78 0.028 264)' }}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ color: 'var(--court)', flexShrink: 0 }} aria-hidden>
+          <path d="M4 4l16 16M9.5 9.6A2.6 2.6 0 0012 14.6M6.2 6.7C3.9 8.2 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.6 0 3-.45 4.2-1.1M10 5.8c.65-.13 1.3-.2 2-.2 6 0 9.5 6.4 9.5 6.4a17 17 0 01-2.3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+        <span>Blind ballot — no one sees your picks, <b style={{ color: 'oklch(0.975 0.012 264)' }}>not even the admin</b>.</span>
+      </div>
       <div className="sticky top-0 z-10 mb-3 grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264 / 0.96)', border: '1px solid oklch(0.36 0.04 266)', backdropFilter: 'blur(12px)' }}>
         <div className="min-w-0">
           <div className="flex items-center justify-between gap-3">
@@ -232,11 +241,22 @@ function RoundSelector({
 }) {
   const byNumber = new Map(rounds.map((round) => [round.round_no, round]));
   const total = Math.max(eventRoundCount, rounds.length, activeRound.round_no);
+  // Per-round status → dot + label (handoff round strip):
+  //   voting-now (serve) · set/played (accent) · not-set (grey)
+  const statusOf = (round: RoundRow | undefined, spent: number) => {
+    if (!round) return { kind: 'notset' as const, dot: 'oklch(0.42 0.045 266)', label: 'Pending' };
+    if (round.state === 'open') return { kind: 'voting' as const, dot: 'var(--serve)', label: 'Voting now' };
+    const played = ['playing', 'done'].includes(round.state);
+    if (spent > 0 || played || ['locked', 'revealed'].includes(round.state)) {
+      return { kind: 'set' as const, dot: 'var(--court)', label: played ? 'Set · played' : 'Set' };
+    }
+    return { kind: 'notset' as const, dot: 'oklch(0.42 0.045 266)', label: 'Not set' };
+  };
   return (
-    <div className="mb-3 rounded-2xl p-3" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>Voting rounds</div>
-        <div className="mono text-xs font-bold" style={{ color: 'var(--court)' }}>R{activeRound.round_no}</div>
+    <div className="mb-3">
+      <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.1em]" style={{ color: 'oklch(0.7 0.03 264)' }}>
+        Ballot for
+        <span className="mono font-bold" style={{ color: 'var(--court)' }}>Round {activeRound.round_no}</span>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {Array.from({ length: total }).map((_, index) => {
@@ -244,15 +264,30 @@ function RoundSelector({
           const round = byNumber.get(roundNo);
           const active = round?.id === activeRound.id;
           const spent = round ? votes.filter((vote) => vote.round_id === round.id).reduce((sum, vote) => sum + vote.up_tokens + vote.down_tokens, 0) : 0;
+          const status = statusOf(round, spent);
+          const inner = (
+            <>
+              <span className="text-sm font-bold" style={{ color: active ? 'oklch(0.2 0.04 140)' : 'oklch(0.975 0.012 264)' }}>Round {roundNo}</span>
+              <span
+                className="mt-1 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.06em]"
+                style={{ color: active ? 'oklch(0.2 0.04 140)' : 'oklch(0.78 0.028 264)' }}
+              >
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: active ? 'oklch(0.2 0.04 140)' : status.dot }} />
+                {status.label}
+              </span>
+            </>
+          );
+          const style = {
+            minWidth: 118,
+            background: active ? 'var(--court)' : 'oklch(0.215 0.03 264)',
+            border: active
+              ? '1.5px solid var(--court)'
+              : `1.5px solid ${status.kind === 'voting' ? 'color-mix(in oklch, var(--serve) 40%, oklch(0.36 0.04 266))' : 'oklch(0.36 0.04 266)'}`,
+          };
           if (!round) {
             return (
-              <span
-                key={roundNo}
-                className="flex min-w-[76px] flex-col items-center rounded-xl px-3 py-2 text-center opacity-45"
-                style={{ border: '1px dashed oklch(0.36 0.04 266)', color: 'oklch(0.78 0.028 264)' }}
-              >
-                <span className="mono text-sm font-bold">R{roundNo}</span>
-                <span className="mt-0.5 text-[10px] uppercase tracking-[0.08em]">Pending</span>
+              <span key={roundNo} className="flex flex-col items-start rounded-xl px-3.5 py-2.5 opacity-50" style={style}>
+                {inner}
               </span>
             );
           }
@@ -260,15 +295,10 @@ function RoundSelector({
             <Link
               key={round.id}
               href={`/tournaments/${tournamentId}/mixer?round=${round.round_no}`}
-              className="flex min-w-[76px] flex-col items-center rounded-xl px-3 py-2 text-center"
-              style={{
-                background: active ? 'var(--court)' : 'oklch(0.285 0.038 266)',
-                color: active ? 'oklch(0.2 0.04 140)' : 'oklch(0.975 0.012 264)',
-                border: active ? '1px solid var(--court)' : '1px solid oklch(0.42 0.045 266)',
-              }}
+              className="flex flex-col items-start rounded-xl px-3.5 py-2.5"
+              style={style}
             >
-              <span className="mono text-sm font-bold">R{round.round_no}</span>
-              <span className="mt-0.5 text-[10px] uppercase tracking-[0.08em]">{spent > 0 ? `${spent} token${spent === 1 ? '' : 's'}` : round.state}</span>
+              {inner}
             </Link>
           );
         })}
