@@ -121,37 +121,75 @@ export default async function TournamentsPage({
           </div>
         )}
 
-        {tournaments.length === 0 ? (
-          <div
-            className="rounded-2xl bg-white p-6 text-center"
-            style={{ border: '1px dashed var(--line)' }}
-          >
-            <div className="text-[15px] font-semibold text-ink">No tournaments here yet</div>
-            <div className="mt-1 text-xs text-ink-3">
-              Create a Mixer, round robin, or bracket when the next game night appears.
-            </div>
-          </div>
+        {user && rows.length === 0 && filter === 'all' ? (
+          <FirstRunEmpty />
         ) : (
-          <div className="space-y-2.5">
-            {tournaments.map((t) => (
-              <TournamentRow key={t.id} t={t} />
-            ))}
-          </div>
-        )}
+          <>
+            {tournaments.length === 0 ? (
+              <div
+                className="rounded-2xl bg-white p-6 text-center"
+                style={{ border: '1px dashed var(--line)' }}
+              >
+                <div className="text-[15px] font-semibold text-ink">No tournaments here yet</div>
+                <div className="mt-1 text-xs text-ink-3">
+                  Create a Mixer, round robin, or bracket when the next game night appears.
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {tournaments.map((t) => (
+                  <TournamentRow key={t.id} t={t} />
+                ))}
+              </div>
+            )}
 
-        <div className="mt-5">
-          <Link
-            href="/tournaments/new"
-            className="block w-full rounded-2xl px-5 py-[18px] text-center text-base font-semibold tracking-tight"
-            style={{
-              background: 'var(--court)',
-              color: 'oklch(0.2 0.04 140)',
-              boxShadow: '0 4px 14px oklch(0.2 0.05 100 / 0.12)',
-            }}
-          >
-            ＋ Create new tournament
-          </Link>
-        </div>
+            <div className="mt-5">
+              <Link
+                href="/tournaments/new"
+                className="block w-full rounded-2xl px-5 py-[18px] text-center text-base font-semibold tracking-tight"
+                style={{
+                  background: 'var(--court)',
+                  color: 'oklch(0.2 0.04 140)',
+                  boxShadow: '0 4px 14px oklch(0.2 0.05 100 / 0.12)',
+                }}
+              >
+                ＋ Create new tournament
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// First-run empty state (handoff first-run.html, step 1): coach Dink, one
+// clear action, an honest time estimate, and a real "join with a code" path —
+// no blank dashboard, no feature tour.
+function FirstRunEmpty() {
+  return (
+    <div className="rounded-[22px] bg-white p-7 text-center" style={{ border: '1px solid var(--line)' }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/design-handoff/dink/coach.png" alt="" width={104} height={104} className="mx-auto mb-3" style={{ width: 104, height: 104, objectFit: 'contain' }} />
+      <div className="serif text-[26px] leading-none text-ink">No events yet — let&apos;s fix that</div>
+      <div className="mx-auto mt-2.5 max-w-[26em] text-[13px] leading-[1.5] text-ink-3">
+        Most first nights are up and running in about <b className="text-ink-2">90 seconds</b>. Templates carry the defaults,
+        so there&apos;s almost nothing to decide.
+      </div>
+      <Link
+        href="/tournaments/new"
+        className="mt-5 block w-full rounded-2xl px-5 py-4 text-center text-base font-semibold tracking-tight"
+        style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)', boxShadow: '0 4px 14px oklch(0.2 0.05 100 / 0.12)' }}
+      >
+        ＋ Create your first event
+      </Link>
+      <Link href="/join" className="mt-3 block text-[13px] font-semibold" style={{ color: 'var(--court-deep)' }}>
+        Have a code? Join an event →
+      </Link>
+      <div className="mt-6 flex items-center justify-center gap-5 border-t pt-4 text-[11px] text-ink-3" style={{ borderColor: 'var(--line)' }}>
+        <span><b className="mono text-ink-2">4</b> taps to live</span>
+        <span><b className="mono text-ink-2">~90s</b> median</span>
+        <span><b className="mono text-ink-2">0</b> required decisions</span>
       </div>
     </div>
   );
