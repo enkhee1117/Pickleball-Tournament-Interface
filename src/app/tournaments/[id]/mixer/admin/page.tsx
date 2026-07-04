@@ -235,6 +235,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                     <AdminLink href={`/tournaments/${id}/mixer/present/between`} title="Between-rounds board" sub="Projector standings & check-in" />
                     <AdminLink href={`/tournaments/${id}/mixer/score`} title="Score entry" sub="Post scores, watch standings rise" />
                     <AdminLink href={`/tournaments/${id}/mixer/recovery`} title="Roster recovery" sub="Odd count, no-shows, early leaves" />
+                    <AdminLink href={`/tournaments/${id}/recap`} title="Recap & export" sub="Podium, superlatives, CSV & share" />
                   </div>
                 </Section>
               </>
