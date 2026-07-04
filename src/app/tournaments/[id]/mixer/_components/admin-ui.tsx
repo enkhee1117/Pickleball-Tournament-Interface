@@ -32,7 +32,7 @@ export function Notice({ tone, children }: { tone: 'ok' | 'error'; children: Rea
     <div className="mb-3 rounded-xl border px-3 py-2 text-sm" style={{
       borderColor: tone === 'ok' ? 'var(--court-deep)' : 'var(--berry)',
       color: tone === 'ok' ? 'var(--court-deep)' : 'var(--berry)',
-      background: tone === 'ok' ? 'oklch(0.96 0.04 140)' : 'oklch(0.96 0.04 12)',
+      background: tone === 'ok' ? 'var(--note-ok-bg)' : 'var(--note-err-bg)',
     }}>
       {children}
     </div>
@@ -67,7 +67,7 @@ export function RoundRail({ rounds, activeRoundId }: { rounds: RoundRow[]; activ
             }}
           >
             <span className="mono text-sm font-bold">R{round.round_no}</span>
-            <span className="mt-0.5 text-[10px] uppercase tracking-[0.08em]" style={{ color: active ? 'oklch(0.82 0.02 95)' : 'var(--ink-3)' }}>
+            <span className="mt-0.5 text-[10px] uppercase tracking-[0.08em]" style={{ color: active ? 'var(--chip-on-label)' : 'var(--ink-3)' }}>
               {round.state}
             </span>
           </div>
@@ -98,7 +98,7 @@ export function PaymentButton({ tournamentId, paymentId, status, label }: { tour
       <input type="hidden" name="status" value={status} />
       <button className="rounded-xl px-3 py-2 text-xs font-semibold" style={{
         background: status === 'confirmed' ? 'var(--court)' : 'transparent',
-        color: status === 'confirmed' ? 'oklch(0.2 0.04 140)' : 'var(--berry)',
+        color: status === 'confirmed' ? 'var(--night-court-ink)' : 'var(--berry)',
         border: status === 'confirmed' ? 'none' : '1px solid var(--berry)',
       }}>
         {label}
@@ -202,7 +202,7 @@ export function OrganizerTabNav({
                   </span>
                 ) : null}
               </span>
-              <span className="mt-0.5 text-[10.5px]" style={{ color: on ? 'oklch(0.82 0.02 95)' : 'var(--ink-3)' }}>
+              <span className="mt-0.5 text-[10.5px]" style={{ color: on ? 'var(--chip-on-label)' : 'var(--ink-3)' }}>
                 {tab.description}
               </span>
             </Link>

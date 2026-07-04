@@ -153,7 +153,7 @@ export default async function MixerPresentPage({ params, searchParams }: PagePro
   }
 
   return (
-    <div className="relative left-1/2 flex min-h-full w-[calc(100vw-15px)] -translate-x-1/2 flex-col overflow-hidden" style={{ background: 'oklch(0.155 0.024 264)', color: 'oklch(0.975 0.012 264)' }}>
+    <div className="relative left-1/2 flex min-h-full w-[calc(100vw-15px)] -translate-x-1/2 flex-col overflow-hidden" style={{ background: 'var(--night-bg)', color: 'var(--night-text)' }}>
       <MixerRealtimeSync tournamentId={id} />
       <TopBar
         dark
@@ -166,7 +166,7 @@ export default async function MixerPresentPage({ params, searchParams }: PagePro
         <Link
           href={`/tournaments/${id}/mixer/present/between`}
           className="mono inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] uppercase tracking-[0.08em]"
-          style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)', color: 'var(--court)' }}
+          style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)', color: 'var(--court)' }}
         >
           Between-rounds board →
         </Link>
