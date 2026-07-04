@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth';
 import type { Tournament } from '@/lib/types';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import { DesktopNav, DesktopSurface } from '@/components/desktop';
@@ -30,9 +31,7 @@ export default async function TournamentsPage({
   const cookieStore = await cookies();
   const theme = readThemeFromCookie(cookieStore.get(THEME_COOKIE)?.value);
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   let rows: TournamentMemberRow[] = [];
   if (user) {

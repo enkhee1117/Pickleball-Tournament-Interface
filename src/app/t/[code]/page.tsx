@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
 import { Chip } from '@/components/ui/Chip';
 import { TopBar } from '@/components/ui/TopBar';
@@ -91,9 +92,9 @@ export default async function PublicTournamentPage({ params, searchParams }: Pag
 
   const supabase = await createClient();
 
-  const [{ data, error }, { data: { user } }] = await Promise.all([
+  const [{ data, error }, user] = await Promise.all([
     supabase.rpc('app_get_public_tournament_by_code', { p_code: code }),
-    supabase.auth.getUser(),
+    getCurrentUser(),
   ]);
 
   if (error || !data) {
