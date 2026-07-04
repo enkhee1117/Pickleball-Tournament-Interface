@@ -98,13 +98,17 @@ export function JoinForm({ initialCode = '' }: Props) {
       />
 
       <div className="flex flex-1 flex-col px-[18px] pt-5">
-        <div className="serif text-[30px] leading-[1.1] text-ink">
-          Got an
-          <br />
-          <span className="italic" style={{ color: 'var(--court-deep)' }}>invite code?</span>
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/design-handoff/dink/coach.png" alt="" width={64} height={64} style={{ width: 64, height: 64, objectFit: 'contain' }} />
+          <div>
+            <div className="serif text-[28px] leading-[1.05] text-ink">
+              You&apos;re a few taps from <span className="italic" style={{ color: 'var(--court-deep)' }}>your first game.</span>
+            </div>
+          </div>
         </div>
-        <div className="mb-7 mt-2 text-[13px] text-ink-3">
-          Six characters, usually shouted across the court.
+        <div className="mb-6 mt-2 text-[13px] text-ink-3">
+          Enter the 6-digit code from your invite. <b className="text-ink-2">No account needed yet.</b>
         </div>
 
         <div className="flex justify-center gap-2">
@@ -138,10 +142,35 @@ export function JoinForm({ initialCode = '' }: Props) {
           </div>
         )}
 
+        <div className="mt-7 rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+          <div className="mono text-[10px] uppercase tracking-[0.1em] text-ink-3">How a mixer works</div>
+          <div className="mt-3 flex flex-col gap-2.5">
+            {[
+              ['Vote for partners', "Secretly spend tokens on who you'd love to play with."],
+              ['The draw decides', 'Votes shuffle the teams. Most-wanted often become partners.'],
+              ['Play & climb', 'New partner each round. Win to climb the board.'],
+            ].map(([t, d], i) => (
+              <div key={t} className="flex items-start gap-3">
+                <span
+                  className="mono grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[12px] font-bold"
+                  style={{ background: 'color-mix(in oklch, var(--court) 16%, transparent)', color: 'var(--court-deep)' }}
+                >
+                  {i + 1}
+                </span>
+                <div>
+                  <div className="text-[13.5px] font-semibold text-ink">{t}</div>
+                  <div className="mt-0.5 text-[12px] leading-[1.4] text-ink-3">{d}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="mt-auto pt-6 pb-[18px]">
           <BigButton tone="ink" disabled={!filled || isPending} onClick={submit}>
-            {isPending ? 'Joining…' : 'Join'}
+            {isPending ? 'Joining…' : 'Join the event'}
           </BigButton>
+          <div className="mt-2.5 text-center text-[12px] text-ink-3">Play first — secure your account after your first game.</div>
         </div>
       </div>
     </div>
