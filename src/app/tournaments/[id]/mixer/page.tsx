@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
 import { Icons } from '@/components/ui/icons';
+import { BallMark } from '@/components/desktop';
 import { formatInviteCode } from '@/lib/invite-codes';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 import { AnonymousMixerJoinButton } from './AnonymousMixerJoinButton';
@@ -212,41 +213,94 @@ function MixerShell({
   children: ReactNode;
 }) {
   const base = `/tournaments/${tournament.id}/mixer`;
-  const tabs = [
+  const tabs: [string, string][] = [
     ['vote', 'Vote'],
     ['match', 'Match'],
     ['betting', 'Pool'],
     ['me', 'Me'],
   ];
+  const href = (id: string) => (id === 'vote' ? base : `${base}?tab=${id}`);
+  // Player mode is mobile-primary and widens on desktop (handoff player.html):
+  // below lg the bottom tab bar drives; at lg+ a sticky sidebar takes over and
+  // the mobile top chrome hides. Night surface throughout; escapes the shell.
   return (
-    <div className="flex min-h-[100dvh] flex-col" style={{ background: 'oklch(0.155 0.024 264)', color: 'oklch(0.975 0.012 264)' }}>
+    <div data-fullscreen="night" className="min-h-[100dvh]" style={{ background: 'oklch(0.155 0.024 264)', color: 'oklch(0.975 0.012 264)' }}>
       <MixerRealtimeSync tournamentId={tournament.id} />
-      <TopBar
-        dark
-        title={tournament.name}
-        sub={`Player mode · Round ${currentRound.round_no} · ${currentRound.state}`}
-        left={<Link href={`/tournaments/${tournament.id}`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
-      />
-      {isManager && <MixerModeSwitch tournamentId={tournament.id} active="player" />}
-      <div className="px-[18px] pb-3">
-        <div className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
-          <div>
-            <Chip tone={currentRound.state === 'open' ? 'court' : 'ghost'}>{currentRound.state}</Chip>
-            <div className="serif mt-2 text-[28px] leading-none">Blind partner vote</div>
-            <div className="mt-1 text-xs" style={{ color: 'oklch(0.78 0.028 264)' }}>
-              {player ? `Playing as ${player.display_name}` : `Code ${formatInviteCode(tournament.invite_code)}`}
+      <a href="#main" className="skip-link">Skip to content</a>
+      <div className="lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
+        {/* Sidebar — desktop only */}
+        <aside
+          className="hidden lg:flex lg:h-screen lg:flex-col lg:gap-1 lg:sticky lg:top-0 lg:p-4"
+          style={{ borderRight: '1px solid oklch(0.36 0.04 266)', background: 'oklch(0.175 0.026 264)' }}
+        >
+          <div className="flex items-center gap-2.5 px-2 pb-4 pt-1.5">
+            <BallMark size={26} />
+            <span className="serif text-[20px]">Try to Dink</span>
+          </div>
+          <div className="mb-2 rounded-xl px-3 py-2.5" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+            <div className="flex items-center gap-2 text-[13px] font-semibold">
+              <Chip tone={currentRound.state === 'open' ? 'court' : 'ghost'}>{currentRound.state}</Chip>
+              <span className="truncate">{tournament.name}</span>
+            </div>
+            <div className="mono mt-1 text-[10.5px] tracking-[0.06em]" style={{ color: 'oklch(0.7 0.03 264)' }}>
+              ROUND {currentRound.round_no}{player ? ` · ${player.display_name.toUpperCase()}` : ''}
             </div>
           </div>
-          <div className="text-right">
-            <div className="mono text-[22px] font-bold" style={{ color: 'var(--court)' }}>R{currentRound.round_no}</div>
-            <div className="text-[10px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>No tallies</div>
+          {tabs.map(([id, label]) => (
+            <Link
+              key={id}
+              href={href(id)}
+              className="rounded-[11px] px-3 py-2.5 text-[14px] font-medium"
+              style={tab === id ? { background: 'var(--court)', color: 'oklch(0.2 0.04 140)', fontWeight: 600 } : { color: 'oklch(0.82 0.02 264)' }}
+            >
+              {label}
+            </Link>
+          ))}
+          <div className="flex-1" />
+          {isManager && (
+            <Link href={`${base}/admin`} className="rounded-[11px] px-3 py-2.5 text-[13px] font-semibold" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)', color: 'oklch(0.9 0.02 264)' }}>
+              Organizer mode →
+            </Link>
+          )}
+          <Link href={`/tournaments/${tournament.id}`} className="rounded-[11px] px-3 py-2.5 text-[13px] font-medium" style={{ color: 'oklch(0.7 0.03 264)' }}>
+            ← Back to hub
+          </Link>
+        </aside>
+
+        {/* Main column — constrained on tablet, full on desktop */}
+        <div className="mx-auto w-full max-w-[560px] lg:max-w-[860px] lg:px-6">
+          <div className="lg:hidden">
+            <TopBar
+              dark
+              title={tournament.name}
+              sub={`Player mode · Round ${currentRound.round_no} · ${currentRound.state}`}
+              left={<Link href={`/tournaments/${tournament.id}`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
+            />
+            {isManager && <MixerModeSwitch tournamentId={tournament.id} active="player" />}
           </div>
+          <div id="main" className="px-[18px] pb-3 pt-4 lg:px-0">
+            <div className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+              <div>
+                <Chip tone={currentRound.state === 'open' ? 'court' : 'ghost'}>{currentRound.state}</Chip>
+                <div className="serif mt-2 text-[28px] leading-none">Blind partner vote</div>
+                <div className="mt-1 text-xs" style={{ color: 'oklch(0.78 0.028 264)' }}>
+                  {player ? `Playing as ${player.display_name}` : `Code ${formatInviteCode(tournament.invite_code)}`}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="mono text-[22px] font-bold" style={{ color: 'var(--court)' }}>R{currentRound.round_no}</div>
+                <div className="text-[10px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>No tallies</div>
+              </div>
+            </div>
+          </div>
+          <div className="pb-28 lg:pb-10">{children}</div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto pb-24">{children}</div>
-      <div className="fixed bottom-0 left-0 right-0 mx-auto grid max-w-md grid-cols-4 gap-1 p-2" style={{ background: 'oklch(0.155 0.024 264)', borderTop: '1px solid oklch(0.36 0.04 266)' }}>
+
+      {/* Bottom tab bar — mobile only */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 mx-auto grid max-w-md grid-cols-4 gap-1 p-2 lg:hidden" style={{ background: 'oklch(0.155 0.024 264)', borderTop: '1px solid oklch(0.36 0.04 266)' }}>
         {tabs.map(([id, label]) => (
-          <Link key={id} href={id === 'vote' ? base : `${base}?tab=${id}`} className="rounded-xl py-3 text-center text-[12px] font-bold" style={{
+          <Link key={id} href={href(id)} className="rounded-xl py-3 text-center text-[12px] font-bold" style={{
             background: tab === id ? 'var(--court)' : 'transparent',
             color: tab === id ? 'oklch(0.2 0.04 140)' : 'oklch(0.78 0.028 264)',
           }}>
