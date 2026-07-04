@@ -10,6 +10,8 @@ import { BallMark } from '@/components/desktop';
 import { formatInviteCode } from '@/lib/invite-codes';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 import { AnonymousMixerJoinButton } from './AnonymousMixerJoinButton';
+import { PushRegistration } from './PushRegistration';
+import { MixerCourtCall, MixerPresenceCheckIn } from './MixerCourtCall';
 import { bindMixerRosterEntry } from './actions';
 import { MixerBettingPanel } from './MixerBettingPanel';
 import { MixerModeSwitch } from './MixerModeSwitch';
@@ -93,7 +95,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const myPlayer = user ? roster.find((p) => p.profile_id === user.id) ?? null : null;
   const myState = myPlayer ? stateRows.find((s) => s.player_id === myPlayer.id) ?? null : null;
 
-  const [{ data: votes }, { data: pairings }, { data: scores }, { data: bets }, { data: payments }, { data: snapshot }] = await Promise.all([
+  const [{ data: votes }, { data: pairings }, { data: scores }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }] = await Promise.all([
     roundIds.length > 0 && myPlayer
       ? supabase.from('mixer_votes').select('round_id,target_player_id,up_tokens,down_tokens').in('round_id', roundIds).eq('voter_player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
@@ -112,6 +114,9 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     myPlayer
       ? supabase.from('mixer_final_snapshots').select('standings,raffle_tickets,raffle_winner,bet_settlements').eq('tournament_id', id).maybeSingle()
       : Promise.resolve({ data: null }),
+    myPlayer
+      ? supabase.from('mixer_check_ins').select('checked_in_at,acked_round_id').eq('tournament_id', id).eq('player_id', myPlayer.id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const voteRows = (votes ?? []) as VoteRow[];
@@ -123,7 +128,40 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const standings = Array.isArray(final?.standings) ? (final.standings as StandingItem[]) : [];
   const raffleTickets = Array.isArray(final?.raffle_tickets) ? (final.raffle_tickets as RaffleItem[]) : [];
   const raffleWinner = final?.raffle_winner && !Array.isArray(final.raffle_winner) ? (final.raffle_winner as RaffleItem) : null;
+  const checkInRow = checkIn as { checked_in_at: string; acked_round_id: string | null } | null;
   const shellRound = tab === 'vote' ? (voteRound ?? currentRound) : currentRound;
+
+  // notify.html touchpoint 2 — the in-app court-call banner. Distinct from the
+  // go-time takeover (which lives in the Match tab): this is the glowing
+  // "your court is ready" call that sits above every tab until the player
+  // acks it with "I'm here". It shows once the draw has seated this player on
+  // a court whose game isn't finished, and their check-in hasn't yet
+  // acknowledged this round. Names their seat & opponents only — never picks.
+  const courtCall = computeCourtCall();
+  function computeCourtCall() {
+    if (!myPlayer || !currentRound) return null;
+    if (!['revealed', 'playing'].includes(currentRound.state)) return null;
+    const mine = pairingRows.find((p) => p.player_a_id === myPlayer.id || p.player_b_id === myPlayer.id);
+    if (!mine) return null;
+    if (scoreRows.find((s) => s.court_no === mine.court_no)?.completed_at) return null;
+    if (checkInRow?.acked_round_id === currentRound.id) return null;
+    const nameOf = (pid: string) => roster.find((p) => p.id === pid)?.display_name ?? 'TBD';
+    const partnerId = mine.player_a_id === myPlayer.id ? mine.player_b_id : mine.player_a_id;
+    const opponent = pairingRows.find((p) => p.court_no === mine.court_no && p.id !== mine.id) ?? null;
+    return {
+      roundId: currentRound.id,
+      courtNo: mine.court_no,
+      partnerName: nameOf(partnerId),
+      opponentTeam: opponent ? `${nameOf(opponent.player_a_id)} & ${nameOf(opponent.player_b_id)}` : null,
+    };
+  }
+
+  // Show the quiet presence check-in when the player is at a live event, not
+  // currently court-called, and hasn't checked in yet — this is what fills the
+  // present-between face-wall between rounds.
+  const checkedIn = !!checkInRow?.checked_in_at;
+  const eventLive = t.status === 'active';
+  const showPresenceCheckIn = !!myPlayer && eventLive && !courtCall && !checkedIn;
 
   if (!cfg || !currentRound) {
     return <MissingSetup tournamentId={id} tournamentName={t.name} />;
@@ -133,14 +171,11 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     return (
       <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={null} isManager={isManager}>
         <div className="px-[18px] pt-6">
-          <div className="rounded-2xl bg-white p-5 text-center" style={{ border: '1px solid var(--line)' }}>
-            <div className="serif text-[32px] leading-none text-ink">Jump into the Mixer</div>
-            <div className="mt-2 text-sm text-ink-3">
-              Join with an anonymous session now. You can upgrade later without losing tokens, bets, or pairings.
-            </div>
-            <div className="mt-5"><AnonymousMixerJoinButton tournamentId={id} /></div>
-            <Link href={`/login?next=${encodeURIComponent(`/tournaments/${id}/mixer`)}`} className="mt-3 block text-[13px] font-semibold text-ink-3">
-              Or sign in →
+          <div className="rounded-2xl bg-white p-5" style={{ border: '1px solid var(--line)' }}>
+            <div className="mono text-[10px] uppercase tracking-[0.1em] text-ink-3">You&apos;re in · {t.name}</div>
+            <div className="mt-4"><AnonymousMixerJoinButton tournamentId={id} inviteCode={t.invite_code} /></div>
+            <Link href={`/login?next=${encodeURIComponent(`/tournaments/${id}/mixer`)}`} className="mt-3 block text-center text-[13px] font-semibold text-ink-3">
+              Already have an account? Sign in →
             </Link>
           </div>
         </div>
@@ -168,6 +203,17 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
 
   return (
     <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={myPlayer} isManager={isManager}>
+      <PushRegistration />
+      {courtCall && (
+        <MixerCourtCall
+          tournamentId={id}
+          roundId={courtCall.roundId}
+          courtNo={courtCall.courtNo}
+          partnerName={courtCall.partnerName}
+          opponentTeam={courtCall.opponentTeam}
+        />
+      )}
+      {showPresenceCheckIn && <MixerPresenceCheckIn tournamentId={id} />}
       {sp.error && <Notice tone="error">{sp.error}</Notice>}
       {sp.ok && <Notice tone="ok">{sp.ok}</Notice>}
       {tab === 'vote' && (

@@ -39,13 +39,14 @@ export default async function MixerPresentBetweenPage({ params }: PageProps) {
   const roster = (players ?? []) as PlayerRow[];
   const roundIds = roundRows.map((r) => r.id);
 
-  const [{ data: pairings }, { data: scores }] = await Promise.all([
+  const [{ data: pairings }, { data: scores }, { data: checkIns }] = await Promise.all([
     roundIds.length
       ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no').in('round_id', roundIds)
       : Promise.resolve({ data: [] }),
     roundIds.length
       ? supabase.from('mixer_scores').select('round_id,court_no,team_a_score,team_b_score,completed_at').in('round_id', roundIds)
       : Promise.resolve({ data: [] }),
+    supabase.from('mixer_check_ins').select('player_id').eq('tournament_id', id),
   ]);
 
   const pairingRows = (pairings ?? []) as (PairingRow & { round_id: string })[];
@@ -69,16 +70,11 @@ export default async function MixerPresentBetweenPage({ params }: PageProps) {
   const deltas: Record<string, number> = {};
   for (const [k, v] of deltasMap) deltas[k] = v;
 
-  // "Checked in" for the holding face-wall = players seated in the current
-  // round's draw (real data). Before a draw everyone reads as waiting.
-  const seated = new Set<string>();
-  if (currentRound) {
-    for (const p of pairingRows.filter((row) => row.round_id === currentRound.id)) {
-      seated.add(p.player_a_id);
-      seated.add(p.player_b_id);
-    }
-  }
-  const facewall = roster.map((p) => ({ id: p.id, name: p.display_name, checked: seated.has(p.id) }));
+  // "Checked in" for the holding face-wall = players who tapped "I'm here"
+  // (real mixer_check_ins state), not merely whoever the last draw seated. A
+  // player between rounds still reads as present once they've checked in.
+  const checkedInIds = new Set((checkIns ?? []).map((row) => (row as { player_id: string }).player_id));
+  const facewall = roster.map((p) => ({ id: p.id, name: p.display_name, checked: checkedInIds.has(p.id) }));
 
   const nextRoundNo = roundRows.find((r) => r.round_no === scoredRound + 1)?.round_no ?? null;
 

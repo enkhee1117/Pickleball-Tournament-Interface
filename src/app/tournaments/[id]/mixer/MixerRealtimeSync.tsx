@@ -34,6 +34,7 @@ export function MixerRealtimeSync({ tournamentId }: Props) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mixer_rounds', filter }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mixer_pairings' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mixer_scores' }, schedule)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mixer_check_ins', filter }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mixer_final_snapshots', filter }, schedule)
       .subscribe();
 

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { fieldInt, fieldString, formatPgError } from '@/lib/forms';
+import { notifySeatedPlayers } from '@/lib/push/notify-seated';
 import type { ConfigRow } from './_types';
 
 function mixerPath(tournamentId: string) {
@@ -41,6 +42,29 @@ export async function bindMixerRosterEntry(formData: FormData): Promise<void> {
 
   revalidatePath(mixerPath(tournamentId));
   redirect(mixerPath(tournamentId));
+}
+
+// notify.html touchpoint 2 — records the caller present at the event and, when
+// a round is given, acknowledges that round's court call (silences the
+// escalation chain). Returns rather than redirects so the client banner can
+// dismiss in place; the present-between face-wall and other views pick up the
+// new state via revalidation + realtime.
+export async function checkInToMixer(
+  tournamentId: string,
+  roundId?: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_mixer_check_in', {
+    p_tournament_id: tournamentId,
+    p_round_id: roundId || null,
+  });
+  if (error) return { ok: false, error: formatPgError(error) };
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/present/between`);
+  return { ok: true };
 }
 
 export async function updateMixerConfig(formData: FormData): Promise<void> {
@@ -200,6 +224,11 @@ export async function drawMixerRound(formData: FormData): Promise<void> {
     p_round_id: roundId,
   });
   if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+
+  // notify.html touchpoint 1 — the draw just seated players, so fire the
+  // lock-screen "You're on Court N" push. Best-effort and quiet-hours aware
+  // (only checked-in players in a live event); never blocks the redirect.
+  await notifySeatedPlayers(tournamentId, roundId);
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
