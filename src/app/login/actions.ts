@@ -27,6 +27,13 @@ export async function signInWithPassword(_prev: FormState, formData: FormData): 
   if (!passCheck.ok) return { error: passCheck.error };
 
   const supabase = await createClient();
+  // Clear any pre-existing local session before authenticating. Without this,
+  // a leftover auth cookie from a previous user on the same browser (e.g. a
+  // stale or chunked `sb-*-auth-token`) can shadow the fresh login on a later
+  // read, so the app resolves the wrong profile — the signed-in name/events
+  // flip back to the previous user. `scope: 'local'` only clears this browser's
+  // cookies (no network round-trip, no effect on other devices).
+  await supabase.auth.signOut({ scope: 'local' });
   const { data: authData, error } = await supabase.auth.signInWithPassword({
     email: resolved.email,
     password,
