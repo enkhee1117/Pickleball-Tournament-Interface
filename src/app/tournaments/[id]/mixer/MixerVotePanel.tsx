@@ -1,22 +1,28 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icons } from '@/components/ui/icons';
 import { eligibleBallotTargets } from '@/lib/mixer';
 import { Dink, mixerAvatarFor } from './_components/mixer-night';
-import { setMixerVote } from './actions';
+import { saveMixerBallot } from './actions';
 
 // Player ballot — rebuilt to the handoff player.html spec: candidate cards
 // with − n + steppers and a "rather not" toggle, a desktop ballot rail with
 // the live allocation summary, and a plain-language "how the draw works"
 // fairness card. Votes stay blind; everything here is the caller's own data.
+//
+// Token flow: the ballot is tracked LOCALLY as the player taps. Changes save
+// quietly in the background (one debounced batched write per round, never a
+// round-trip per tap) and there's an explicit "Lock in my ballot" button for
+// closure. A player who edits and walks away still has their picks saved.
 
 type ConfigRow = {
   starting_tokens: number;
   rounds: number;
   downvotes_enabled: boolean;
+  upvote_cap_per_target?: number | null;
   alpha?: number;
   beta?: number;
   gamma?: number;
@@ -50,10 +56,30 @@ type VoteRow = {
   down_tokens: number;
 };
 
+// Local ballot cell for the round being edited.
+type Cell = { up: number; down: number };
+type Ballot = Record<string, Cell>;
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
 const NIGHT_CARD = 'var(--night-card)';
 const NIGHT_LINE = 'var(--night-line)';
 const NIGHT_TEXT2 = 'var(--night-text2)';
 const NIGHT_TEXT3 = 'var(--night-text3)';
+
+function ballotFromVotes(votes: VoteRow[], roundId: string): Ballot {
+  const out: Ballot = {};
+  for (const v of votes) {
+    if (v.round_id !== roundId) continue;
+    if (v.up_tokens > 0 || v.down_tokens > 0) out[v.target_player_id] = { up: v.up_tokens, down: v.down_tokens };
+  }
+  return out;
+}
+
+const ballotSpent = (b: Ballot) => Object.values(b).reduce((s, c) => s + c.up + c.down, 0);
+const ballotToArray = (b: Ballot) =>
+  Object.entries(b)
+    .filter(([, c]) => c.up > 0 || c.down > 0)
+    .map(([target_player_id, c]) => ({ target_player_id, up_tokens: c.up, down_tokens: c.down }));
 
 export function MixerVotePanel({
   tournamentId,
@@ -66,6 +92,7 @@ export function MixerVotePanel({
   myPlayer,
   myState,
   votes,
+  confirmedRoundIds = [],
   genderMode = 'mixed',
 }: {
   tournamentId: string;
@@ -78,9 +105,9 @@ export function MixerVotePanel({
   myPlayer: PlayerRow;
   myState: StateRow | null;
   votes: VoteRow[];
+  confirmedRoundIds?: string[];
   genderMode?: string;
 }) {
-  const [optimisticVotes, setOptimisticVotes] = useState(votes);
   const [showHow, setShowHow] = useState(false);
   const myPool = states.find((s) => s.player_id === myPlayer.id)?.pairing_pool;
   // Eligible ballot targets follow the event's gender mode: mixed shows the
@@ -88,38 +115,200 @@ export function MixerVotePanel({
   // everyone. Mirrors the draw's pairing constraints so players never spend
   // tokens on someone they can't be paired with.
   const targets = eligibleBallotTargets(roster, myPlayer, genderMode, myPool);
-  const activeVotes = optimisticVotes.filter((v) => v.round_id === round.id);
-  const serverSpent = votes.reduce((s, v) => s + v.up_tokens + v.down_tokens, 0);
-  const optimisticSpent = optimisticVotes.reduce((s, v) => s + v.up_tokens + v.down_tokens, 0);
-  const roundSpent = activeVotes.reduce((s, v) => s + v.up_tokens + v.down_tokens, 0);
-  const serverRemaining = (myState?.tokens_base_remaining ?? config.starting_tokens) + (myState?.tokens_bought_remaining ?? 0);
-  const budget = Math.max(config.starting_tokens, serverRemaining + serverSpent);
-  const left = Math.max(0, budget - optimisticSpent);
+  const upvoteCap = Math.max(1, config.upvote_cap_per_target || 3);
   const locked = round.state !== 'open' || (round.lock_at ? new Date(round.lock_at).getTime() <= Date.now() : false);
   const nameOf = (id: string) => roster.find((p) => p.id === id)?.display_name ?? '—';
 
-  useEffect(() => setOptimisticVotes(votes), [votes]);
+  // Honest budget = the player's ACTUAL grant, derived from the DB wallet, not
+  // the config ceiling. `remaining + spent` is invariant to spending, so it
+  // equals the real number of tokens they hold. (The old code took
+  // Math.max(config.starting_tokens, …), which showed a budget the DB refused
+  // to honor whenever starting_tokens was raised without re-granting.)
+  const serverSpent = votes.reduce((s, v) => s + v.up_tokens + v.down_tokens, 0);
+  const serverRemaining = (myState?.tokens_base_remaining ?? config.starting_tokens) + (myState?.tokens_bought_remaining ?? 0);
+  const budget = serverRemaining + serverSpent;
+  // Tokens this player has committed in OTHER rounds (fixed server data) — the
+  // current round is now tracked locally.
+  const serverCurrentRoundSpent = votes
+    .filter((v) => v.round_id === round.id)
+    .reduce((s, v) => s + v.up_tokens + v.down_tokens, 0);
+  const otherRoundsSpent = serverSpent - serverCurrentRoundSpent;
+
+  // --- Local ballot state (source of truth while editing) ---------------
+  const serverBallot = useMemo(() => ballotFromVotes(votes, round.id), [votes, round.id]);
+  const [ballot, setBallot] = useState<Ballot>(serverBallot);
+  const [confirmed, setConfirmed] = useState(confirmedRoundIds.includes(round.id));
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const latestBallotRef = useRef(ballot);
+  latestBallotRef.current = ballot;
+  const dirtyRef = useRef(false);
+  const savingRef = useRef(false);
+  const pendingRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const confirmedRef = useRef(confirmed);
+  confirmedRef.current = confirmed;
+  // Carries an explicit confirm/unconfirm intent into the next save; null means
+  // "leave confirmation as-is" (a plain auto-save).
+  const nextConfirmRef = useRef<boolean | null>(null);
+
+  const roundSpent = ballotSpent(ballot);
+  const totalSpent = otherRoundsSpent + roundSpent;
+  const left = Math.max(0, budget - totalSpent);
+
+  // Re-sync from the server when the round changes (RoundSelector is a client
+  // nav that swaps props without unmounting) or when fresh server data arrives
+  // while we have no unsaved edits (e.g. a realtime refresh).
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    dirtyRef.current = false;
+    pendingRef.current = false;
+    nextConfirmRef.current = null;
+    setBallot(serverBallot);
+    setConfirmed(confirmedRoundIds.includes(round.id));
+    setSaveState('idle');
+    setSaveError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round.id]);
+
+  useEffect(() => {
+    if (dirtyRef.current || savingRef.current) return;
+    setBallot(serverBallot);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverBallot]);
+
+  const runSave = useCallback(async () => {
+    if (locked) return;
+    if (savingRef.current) {
+      pendingRef.current = true;
+      return;
+    }
+    savingRef.current = true;
+    setSaveState('saving');
+    setSaveError(null);
+    const confirmArg = nextConfirmRef.current;
+    nextConfirmRef.current = null;
+    const res = await saveMixerBallot({
+      tournamentId,
+      roundId: round.id,
+      voterPlayerId: myPlayer.id,
+      ballot: ballotToArray(latestBallotRef.current),
+      confirmed: confirmArg,
+    });
+    savingRef.current = false;
+    if (res.ok) {
+      dirtyRef.current = false;
+      setSaveState('saved');
+    } else {
+      setSaveState('error');
+      setSaveError(res.error ?? 'Could not save your ballot.');
+    }
+    if (pendingRef.current) {
+      pendingRef.current = false;
+      void runSave();
+    }
+  }, [locked, tournamentId, round.id, myPlayer.id]);
+
+  const scheduleSave = useCallback(() => {
+    if (locked) return;
+    dirtyRef.current = true;
+    setSaveState('saving');
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      void runSave();
+    }, 650);
+  }, [locked, runSave]);
+
+  // Flush any pending debounce when leaving the page/tab so a walk-away can't
+  // drop the last edit.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        if (dirtyRef.current) void runSave();
+      }
+    };
+  }, [runSave]);
+
+  // Mutating a cell also silently reopens a locked-in ballot (its contents
+  // changed), so we thread an explicit unconfirm into the next save.
+  const mutate = (targetId: string, next: Cell) => {
+    if (locked) return;
+    setBallot((cur) => {
+      const copy = { ...cur };
+      if (next.up <= 0 && next.down <= 0) delete copy[targetId];
+      else copy[targetId] = next;
+      return copy;
+    });
+    if (confirmedRef.current) {
+      setConfirmed(false);
+      confirmedRef.current = false;
+      nextConfirmRef.current = false;
+    }
+    scheduleSave();
+  };
+
+  const stepUp = (targetId: string, delta: number) => {
+    const cell = ballot[targetId] ?? { up: 0, down: 0 };
+    const nextUp = Math.min(upvoteCap, Math.max(0, cell.up + delta));
+    if (delta > 0 && left <= 0) return; // no tokens to spend
+    if (nextUp === cell.up && cell.down === 0) return;
+    mutate(targetId, { up: nextUp, down: 0 });
+  };
+
+  const toggleRatherNot = (targetId: string) => {
+    const cell = ballot[targetId] ?? { up: 0, down: 0 };
+    if (cell.down > 0) mutate(targetId, { up: 0, down: 0 });
+    else {
+      if (left <= 0 && cell.up === 0) return;
+      mutate(targetId, { up: 0, down: 1 });
+    }
+  };
+
+  const lockIn = useCallback(() => {
+    if (locked) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setConfirmed(true);
+    confirmedRef.current = true;
+    nextConfirmRef.current = true;
+    dirtyRef.current = true;
+    void runSave();
+  }, [locked, runSave]);
+
+  const reopen = useCallback(() => {
+    if (locked) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setConfirmed(false);
+    confirmedRef.current = false;
+    nextConfirmRef.current = false;
+    dirtyRef.current = true;
+    void runSave();
+  }, [locked, runSave]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (window.localStorage.getItem('tp_mixer_howto_seen') !== '1') setShowHow(true);
   }, []);
 
-  const submitVote = async (formData: FormData) => {
-    const targetId = String(formData.get('target_player_id') ?? '');
-    const up = Number(formData.get('up_tokens') ?? 0);
-    const down = Number(formData.get('down_tokens') ?? 0);
-    setOptimisticVotes((current) => {
-      const next = current.filter((vote) => !(vote.round_id === round.id && vote.target_player_id === targetId));
-      if (up > 0 || down > 0) next.push({ round_id: round.id, target_player_id: targetId, up_tokens: up, down_tokens: down });
-      return next;
-    });
-    await setMixerVote(formData);
-  };
-
   const closeHow = () => {
     window.localStorage.setItem('tp_mixer_howto_seen', '1');
     setShowHow(false);
   };
+
+  const optimisticVotes: VoteRow[] = useMemo(() => {
+    const others = votes.filter((v) => v.round_id !== round.id);
+    const mine = ballotToArray(ballot).map((v) => ({
+      round_id: round.id,
+      target_player_id: v.target_player_id,
+      up_tokens: v.up_tokens,
+      down_tokens: v.down_tokens,
+    }));
+    return [...others, ...mine];
+  }, [votes, ballot, round.id]);
+
+  const activeVotes = optimisticVotes.filter((v) => v.round_id === round.id);
 
   return (
     <div className="px-[18px] lg:px-0">
@@ -202,22 +391,21 @@ export function MixerVotePanel({
 
           <div className="grid gap-2.5 sm:grid-cols-2 2xl:grid-cols-3">
             {targets.map((p) => {
-              const vote = activeVotes.find((v) => v.target_player_id === p.id) ?? { up_tokens: 0, down_tokens: 0 };
+              const cell = ballot[p.id] ?? { up: 0, down: 0 };
               return (
                 <CandidateCard
                   key={p.id}
                   player={p}
                   selfId={myPlayer.id}
-                  up={vote.up_tokens}
-                  down={vote.down_tokens}
+                  up={cell.up}
+                  down={cell.down}
                   locked={locked}
                   left={left}
+                  atCap={cell.up >= upvoteCap}
                   downvotesEnabled={config.downvotes_enabled}
-                  tournamentId={tournamentId}
-                  roundId={round.id}
-                  voterPlayerId={myPlayer.id}
-                  returnRound={round.round_no}
-                  action={submitVote}
+                  onDec={() => stepUp(p.id, -1)}
+                  onInc={() => stepUp(p.id, +1)}
+                  onRatherNot={() => toggleRatherNot(p.id)}
                 />
               );
             })}
@@ -234,10 +422,10 @@ export function MixerVotePanel({
               </span>
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ background: 'var(--night-inset)' }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${budget ? Math.min(100, Math.round((optimisticSpent / budget) * 100)) : 0}%`, background: 'linear-gradient(90deg, var(--court), var(--serve))' }} />
+              <div className="h-full rounded-full transition-all" style={{ width: `${budget ? Math.min(100, Math.round((totalSpent / budget) * 100)) : 0}%`, background: 'linear-gradient(90deg, var(--court), var(--serve))' }} />
             </div>
             <div className="mono mt-1.5 flex justify-between text-[11px]" style={{ color: NIGHT_TEXT3 }}>
-              <span>{roundSpent} on this round · {optimisticSpent} spent</span>
+              <span>{roundSpent} on this round · {totalSpent} spent</span>
               <span>{left} left</span>
             </div>
             <div className="mt-3 grid gap-1.5">
@@ -257,6 +445,17 @@ export function MixerVotePanel({
                 </div>
               ))}
             </div>
+
+            {!locked && (
+              <BallotConfirm
+                confirmed={confirmed}
+                saveState={saveState}
+                saveError={saveError}
+                roundSpent={roundSpent}
+                onLockIn={lockIn}
+                onReopen={reopen}
+              />
+            )}
           </div>
 
           <FairnessCard config={config} />
@@ -266,12 +465,133 @@ export function MixerVotePanel({
           </div>
         </aside>
       </div>
+
+      {/* Mobile confirm bar — sticky above the tab bar so "done" is always reachable */}
+      {!locked && (
+        <MobileConfirmBar
+          confirmed={confirmed}
+          saveState={saveState}
+          saveError={saveError}
+          roundSpent={roundSpent}
+          left={left}
+          onLockIn={lockIn}
+          onReopen={reopen}
+        />
+      )}
+    </div>
+  );
+}
+
+function saveLabel(saveState: SaveState, saveError: string | null): { text: string; color: string } {
+  switch (saveState) {
+    case 'saving':
+      return { text: 'Saving…', color: NIGHT_TEXT3 };
+    case 'saved':
+      return { text: 'Saved ✓', color: 'var(--court)' };
+    case 'error':
+      return { text: saveError ?? 'Save failed', color: 'var(--amber)' };
+    default:
+      return { text: '', color: NIGHT_TEXT3 };
+  }
+}
+
+// Desktop rail confirm block: save status + "Lock in my ballot" / locked-in
+// state with an edit affordance. Auto-save means picks are already safe; this
+// is closure, not the only path to persistence.
+function BallotConfirm({
+  confirmed,
+  saveState,
+  saveError,
+  roundSpent,
+  onLockIn,
+  onReopen,
+}: {
+  confirmed: boolean;
+  saveState: SaveState;
+  saveError: string | null;
+  roundSpent: number;
+  onLockIn: () => void;
+  onReopen: () => void;
+}) {
+  const status = saveLabel(saveState, saveError);
+  return (
+    <div className="mt-4 border-t pt-3" style={{ borderColor: NIGHT_LINE }}>
+      {confirmed ? (
+        <div className="grid gap-2">
+          <div className="flex items-center gap-2 text-[13px] font-bold" style={{ color: 'var(--court)' }}>
+            <span aria-hidden>{Icons.spark}</span> Ballot locked in
+          </div>
+          <div className="text-[11.5px]" style={{ color: NIGHT_TEXT3 }}>
+            Saved and ready for the draw. You can still change it until voting closes.
+          </div>
+          <button type="button" onClick={onReopen} className="rounded-xl px-3 py-2 text-[12.5px] font-semibold" style={{ border: `1px solid ${NIGHT_LINE}`, color: 'var(--night-text)' }}>
+            Edit ballot
+          </button>
+        </div>
+      ) : (
+        <div className="grid gap-2">
+          <button
+            type="button"
+            onClick={onLockIn}
+            className="rounded-xl px-3 py-2.5 text-[13px] font-extrabold disabled:opacity-45"
+            style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}
+          >
+            {roundSpent > 0 ? 'Lock in my ballot' : "Lock in — I'm sitting this round out"}
+          </button>
+          <div className="min-h-[16px] text-center text-[11px]" style={{ color: status.color }}>{status.text}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Mobile: a sticky action bar just above the bottom tab bar, so the confirm
+// button and save status are reachable without scrolling to the desktop rail.
+function MobileConfirmBar({
+  confirmed,
+  saveState,
+  saveError,
+  roundSpent,
+  left,
+  onLockIn,
+  onReopen,
+}: {
+  confirmed: boolean;
+  saveState: SaveState;
+  saveError: string | null;
+  roundSpent: number;
+  left: number;
+  onLockIn: () => void;
+  onReopen: () => void;
+}) {
+  const status = saveLabel(saveState, saveError);
+  return (
+    <div
+      className="fixed inset-x-0 bottom-[68px] z-20 mx-auto flex max-w-md items-center gap-3 px-3 py-2.5 lg:hidden"
+      style={{ background: 'var(--night-card-glass)', borderTop: `1px solid ${NIGHT_LINE}`, backdropFilter: 'blur(12px)' }}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="text-[12px] font-bold" style={{ color: confirmed ? 'var(--court)' : 'var(--night-text)' }}>
+          {confirmed ? 'Ballot locked in ✓' : `${roundSpent} spent · ${left} left`}
+        </div>
+        <div className="min-h-[14px] text-[10.5px]" style={{ color: status.color }}>{status.text}</div>
+      </div>
+      {confirmed ? (
+        <button type="button" onClick={onReopen} className="shrink-0 rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ border: `1px solid ${NIGHT_LINE}`, color: 'var(--night-text)' }}>
+          Edit
+        </button>
+      ) : (
+        <button type="button" onClick={onLockIn} className="shrink-0 rounded-xl px-4 py-2.5 text-[13px] font-extrabold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>
+          {roundSpent > 0 ? 'Lock in' : 'Sit out'}
+        </button>
+      )}
     </div>
   );
 }
 
 // Candidate card (player.html): avatar + name + DUPR, − n ＋ stepper, and a
 // "rather not" toggle. Green ring when boosted, muted berry when avoided.
+// Steppers are local (no per-tap round-trip); the parent batches the write.
 function CandidateCard({
   player,
   selfId,
@@ -279,12 +599,11 @@ function CandidateCard({
   down,
   locked,
   left,
+  atCap,
   downvotesEnabled,
-  tournamentId,
-  roundId,
-  voterPlayerId,
-  returnRound,
-  action,
+  onDec,
+  onInc,
+  onRatherNot,
 }: {
   player: PlayerRow;
   selfId: string;
@@ -292,26 +611,14 @@ function CandidateCard({
   down: number;
   locked: boolean;
   left: number;
+  atCap: boolean;
   downvotesEnabled: boolean;
-  tournamentId: string;
-  roundId: string;
-  voterPlayerId: string;
-  returnRound: number;
-  action: (formData: FormData) => Promise<void>;
+  onDec: () => void;
+  onInc: () => void;
+  onRatherNot: () => void;
 }) {
   const boosted = up > 0;
   const avoided = down > 0;
-  const hidden = (upTokens: number, downTokens: number) => (
-    <>
-      <input type="hidden" name="tournament_id" value={tournamentId} />
-      <input type="hidden" name="round_id" value={roundId} />
-      <input type="hidden" name="voter_player_id" value={voterPlayerId} />
-      <input type="hidden" name="target_player_id" value={player.id} />
-      <input type="hidden" name="up_tokens" value={upTokens} />
-      <input type="hidden" name="down_tokens" value={downTokens} />
-      <input type="hidden" name="return_round" value={returnRound} />
-    </>
-  );
   const stepBtn = 'grid h-9 w-9 place-items-center rounded-[10px] text-[18px] font-bold disabled:opacity-35';
 
   return (
@@ -335,42 +642,38 @@ function CandidateCard({
         </div>
       </div>
       <div className="mt-3 flex items-center gap-2">
-        <form action={action}>
-          {hidden(Math.max(0, up - 1), 0)}
-          <button disabled={locked || up === 0} aria-label={`Remove a token from ${player.display_name}`} className={stepBtn} style={{ border: `1px solid ${NIGHT_LINE}`, color: 'var(--night-text)' }}>
-            −
-          </button>
-        </form>
+        <button type="button" onClick={onDec} disabled={locked || up === 0} aria-label={`Remove a token from ${player.display_name}`} className={stepBtn} style={{ border: `1px solid ${NIGHT_LINE}`, color: 'var(--night-text)' }}>
+          −
+        </button>
         <div className="mono min-w-9 text-center text-[17px] font-bold" style={{ color: boosted ? 'var(--court)' : NIGHT_TEXT3 }}>
           {up}
         </div>
-        <form action={action}>
-          {hidden(up + 1, 0)}
-          <button
-            disabled={locked || left <= 0}
-            aria-label={`Add a token to ${player.display_name}`}
-            className={stepBtn}
-            style={{ background: 'color-mix(in oklch, var(--court) 16%, transparent)', border: '1px solid color-mix(in oklch, var(--court) 45%, transparent)', color: 'var(--court)' }}
-          >
-            ＋
-          </button>
-        </form>
+        <button
+          type="button"
+          onClick={onInc}
+          disabled={locked || atCap || left <= 0}
+          aria-label={atCap ? `At the ${up}-token cap for ${player.display_name}` : `Add a token to ${player.display_name}`}
+          title={atCap ? 'Per-player token cap reached' : undefined}
+          className={stepBtn}
+          style={{ background: 'color-mix(in oklch, var(--court) 16%, transparent)', border: '1px solid color-mix(in oklch, var(--court) 45%, transparent)', color: 'var(--court)' }}
+        >
+          ＋
+        </button>
         <div className="flex-1" />
         {downvotesEnabled && (
-          <form action={action}>
-            {hidden(0, avoided ? 0 : 1)}
-            <button
-              disabled={locked || (!avoided && left <= 0 && up === 0)}
-              className="rounded-full px-3 py-1.5 text-[11.5px] font-semibold"
-              style={
-                avoided
-                  ? { background: 'color-mix(in oklch, var(--night-down) 20%, transparent)', color: 'var(--night-down-text)', border: '1px solid color-mix(in oklch, var(--night-down) 50%, transparent)' }
-                  : { color: NIGHT_TEXT3, border: `1px solid ${NIGHT_LINE}` }
-              }
-            >
-              {avoided ? '✓ rather not' : 'rather not'}
-            </button>
-          </form>
+          <button
+            type="button"
+            onClick={onRatherNot}
+            disabled={locked || (!avoided && left <= 0 && up === 0)}
+            className="rounded-full px-3 py-1.5 text-[11.5px] font-semibold disabled:opacity-40"
+            style={
+              avoided
+                ? { background: 'color-mix(in oklch, var(--night-down) 20%, transparent)', color: 'var(--night-down-text)', border: '1px solid color-mix(in oklch, var(--night-down) 50%, transparent)' }
+                : { color: NIGHT_TEXT3, border: `1px solid ${NIGHT_LINE}` }
+            }
+          >
+            {avoided ? '✓ rather not' : 'rather not'}
+          </button>
         )}
       </div>
     </div>
@@ -604,6 +907,3 @@ function TokenDot({ active }: { active: boolean }) {
     />
   );
 }
-
-
-

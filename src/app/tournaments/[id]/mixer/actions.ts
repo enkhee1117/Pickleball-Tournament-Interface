@@ -148,31 +148,46 @@ export async function updateMixerPlayerPool(formData: FormData): Promise<void> {
   redirect(`${mixerPath(tournamentId)}/admin?ok=Player%20pool%20updated`);
 }
 
-export async function setMixerVote(formData: FormData): Promise<void> {
-  const tournamentId = fieldString(formData, 'tournament_id');
-  const roundId = fieldString(formData, 'round_id');
-  const voterPlayerId = fieldString(formData, 'voter_player_id');
-  const targetPlayerId = fieldString(formData, 'target_player_id');
-  const up = fieldInt(formData, 'up_tokens', 0, 0, 100);
-  const down = fieldInt(formData, 'down_tokens', 0, 0, 100);
-  const returnRound = fieldInt(formData, 'return_round', 0, 0, 1000);
-  if (!tournamentId || !roundId || !voterPlayerId || !targetPlayerId) redirect('/tournaments');
-  const returnPath = returnRound > 0 ? `${mixerPath(tournamentId)}?round=${returnRound}` : mixerPath(tournamentId);
+// Batched ballot save. The player tracks tokens locally and this writes the
+// WHOLE round's ballot in one atomic RPC (app_mixer_set_ballot reconciles the
+// wallet from scratch). Called on a debounced auto-save and on "lock in".
+//
+// Deliberately does NOT redirect or revalidatePath: those would each trigger a
+// full re-render/refetch of the heavy player page on every keystroke of voting.
+// The client already holds the source-of-truth ballot state, so we just report
+// ok/error and let the UI reflect it. Server data catches up on the next real
+// navigation. `confirmed`: true = lock in, false = reopen, null = plain save.
+export type SaveBallotInput = {
+  tournamentId: string;
+  roundId: string;
+  voterPlayerId: string;
+  ballot: Array<{ target_player_id: string; up_tokens: number; down_tokens: number }>;
+  confirmed?: boolean | null;
+};
+
+export async function saveMixerBallot(input: SaveBallotInput): Promise<{ ok: boolean; error?: string }> {
+  const { tournamentId, roundId, voterPlayerId } = input;
+  if (!tournamentId || !roundId || !voterPlayerId) return { ok: false, error: 'Missing ballot context.' };
+
+  // Sanitize/clamp on the server too — the RPC is the real authority, but this
+  // keeps obviously-bad payloads from ever reaching it.
+  const ballot = (Array.isArray(input.ballot) ? input.ballot : [])
+    .map((v) => ({
+      target_player_id: String(v?.target_player_id ?? ''),
+      up_tokens: Math.max(0, Math.min(100, Math.trunc(Number(v?.up_tokens) || 0))),
+      down_tokens: Math.max(0, Math.min(100, Math.trunc(Number(v?.down_tokens) || 0))),
+    }))
+    .filter((v) => v.target_player_id && (v.up_tokens > 0 || v.down_tokens > 0));
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc('app_mixer_set_vote', {
+  const { error } = await supabase.rpc('app_mixer_set_ballot', {
     p_round_id: roundId,
     p_voter_player_id: voterPlayerId,
-    p_target_player_id: targetPlayerId,
-    p_up_tokens: up,
-    p_down_tokens: down,
+    p_ballot: ballot,
+    p_confirmed: input.confirmed ?? null,
   });
-  if (error) redirect(`${returnPath}${returnPath.includes('?') ? '&' : '?'}error=${encodeURIComponent(formatPgError(error))}`);
-
-  // No redirect on success: the ballot updates optimistically on the client and
-  // via realtime sync, so a redirect here would reload the whole page on every
-  // single token tap. revalidatePath refreshes the server data in place.
-  revalidatePath(mixerPath(tournamentId));
+  if (error) return { ok: false, error: formatPgError(error) };
+  return { ok: true };
 }
 
 export async function updateMixerPlayerGender(formData: FormData): Promise<void> {
