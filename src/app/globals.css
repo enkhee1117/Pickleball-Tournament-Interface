@@ -110,12 +110,56 @@
   --text3: var(--ink-3);
 }
 
+/* Night player surface + projector stage — the mixer player pages
+   (data-fullscreen="night") and present views (data-fullscreen="show")
+   are ALWAYS dark regardless of the user's data-theme choice, so these
+   are fixed, theme-independent values. Components on those surfaces
+   consume these instead of hardcoding colors. */
+:root {
+  --night-bg: oklch(0.155 0.024 264);
+  --night-nav: oklch(0.175 0.026 264);
+  --night-card: oklch(0.215 0.03 264);
+  --night-card-glass: oklch(0.215 0.03 264 / 0.96);
+  --night-inset: oklch(0.285 0.038 266);
+  --night-line: oklch(0.36 0.04 266);
+  --night-line-2: oklch(0.42 0.045 266);
+  --night-text: oklch(0.975 0.012 264);
+  --night-text2: oklch(0.78 0.028 264);
+  --night-text3: oklch(0.7 0.03 264);
+  --night-nav-link: oklch(0.82 0.02 264);
+  --night-nav-link-strong: oklch(0.9 0.02 264);
+  --night-scrim: oklch(0.155 0.024 264 / 0.94);
+  --night-court-ink: oklch(0.2 0.04 140); /* ink on court-green fills */
+  --night-court-ink-soft: oklch(0.2 0.04 140 / 0.22);
+  --night-serve-deep: oklch(0.62 0.19 40);
+  --night-serve-bg: oklch(0.16 0.03 40);
+  --night-cream: oklch(0.98 0.02 90);
+  --night-down: oklch(0.6 0.18 12); /* down-vote red family */
+  --night-down-num: oklch(0.7 0.16 12);
+  --night-down-text: oklch(0.75 0.14 12);
+  /* projector stage (present views) */
+  --show-bg: #06070c;
+  --show-stage: #04050a;
+  --show-stage-under: #06070d; /* galaxy fallback — one off from --show-bg, kept exact */
+  --show-card: oklch(0.22 0.03 264);
+  --show-card-2: oklch(0.2 0.028 264);
+  --show-tint: oklch(0.2 0.03 264);
+  --show-track: oklch(0.24 0.03 264);
+  --show-chip: oklch(0.16 0.02 264 / 0.8);
+  --show-green-line: oklch(0.6 0.15 140);
+  --show-green-line-2: oklch(0.55 0.13 140);
+  --show-text-dim: oklch(0.6 0.02 264);
+  --show-stage-veil: radial-gradient(ellipse 60% 55% at 50% 42%, oklch(0.2 0.03 264 / .82), oklch(0.13 0.02 264 / .92) 70%, oklch(0.06 0.03 264 / .96) 100%);
+  --show-galaxy-veil: radial-gradient(ellipse 90% 60% at 50% -8%, color-mix(in oklch, var(--accent) 14%, transparent), transparent 60%), radial-gradient(ellipse 70% 50% at 50% 118%, color-mix(in oklch, var(--sky) 10%, transparent), transparent 55%), linear-gradient(180deg, oklch(0.11 0.05 270 / .8), oklch(0.09 0.05 265 / .9));
+}
+
 /* Liberty 250 — seasonal, opt-in. Theme-independent celebration chrome. */
 :root {
   --flag-red: oklch(0.55 0.2 25);
   --flag-blue: oklch(0.42 0.14 258);
   --star-gold: oklch(0.86 0.14 90);
   --liberty-stripe: linear-gradient(90deg, var(--flag-red) 0 40%, #fff 40% 60%, var(--flag-blue) 60%);
+  --liberty-banner: linear-gradient(90deg, oklch(0.55 0.2 25 / .92), oklch(0.42 0.14 258 / .92));
   --display: var(--font-archivo), Archivo, system-ui, sans-serif;
 }
 
@@ -271,8 +315,8 @@ input, textarea, select { font-family: inherit; }
    ───────────────────────────────────────────────────────────── */
 body:has([data-fullscreen]) > div { max-width: none; }
 body:has([data-fullscreen='ink']) { background: var(--ink); }
-body:has([data-fullscreen='night']) { background: oklch(0.155 0.024 264); }
-body:has([data-fullscreen='show']) { background: #06070c; }
+body:has([data-fullscreen='night']) { background: var(--night-bg); }
+body:has([data-fullscreen='show']) { background: var(--show-bg); }
 main:has([data-fullscreen]) + [data-app-tabbar] { display: none; }
 
 /* ─────────────────────────────────────────────────────────────

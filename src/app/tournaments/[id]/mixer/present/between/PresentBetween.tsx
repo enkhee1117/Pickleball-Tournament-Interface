@@ -111,7 +111,7 @@ export function PresentBetween({
       <Link
         href={`/tournaments/${tournamentId}`}
         className="mono fixed bottom-5 left-5 z-30 rounded-full px-[15px] py-[9px] text-[12px] uppercase tracking-[.1em]"
-        style={{ background: 'oklch(0.16 0.02 264 / .8)', border: '1px solid var(--line-2)', color: 'var(--text3)' }}
+        style={{ background: 'var(--show-chip)', border: '1px solid var(--line-2)', color: 'var(--text3)' }}
       >
         ← Exit
       </Link>
@@ -119,17 +119,17 @@ export function PresentBetween({
         type="button"
         onClick={() => setPhase((p) => (p === 'standings' ? 'holding' : 'standings'))}
         className="mono fixed bottom-5 right-5 z-30 rounded-full px-[15px] py-[9px] text-[12px] uppercase tracking-[.1em]"
-        style={{ background: 'oklch(0.16 0.02 264 / .8)', border: '1px solid var(--line-2)', color: 'var(--text2)' }}
+        style={{ background: 'var(--show-chip)', border: '1px solid var(--line-2)', color: 'var(--text2)' }}
       >
         ↻ Cycle view
       </button>
-      <div className="fixed inset-0 grid place-items-center overflow-hidden" style={{ background: '#06070c' }}>
+      <div className="fixed inset-0 grid place-items-center overflow-hidden" style={{ background: 'var(--show-bg)' }}>
         <div
           ref={stageRef}
           id="main"
           className="relative h-[1080px] w-[1920px] origin-center overflow-hidden"
           style={{
-            background: `radial-gradient(ellipse 90% 60% at 50% -8%, color-mix(in oklch, var(--accent) 14%, transparent), transparent 60%), radial-gradient(ellipse 70% 50% at 50% 118%, color-mix(in oklch, var(--sky) 10%, transparent), transparent 55%), linear-gradient(180deg, oklch(0.11 0.05 270 / .8), oklch(0.09 0.05 265 / .9)), url('${GALAXY_BG}') center/cover no-repeat, var(--bg)`,
+            background: `var(--show-galaxy-veil), url('${GALAXY_BG}') center/cover no-repeat, var(--bg)`,
             color: 'var(--text)',
           }}
         >
@@ -142,7 +142,7 @@ export function PresentBetween({
             <div className="flex items-center gap-3.5">
               <span
                 className="mono rounded-full px-[11px] py-[5px] text-[10.5px] font-bold text-white"
-                style={{ background: 'linear-gradient(90deg, oklch(0.55 0.2 25 / .92), oklch(0.42 0.14 258 / .92))' }}
+                style={{ background: 'var(--liberty-banner)' }}
               >
                 ★ 250
               </span>
@@ -155,7 +155,7 @@ export function PresentBetween({
           {/* phase tabs */}
           <div
             className="absolute left-1/2 top-[30px] z-[21] flex -translate-x-1/2 gap-1.5 rounded-full p-[5px]"
-            style={{ background: 'oklch(0.16 0.02 264 / .8)', border: '1px solid var(--line-2)' }}
+            style={{ background: 'var(--show-chip)', border: '1px solid var(--line-2)' }}
           >
             {(['standings', 'holding'] as const).map((p) => (
               <button
@@ -221,7 +221,7 @@ export function PresentBetween({
                 </div>
               </div>
               <div className="mt-11 w-[900px]">
-                <div className="h-5 overflow-hidden rounded-full" style={{ background: 'oklch(0.24 0.03 264)', border: '1px solid var(--line-2)' }}>
+                <div className="h-5 overflow-hidden rounded-full" style={{ background: 'var(--show-track)', border: '1px solid var(--line-2)' }}>
                   <div
                     className="h-full rounded-full transition-[width] duration-1000"
                     style={{
@@ -241,7 +241,7 @@ export function PresentBetween({
                   <div
                     key={f.id}
                     className="flex items-center gap-2.5 rounded-full py-2.5 pl-2.5 pr-4 text-[17px] font-semibold"
-                    style={{ background: 'oklch(0.2 0.028 264 / .7)', border: '1px solid var(--line-2)', color: 'var(--text)', opacity: f.checked ? 1 : 0.42 }}
+                    style={{ background: 'color-mix(in oklch, var(--show-card-2) 70%, transparent)', border: '1px solid var(--line-2)', color: 'var(--text)', opacity: f.checked ? 1 : 0.42 }}
                   >
                     <Face name={f.name} size={34} />
                     {firstName(f.name)}
@@ -284,7 +284,7 @@ function LeaderCard({ leader }: { leader: StandingItem }) {
     <div
       className="mb-5 flex w-[1500px] items-center gap-[26px] rounded-[26px] px-[34px] py-[26px]"
       style={{
-        background: 'linear-gradient(120deg, color-mix(in oklch, var(--accent) 26%, oklch(0.2 0.03 264)), oklch(0.2 0.03 264) 62%)',
+        background: 'linear-gradient(120deg, color-mix(in oklch, var(--accent) 26%, var(--show-tint)), var(--show-tint) 62%)',
         border: '1px solid color-mix(in oklch, var(--accent) 45%, var(--line-2))',
       }}
     >
@@ -318,7 +318,7 @@ function BoardRow({ row, delta, index }: { row: StandingItem; delta: number; ind
   return (
     <div
       className="grid grid-cols-[52px_64px_1fr_auto_auto] items-center gap-5 rounded-2xl px-[22px] py-3.5"
-      style={{ background: 'oklch(0.2 0.028 264 / .72)', border: '1px solid var(--line-2)', animation: `climb .7s cubic-bezier(.2,1.2,.4,1) both`, animationDelay: `${index * 55}ms` }}
+      style={{ background: 'color-mix(in oklch, var(--show-card-2) 72%, transparent)', border: '1px solid var(--line-2)', animation: `climb .7s cubic-bezier(.2,1.2,.4,1) both`, animationDelay: `${index * 55}ms` }}
     >
       <span className="disp text-center text-[30px] font-extrabold" style={{ color: 'var(--text3)' }}>{row.rank}</span>
       <Face name={row.name} size={52} />

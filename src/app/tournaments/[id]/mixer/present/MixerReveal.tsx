@@ -122,7 +122,7 @@ function TopBar({ eventName, roundNo }: { eventName: string; roundNo: number }) 
       <div className="flex items-center gap-3.5">
         <span
           className="mono rounded-full px-[11px] py-[5px] text-[10.5px] font-bold text-white"
-          style={{ background: 'linear-gradient(90deg, oklch(0.55 0.2 25 / .92), oklch(0.42 0.14 258 / .92))' }}
+          style={{ background: 'var(--liberty-banner)' }}
         >
           ★ 250
         </span>
@@ -152,7 +152,7 @@ function Controls({
     <>
       {/* style switch — top-left, mirrors the reveal aesthetic */}
       <div className="fixed left-5 top-5 z-30 flex items-center gap-1.5 rounded-full p-[5px]"
-        style={{ background: 'oklch(0.16 0.02 264 / .8)', border: '1px solid var(--line-2)' }}
+        style={{ background: 'var(--show-chip)', border: '1px solid var(--line-2)' }}
       >
         {(['board', 'stage'] as const).map((v) => (
           <Link
@@ -344,8 +344,8 @@ function BoardCourt({
     <div
       className="relative overflow-hidden rounded-[26px] px-7 pb-8 pt-[30px]"
       style={{
-        background: 'oklch(0.22 0.03 264)',
-        border: settled ? '1px solid oklch(0.6 0.15 140)' : '1px solid var(--line-2)',
+        background: 'var(--show-card)',
+        border: settled ? '1px solid var(--show-green-line)' : '1px solid var(--line-2)',
         boxShadow: settled ? '0 30px 70px -30px rgba(150,215,95,.30)' : undefined,
         animation: settled ? 'ttdPop .55s cubic-bezier(.2,1.3,.5,1)' : undefined,
       }}
@@ -542,8 +542,8 @@ function CenterStage({
               key={c.courtNo}
               className="max-w-[400px] flex-1 rounded-[18px] px-[18px] py-4 transition-all duration-500"
               style={{
-                background: 'oklch(0.2 0.028 264)',
-                border: active ? '1px solid oklch(0.55 0.13 140)' : '1px solid var(--line)',
+                background: 'var(--show-card-2)',
+                border: active ? '1px solid var(--show-green-line-2)' : '1px solid var(--line)',
                 opacity: filled[i] || active ? 1 : 0.32,
                 transform: active ? 'translateY(-6px)' : 'none',
                 boxShadow: active ? '0 20px 50px -26px rgba(150,215,95,.4)' : undefined,
@@ -698,15 +698,15 @@ export function MixerReveal({
           transformed ancestor would scale off-screen on laptop viewports,
           which made the Exit button unreachable. */}
       <Controls tournamentId={tournamentId} variant={variant} onReplay={() => setRunId((x) => x + 1)} />
-      <div className="fixed inset-0 grid place-items-center overflow-hidden" style={{ background: isStage ? '#04050a' : '#06070c' }}>
+      <div className="fixed inset-0 grid place-items-center overflow-hidden" style={{ background: isStage ? 'var(--show-stage)' : 'var(--show-bg)' }}>
         <div
           ref={stageRef}
           id="main"
           className="relative h-[1080px] w-[1920px] origin-center overflow-hidden"
           style={{
             background: isStage
-              ? `radial-gradient(ellipse 60% 55% at 50% 42%, oklch(0.2 0.03 264 / .82), oklch(0.13 0.02 264 / .92) 70%, oklch(0.06 0.03 264 / .96) 100%), url('${GALAXY_BG}') center/cover no-repeat, #06070d`
-              : `radial-gradient(ellipse 90% 60% at 50% -8%, color-mix(in oklch, var(--accent) 14%, transparent), transparent 60%), radial-gradient(ellipse 70% 50% at 50% 118%, color-mix(in oklch, var(--sky) 10%, transparent), transparent 55%), linear-gradient(180deg, oklch(0.11 0.05 270 / .8), oklch(0.09 0.05 265 / .9)), url('${GALAXY_BG}') center/cover no-repeat, var(--bg)`,
+              ? `var(--show-stage-veil), url('${GALAXY_BG}') center/cover no-repeat, var(--show-stage-under)`
+              : `var(--show-galaxy-veil), url('${GALAXY_BG}') center/cover no-repeat, var(--bg)`,
             color: 'var(--text)',
           }}
         >

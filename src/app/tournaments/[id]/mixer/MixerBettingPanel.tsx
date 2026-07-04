@@ -79,17 +79,17 @@ export function MixerBettingPanel({
 
   return (
     <div className="px-[18px]">
-      <div className="mb-3 grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+      <div className="mb-3 grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl p-4" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
         <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>Podium pools</div>
+          <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--night-text3)' }}>Podium pools</div>
           <div className="serif mt-1 text-[32px] leading-none">Back your podium picks</div>
           <div className="mt-3 flex items-end justify-between gap-4">
-            <div className="text-xs leading-5" style={{ color: 'oklch(0.78 0.028 264)' }}>
+            <div className="text-xs leading-5" style={{ color: 'var(--night-text2)' }}>
               Markets settle from final standings. Rake {Math.round(Number(config.betting_rake_pct ?? 0) * 100)}%.
             </div>
             <div className="text-right">
               <div className="mono text-[28px] font-bold" style={{ color: 'var(--court)' }}>{chipsLeft}</div>
-              <div className="text-[10px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>chips left</div>
+              <div className="text-[10px] uppercase tracking-[0.08em]" style={{ color: 'var(--night-text3)' }}>chips left</div>
             </div>
           </div>
         </div>
@@ -101,13 +101,13 @@ export function MixerBettingPanel({
           const marketBets = optimisticBets.filter((bet) => bet.market_place === place);
           const marketTotal = marketBets.reduce((sum, bet) => sum + bet.chips, 0);
           return (
-            <section key={place} className="rounded-2xl p-4" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+            <section key={place} className="rounded-2xl p-4" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--court)' }}>{ordinal(place)} place</div>
                   <div className="text-lg font-extrabold">Market</div>
                 </div>
-                <div className="mono rounded-full px-3 py-1 text-sm font-bold" style={{ background: 'oklch(0.285 0.038 266)', color: 'oklch(0.78 0.028 264)' }}>
+                <div className="mono rounded-full px-3 py-1 text-sm font-bold" style={{ background: 'var(--night-inset)', color: 'var(--night-text2)' }}>
                   You: {marketTotal}
                 </div>
               </div>
@@ -118,7 +118,7 @@ export function MixerBettingPanel({
                   const suggested = Math.min(10, maxChips);
                   const share = marketTotal > 0 ? Math.max(6, Math.round(((mine?.chips ?? 0) / marketTotal) * 100)) : 0;
                   return (
-                    <form key={player.id} action={submitBet} className="rounded-xl p-2" style={{ background: mine ? 'color-mix(in oklch, var(--court) 12%, oklch(0.285 0.038 266))' : 'oklch(0.285 0.038 266)', border: mine ? '1px solid color-mix(in oklch, var(--court) 60%, oklch(0.42 0.045 266))' : '1px solid transparent' }}>
+                    <form key={player.id} action={submitBet} className="rounded-xl p-2" style={{ background: mine ? 'color-mix(in oklch, var(--court) 12%, var(--night-inset))' : 'var(--night-inset)', border: mine ? '1px solid color-mix(in oklch, var(--court) 60%, var(--night-line-2))' : '1px solid transparent' }}>
                       <input type="hidden" name="tournament_id" value={tournamentId} />
                       <input type="hidden" name="bettor_player_id" value={myPlayer.id} />
                       <input type="hidden" name="pick_player_id" value={player.id} />
@@ -127,7 +127,7 @@ export function MixerBettingPanel({
                         <Avatar player={mixerAvatarFor(player, myPlayer.id)} size={34} ring={!!mine} />
                         <div className="min-w-0">
                           <div className="truncate text-sm font-extrabold">{player.id === myPlayer.id ? 'You' : player.display_name}</div>
-                          <div className="mono mt-0.5 text-[11px]" style={{ color: 'oklch(0.7 0.03 264)' }}>
+                          <div className="mono mt-0.5 text-[11px]" style={{ color: 'var(--night-text3)' }}>
                             {mine ? `${mine.chips} chips on ticket` : `DUPR ${player.dupr ?? '-'}`}
                           </div>
                         </div>
@@ -146,7 +146,7 @@ export function MixerBettingPanel({
                             className="h-10 rounded-xl px-3 text-xs font-extrabold disabled:opacity-40"
                             style={{
                               background: mine ? 'var(--court)' : 'transparent',
-                              color: mine ? 'oklch(0.2 0.04 140)' : 'var(--court)',
+                              color: mine ? 'var(--night-court-ink)' : 'var(--court)',
                               border: mine ? 'none' : '1px solid var(--court)',
                             }}
                           >
@@ -155,7 +155,7 @@ export function MixerBettingPanel({
                         </div>
                       </div>
                       {mine && (
-                        <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ background: 'oklch(0.36 0.04 266)' }}>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ background: 'var(--night-line)' }}>
                           <div className="h-full rounded-full" style={{ width: `${share}%`, background: 'var(--court)' }} />
                         </div>
                       )}
@@ -174,10 +174,10 @@ export function MixerBettingPanel({
 function EmptyPool() {
   return (
     <div className="px-[18px] pt-6">
-      <div className="rounded-2xl p-6 text-center" style={{ background: 'oklch(0.215 0.03 264)', border: '1px dashed oklch(0.36 0.04 266)' }}>
+      <div className="rounded-2xl p-6 text-center" style={{ background: 'var(--night-card)', border: '1px dashed var(--night-line)' }}>
         <div className="mb-2 flex justify-center"><Dink pose="presenting-t" size={96} /></div>
         <div className="serif text-[30px] leading-none">Pool is off</div>
-        <div className="mt-2 text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>This Mixer is running without podium pools.</div>
+        <div className="mt-2 text-sm" style={{ color: 'var(--night-text2)' }}>This Mixer is running without podium pools.</div>
       </div>
     </div>
   );

@@ -24,8 +24,8 @@ export function Dink({ pose, size }: { pose: DinkPose; size: number }) {
 
 export function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-xl p-3" style={{ background: 'oklch(0.285 0.038 266)' }}>
-      <div className="text-[10px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>{label}</div>
+    <div className="rounded-xl p-3" style={{ background: 'var(--night-inset)' }}>
+      <div className="text-[10px] uppercase tracking-[0.08em]" style={{ color: 'var(--night-text3)' }}>{label}</div>
       <div className="mono mt-1 text-[22px] font-bold" style={{ color: 'var(--court)' }}>{value}</div>
     </div>
   );
@@ -35,8 +35,8 @@ export function Notice({ tone, children }: { tone: 'ok' | 'error'; children: Rea
   return (
     <div className="mx-[18px] mb-3 rounded-xl px-3 py-2 text-sm" style={{
       color: tone === 'ok' ? 'var(--court)' : 'var(--serve)',
-      background: 'oklch(0.215 0.03 264)',
-      border: '1px solid oklch(0.36 0.04 266)',
+      background: 'var(--night-card)',
+      border: '1px solid var(--night-line)',
     }}>
       {children}
     </div>
@@ -46,10 +46,10 @@ export function Notice({ tone, children }: { tone: 'ok' | 'error'; children: Rea
 export function EmptyNight({ title, body }: { title: string; body: string }) {
   return (
     <div className="px-[18px] pt-6">
-      <div className="rounded-2xl p-6 text-center" style={{ background: 'oklch(0.215 0.03 264)', border: '1px dashed oklch(0.36 0.04 266)' }}>
+      <div className="rounded-2xl p-6 text-center" style={{ background: 'var(--night-card)', border: '1px dashed var(--night-line)' }}>
         <div className="mb-2 flex justify-center"><Dink pose="presenting-t" size={96} /></div>
         <div className="serif text-[30px] leading-none">{title}</div>
-        <div className="mt-2 text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>{body}</div>
+        <div className="mt-2 text-sm" style={{ color: 'var(--night-text2)' }}>{body}</div>
       </div>
     </div>
   );

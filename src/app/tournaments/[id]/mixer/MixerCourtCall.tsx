@@ -56,7 +56,7 @@ export function MixerCourtCall({
       <div
         className="relative overflow-hidden rounded-[18px] p-4 text-white"
         style={{
-          background: 'linear-gradient(135deg, var(--serve), oklch(0.62 0.19 40))',
+          background: 'linear-gradient(135deg, var(--serve), var(--night-serve-deep))',
           animation: 'tpCourtGlow 2s ease-in-out infinite',
         }}
       >
@@ -69,7 +69,7 @@ export function MixerCourtCall({
           You &amp; {partnerName}
           {opponentTeam ? ` vs. ${opponentTeam}` : ''}. Other teams are checking in.
         </div>
-        {error && <div className="mt-2 text-[12px] font-semibold" style={{ color: 'oklch(0.98 0.02 90)' }}>{error}</div>}
+        {error && <div className="mt-2 text-[12px] font-semibold" style={{ color: 'var(--night-cream)' }}>{error}</div>}
         <div className="mt-3.5 flex gap-2">
           <button
             type="button"
@@ -121,11 +121,11 @@ export function MixerPresenceCheckIn({ tournamentId }: { tournamentId: string })
     <div className="px-[18px] pt-1">
       <div
         className="flex items-center justify-between gap-3 rounded-2xl p-3.5"
-        style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}
+        style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}
       >
         <div className="min-w-0">
-          <div className="text-[13.5px] font-bold" style={{ color: 'oklch(0.975 0.012 264)' }}>You&apos;re here — let the host know</div>
-          <div className="mt-0.5 text-[12px]" style={{ color: 'oklch(0.78 0.028 264)' }}>
+          <div className="text-[13.5px] font-bold" style={{ color: 'var(--night-text)' }}>You&apos;re here — let the host know</div>
+          <div className="mt-0.5 text-[12px]" style={{ color: 'var(--night-text2)' }}>
             {error ?? 'Check in so you show on the board and get court calls.'}
           </div>
         </div>
@@ -134,7 +134,7 @@ export function MixerPresenceCheckIn({ tournamentId }: { tournamentId: string })
           onClick={checkIn}
           disabled={pending}
           className="shrink-0 rounded-xl px-4 py-2.5 text-[13px] font-extrabold disabled:opacity-60"
-          style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}
+          style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}
         >
           {pending ? 'Checking in…' : "I'm here ✓"}
         </button>

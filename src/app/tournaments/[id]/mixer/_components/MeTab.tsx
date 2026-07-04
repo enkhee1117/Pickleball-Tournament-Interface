@@ -49,12 +49,12 @@ export function MeTab({
   const wonRaffle = raffleWinner?.playerId === player.id;
   return (
     <div className="px-[18px]">
-      <div className="rounded-2xl p-5" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+      <div className="rounded-2xl p-5" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
         <div className="flex items-center gap-3">
           <Avatar player={mixerAvatarFor(player, player.id)} size={56} />
           <div>
             <div className="serif text-[30px] leading-none">{player.display_name}</div>
-            <div className="mt-1 text-xs" style={{ color: 'oklch(0.78 0.028 264)' }}>{tournament.name}</div>
+            <div className="mt-1 text-xs" style={{ color: 'var(--night-text2)' }}>{tournament.name}</div>
           </div>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-2">
@@ -67,22 +67,22 @@ export function MeTab({
         </div>
       </div>
       {raffleWinner && (
-        <div className="mt-3 rounded-2xl p-5" style={{ background: wonRaffle ? 'color-mix(in oklch, var(--court) 22%, oklch(0.215 0.03 264))' : 'oklch(0.215 0.03 264)', border: wonRaffle ? '1px solid var(--court)' : '1px solid oklch(0.36 0.04 266)' }}>
+        <div className="mt-3 rounded-2xl p-5" style={{ background: wonRaffle ? 'color-mix(in oklch, var(--court) 22%, var(--night-card))' : 'var(--night-card)', border: wonRaffle ? '1px solid var(--court)' : '1px solid var(--night-line)' }}>
           <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--court)' }}>Raffle winner</div>
           <div className="serif mt-2 text-[30px] leading-none">{wonRaffle ? 'You won' : raffleWinner.displayName}</div>
-          <div className="mt-1 text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>
+          <div className="mt-1 text-sm" style={{ color: 'var(--night-text2)' }}>
             {raffleWinner.prize ?? config.raffle_prize} · {Math.round(Number(raffleWinner.tickets ?? 0) * 10) / 10} tickets
           </div>
         </div>
       )}
-      <div className="mt-3 rounded-2xl p-5" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+      <div className="mt-3 rounded-2xl p-5" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
         <div className="serif text-[28px] leading-none">Payments</div>
-        <div className="mt-1 text-xs" style={{ color: 'oklch(0.78 0.028 264)' }}>The app never processes payment — organizers confirm Zelle / cash on their side.</div>
+        <div className="mt-1 text-xs" style={{ color: 'var(--night-text2)' }}>The app never processes payment — organizers confirm Zelle / cash on their side.</div>
         <div className="mt-3 grid gap-2">
           {paymentMethodRows(methods).map((m) => (
-            <div key={m.key} className="rounded-xl px-3 py-2 text-sm" style={{ background: 'oklch(0.285 0.038 266)' }}>
+            <div key={m.key} className="rounded-xl px-3 py-2 text-sm" style={{ background: 'var(--night-inset)' }}>
               <div className="font-bold">{m.label}</div>
-              <div className="mono mt-1 text-xs" style={{ color: 'oklch(0.78 0.028 264)' }}>{m.handle || 'Pay organizer in person'} · memo: {player.display_name}</div>
+              <div className="mono mt-1 text-xs" style={{ color: 'var(--night-text2)' }}>{m.handle || 'Pay organizer in person'} · memo: {player.display_name}</div>
             </div>
           ))}
         </div>
@@ -111,9 +111,9 @@ export function MeTab({
           )}
         </div>
         {myTickets && (
-          <div className="mt-4 rounded-xl p-3 text-sm" style={{ background: 'oklch(0.285 0.038 266)' }}>
+          <div className="mt-4 rounded-xl p-3 text-sm" style={{ background: 'var(--night-inset)' }}>
             <div className="font-bold">Raffle ticket math</div>
-            <div className="mt-1 text-xs leading-5" style={{ color: 'oklch(0.78 0.028 264)' }}>
+            <div className="mt-1 text-xs leading-5" style={{ color: 'var(--night-text2)' }}>
               Popularity {Math.round(myTickets.popularityTickets * 10) / 10} + unused base token bonus {Math.round(myTickets.frugalityTickets * 10) / 10}. Bought tokens do not count.
             </div>
           </div>
@@ -143,7 +143,7 @@ function PaymentRequest({
   disabled: boolean;
 }) {
   return (
-    <form action={requestMixerPayment} className="rounded-xl p-3" style={{ background: 'oklch(0.285 0.038 266)' }}>
+    <form action={requestMixerPayment} className="rounded-xl p-3" style={{ background: 'var(--night-inset)' }}>
       <input type="hidden" name="tournament_id" value={tournamentId} />
       <input type="hidden" name="player_id" value={playerId} />
       <input type="hidden" name="type" value={type} />
@@ -151,9 +151,9 @@ function PaymentRequest({
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-bold">{title}</div>
-          <div className="mono mt-1 text-xs" style={{ color: 'oklch(0.78 0.028 264)' }}>${amount} · {status ?? 'not requested'}</div>
+          <div className="mono mt-1 text-xs" style={{ color: 'var(--night-text2)' }}>${amount} · {status ?? 'not requested'}</div>
         </div>
-        <button disabled={disabled} className="rounded-xl px-3 py-2 text-xs font-bold disabled:opacity-40" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
+        <button disabled={disabled} className="rounded-xl px-3 py-2 text-xs font-bold disabled:opacity-40" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>
           Request
         </button>
       </div>
