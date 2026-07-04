@@ -2,10 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { TopBar } from '@/components/ui/TopBar';
 import { IconBtn } from '@/components/ui/IconBtn';
 import { BigButton } from '@/components/ui/BigButton';
 import { Icons } from '@/components/ui/icons';
+import { BallMark } from '@/components/desktop';
 import {
   defaultPairingForFormat,
   genderModeFor,
@@ -179,79 +179,164 @@ export function CreateWizard() {
 
   const ctaLabel = isMixer ? 'Open event home →' : manualFp ? 'Set up teams →' : 'Generate matches →';
 
+  const stepBody = (
+    <>
+      {step === 0 && <StepName data={data} set={set} />}
+      {step === 1 && <StepFormat data={data} set={set} />}
+      {isMixer ? (
+        <>
+          {step === 2 && <StepRoster data={data} set={set} genderMode={genderMode} />}
+          {step === 3 && <StepMixerVoting data={data} set={set} />}
+          {step === 4 && <StepMixerPrizes data={data} set={set} />}
+          {step === 5 && <StepReview data={data} manualTeams={false} genderMode={genderMode} />}
+        </>
+      ) : (
+        <>
+          {step === 2 && <StepPairing data={data} set={set} />}
+          {step === 3 && <StepRoster data={data} set={set} genderMode={genderMode} />}
+          {step === 4 && <StepSchedule data={data} set={set} />}
+          {step === 5 && <StepReview data={data} manualTeams={manualFp} genderMode={genderMode} />}
+        </>
+      )}
+      {error && (
+        <div className="mt-4 rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: 'var(--berry)', color: 'var(--berry)', background: 'oklch(0.96 0.04 12)' }}>
+          {error}
+        </div>
+      )}
+    </>
+  );
+
+  const navButtons =
+    step < steps.length - 1 ? (
+      <BigButton tone="ink" disabled={!canNext} onClick={() => setStep(step + 1)}>
+        Continue
+      </BigButton>
+    ) : (
+      <BigButton tone="court" disabled={isPending || data.name.trim().length === 0} onClick={finish}>
+        {isPending ? 'Creating…' : ctaLabel}
+      </BigButton>
+    );
+
+  // Desktop-primary create wizard (handoff wizard.html): a left step rail, the
+  // center form, and a live summary on the right; collapses to the mobile
+  // single-column + progress bar below lg. Escapes the 480 shell.
   return (
-    <div className="flex min-h-full flex-col bg-paper">
-      <TopBar
-        title="New tournament"
-        sub={`Step ${step + 1} of ${steps.length} · ${steps[step]}`}
-        left={
-          <IconBtn onClick={() => (step === 0 ? router.push('/') : setStep(step - 1))} aria-label="Back">
-            {Icons.back}
-          </IconBtn>
-        }
-        right={
+    <div data-fullscreen className="min-h-[100dvh]" style={{ background: 'var(--paper)' }}>
+      <div className="relative flex h-[62px] items-center gap-3 px-4 sm:px-8" style={{ borderBottom: '1px solid var(--line)' }}>
+        <div className="absolute inset-x-0 top-0 h-[3px]" style={{ background: 'linear-gradient(90deg, oklch(0.55 0.2 25) 0 40%, #fff 40% 60%, oklch(0.42 0.14 258) 60%)' }} />
+        <BallMark size={26} />
+        <span className="serif text-[19px] text-ink">New tournament</span>
+        <span className="mono ml-2 hidden text-[11px] uppercase tracking-[0.08em] text-ink-3 sm:inline">
+          Step {step + 1} of {steps.length} · {steps[step]}
+        </span>
+        <div className="ml-auto">
           <IconBtn onClick={() => router.push('/')} aria-label="Close">
             {Icons.close}
           </IconBtn>
-        }
-      />
-
-      <div className="flex gap-1 px-[18px] pb-3.5">
-        {steps.map((_, i) => (
-          <div
-            key={i}
-            className="h-1 flex-1 rounded-full transition-colors"
-            style={{ background: i <= step ? 'var(--ink)' : 'var(--line)' }}
-          />
-        ))}
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-[18px] pt-1 pb-4">
-        {step === 0 && <StepName data={data} set={set} />}
-        {step === 1 && <StepFormat data={data} set={set} />}
-        {isMixer ? (
-          <>
-            {step === 2 && <StepRoster data={data} set={set} genderMode={genderMode} />}
-            {step === 3 && <StepMixerVoting data={data} set={set} />}
-            {step === 4 && <StepMixerPrizes data={data} set={set} />}
-            {step === 5 && <StepReview data={data} manualTeams={false} genderMode={genderMode} />}
-          </>
-        ) : (
-          <>
-            {step === 2 && <StepPairing data={data} set={set} />}
-            {step === 3 && <StepRoster data={data} set={set} genderMode={genderMode} />}
-            {step === 4 && <StepSchedule data={data} set={set} />}
-            {step === 5 && <StepReview data={data} manualTeams={manualFp} genderMode={genderMode} />}
-          </>
-        )}
+      <div className="mx-auto w-full max-w-[1180px] px-4 pb-24 sm:px-6 lg:grid lg:grid-cols-[210px_minmax(0,1fr)_300px] lg:gap-8 lg:px-8 lg:pt-8">
+        <WizardStepRail steps={steps} step={step} onJump={(i) => i < step && setStep(i)} />
 
-        {error && (
-          <div
-            className="mt-4 rounded-2xl border px-4 py-3 text-sm"
-            style={{ borderColor: 'var(--berry)', color: 'var(--berry)', background: 'oklch(0.96 0.04 12)' }}
-          >
-            {error}
+        <div className="min-w-0">
+          <div className="flex gap-1 py-3.5 lg:hidden">
+            {steps.map((_, i) => (
+              <div key={i} className="h-1 flex-1 rounded-full transition-colors" style={{ background: i <= step ? 'var(--ink)' : 'var(--line)' }} />
+            ))}
           </div>
-        )}
-      </div>
+          <div className="pb-6 pt-1">{stepBody}</div>
+          <div>{navButtons}</div>
+        </div>
 
-      <div className="border-t bg-paper px-[18px] pt-3 pb-[18px]" style={{ borderColor: 'var(--line)' }}>
-        {step < steps.length - 1 ? (
-          <BigButton tone="ink" disabled={!canNext} onClick={() => setStep(step + 1)}>
-            Continue
-          </BigButton>
-        ) : (
-          <BigButton
-            tone="court"
-            disabled={isPending || data.name.trim().length === 0}
-            onClick={finish}
-          >
-            {isPending ? 'Creating…' : ctaLabel}
-          </BigButton>
-        )}
+        <WizardSummary data={data} isMixer={isMixer} manualFp={manualFp} />
       </div>
     </div>
   );
+}
+
+function WizardStepRail({ steps, step, onJump }: { steps: string[]; step: number; onJump: (i: number) => void }) {
+  return (
+    <aside className="hidden lg:block lg:sticky lg:top-8 lg:self-start">
+      <div className="mono mb-3 text-[10px] uppercase tracking-[0.14em] text-ink-3">Steps</div>
+      <div className="flex flex-col gap-1">
+        {steps.map((label, i) => {
+          const done = i < step;
+          const cur = i === step;
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => onJump(i)}
+              disabled={!done}
+              className="flex items-center gap-3 rounded-[11px] px-2.5 py-2 text-left text-[14px] disabled:cursor-default"
+              style={cur ? { background: 'var(--paper-2)', color: 'var(--ink)', fontWeight: 600 } : { color: done ? 'var(--ink-2)' : 'var(--ink-3)' }}
+            >
+              <span
+                className="mono grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px]"
+                style={done ? { background: 'var(--court)', color: 'oklch(0.2 0.04 140)' } : cur ? { background: 'var(--ink)', color: 'var(--paper)' } : { border: '1.5px solid var(--line)' }}
+              >
+                {done ? '✓' : i + 1}
+              </span>
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
+function WizardSummary({ data, isMixer, manualFp }: { data: WizardData; isMixer: boolean; manualFp: boolean }) {
+  const rows: [string, string][] = [
+    ['Event', data.name.trim() || 'Untitled'],
+    ['Format', wizardFormatLabel(data.format)],
+    ['Players', String(data.playerCount)],
+  ];
+  if (isMixer) {
+    rows.push(['Courts', String(data.courts)], ['Rounds', String(data.rounds)], ['Tokens', String(data.startTokens)], ['Entry', data.entryFee > 0 ? `$${data.entryFee}` : 'Free']);
+  } else {
+    rows.push(['Pairing', data.pairing], ['Setup', manualFp ? 'Manual teams' : 'Auto-generated']);
+  }
+  const addons = [data.betting && 'Betting', data.raffle && 'Raffle', data.downvotes && 'Downvotes'].filter(Boolean) as string[];
+  return (
+    <aside className="hidden lg:block lg:sticky lg:top-8 lg:self-start">
+      <div className="rounded-[18px] bg-white p-5" style={{ border: '1px solid var(--line)' }}>
+        <div className="mono mb-3 text-[10px] uppercase tracking-[0.14em] text-ink-3">Live summary</div>
+        <div className="serif text-[24px] leading-tight text-ink">{data.name.trim() || 'Untitled event'}</div>
+        <div className="mt-3 flex flex-col gap-2">
+          {rows.slice(1).map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between gap-3 text-[13.5px]">
+              <span className="text-ink-3">{k}</span>
+              <span className="font-semibold text-ink">{v}</span>
+            </div>
+          ))}
+        </div>
+        {isMixer && addons.length > 0 && (
+          <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--line)' }}>
+            <div className="mb-1.5 text-[11px] uppercase tracking-[0.06em] text-ink-3">Add-ons</div>
+            <div className="flex flex-wrap gap-1.5">
+              {addons.map((a) => (
+                <span key={a} className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: 'color-mix(in oklch, var(--court) 14%, transparent)', color: 'var(--court-deep)' }}>
+                  {a}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/design-handoff/dink/liberty.png" alt="" className="mx-auto mt-4 w-[120px]" style={{ objectFit: 'contain' }} />
+    </aside>
+  );
+}
+
+function wizardFormatLabel(f: string): string {
+  if (f === 'partner_mixer') return 'Partner Mixer';
+  if (f.startsWith('rr') || f === 'round_robin') return 'Round Robin';
+  if (f.startsWith('fp') || f === 'fixed_partners') return 'Fixed Partners';
+  if (f === 'bracket') return 'Bracket';
+  return f;
 }
 
 function StepName({ data, set }: { data: WizardData; set: <K extends keyof WizardData>(k: K, v: WizardData[K]) => void }) {
