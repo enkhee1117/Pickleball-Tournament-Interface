@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 import type { PairingRow, PlayerRow, RoundRow, TournamentRow } from '../_types';
-import type { CourtResult } from './standings';
+import type { CourtResult } from '@/lib/mixer-standings';
 import { ScoreFlow } from './ScoreFlow';
 
 type PageProps = { params: Promise<{ id: string }> };

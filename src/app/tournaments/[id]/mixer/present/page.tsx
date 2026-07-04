@@ -115,6 +115,15 @@ export default async function MixerPresentPage({ params }: PageProps) {
         left={<Link href={`/tournaments/${id}`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
       />
       <MixerModeSwitch tournamentId={id} active="present" />
+      <div className="px-8 pt-3">
+        <Link
+          href={`/tournaments/${id}/mixer/present/between`}
+          className="mono inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] uppercase tracking-[0.08em]"
+          style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)', color: 'var(--court)' }}
+        >
+          Between-rounds board →
+        </Link>
+      </div>
       <div className="flex flex-1 flex-col items-center justify-center px-8 pb-10 text-center">
         <MixerPresentationTakeover
           round={round}

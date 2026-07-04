@@ -7,7 +7,7 @@ import { DesktopSurface } from '@/components/desktop/DesktopSurface';
 import { CommandBar, type Command } from '@/components/desktop/CommandBar';
 import { useToast } from '@/components/desktop/ToastProvider';
 import { useRouter } from 'next/navigation';
-import { computeStandings, ordinal, type CourtResult, type StandingRow } from './standings';
+import { computeStandings, ordinal, type CourtResult, type StandingRow } from '@/lib/mixer-standings';
 import { postCourtScore } from './actions';
 
 const firstName = (n: string) => n.split(' ')[0];
