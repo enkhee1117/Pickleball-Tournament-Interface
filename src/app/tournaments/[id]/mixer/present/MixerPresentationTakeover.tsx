@@ -273,8 +273,9 @@ function PlayerLine({ player, compact = false }: { player: PlayerRow; compact?: 
   );
 }
 
-function Dink({ pose, size }: { pose: 'presenting-t' | 'wave' | 'winner'; size: number }) {
-  const file = pose === 'winner' ? 'presenting-t' : pose;
+function Dink({ size }: { pose: 'presenting-t' | 'wave' | 'winner'; size: number }) {
+  // Paddle mascot retired — every paddle pose now renders the ball bust.
+  const file = 'happy-bust';
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img

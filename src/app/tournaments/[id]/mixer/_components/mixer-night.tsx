@@ -8,11 +8,20 @@ import type { PlayerRow } from '../_types';
 
 export type DinkPose = 'token-t' | 'presenting-t' | 'wave' | 'coach' | 'idle';
 
+// The old paddle-character mascot is retired — the ball is our mascot now. Any
+// remaining paddle poses resolve to the ball bust so the paddle never renders.
+const RETIRED_PADDLE_POSE: Partial<Record<DinkPose, string>> = {
+  wave: 'happy-bust',
+  'token-t': 'happy-bust',
+  'presenting-t': 'happy-bust',
+};
+
 export function Dink({ pose, size }: { pose: DinkPose; size: number }) {
+  const file = RETIRED_PADDLE_POSE[pose] ?? pose;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/design-handoff/dink/${pose}.png`}
+      src={`/design-handoff/dink/${file}.png`}
       alt=""
       width={size}
       height={size}
