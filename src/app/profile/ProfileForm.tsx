@@ -5,7 +5,7 @@ import { useActionState } from 'react';
 import type { Profile } from '@/lib/types';
 import { TopBar } from '@/components/ui/TopBar';
 import { Icons } from '@/components/ui/icons';
-import { AvatarUpload } from '@/components/AvatarUpload';
+import { AvatarChooser } from '@/components/AvatarChooser';
 import { emptyFormState, type FormState } from '@/lib/forms';
 
 type SaveAction = (state: FormState, formData: FormData) => Promise<FormState>;
@@ -37,7 +37,7 @@ export function ProfileForm({
 
       <form action={formAction} className="flex-1 overflow-y-auto px-[18px] pb-6">
         <div className="mb-4 flex justify-center">
-          <AvatarUpload userId={profile.id} initialUrl={profile.avatar_url} />
+          <AvatarChooser userId={profile.id} initialUrl={profile.avatar_url} />
         </div>
 
         {state.error && (
