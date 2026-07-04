@@ -8,16 +8,10 @@ import { validatePassword } from '@/lib/validation';
 import { safeNext } from '@/lib/auth-redirect';
 import { resolveIdentifier } from '@/lib/identifier';
 import { normalizeGender } from '@/lib/quick-join';
+import { createConfirmedAccount } from '@/lib/create-account';
 
-// Signup accepts either a real email or a phone number.
-//   - Email path: the account is created with the user's real email so
-//     password reset / future magic links reach an actual inbox.
-//   - Phone path: paired with a synthetic email (`<digits>@phone.local`)
-//     so signInWithPassword can route through the email provider — this
-//     sidesteps the project's "Phone provider" toggle.
-// Either way we auto-confirm the address so signup is one step (no click
-// through a verification email) — the mixer usage pattern is "guests show
-// up and want to play in under a minute."
+// Signup accepts either a real email or a phone number; account creation
+// policy (synth email for phones, auto-confirm) lives in lib/create-account.
 export async function signUpWithPassword(_prev: FormState, formData: FormData): Promise<FormState> {
   const raw = fieldString(formData, 'phone') || fieldString(formData, 'identifier');
   const resolved = resolveIdentifier(raw);
@@ -35,39 +29,23 @@ export async function signUpWithPassword(_prev: FormState, formData: FormData): 
   const passCheck = validatePassword(password);
   if (!passCheck.ok) return { error: passCheck.error };
 
-  const admin = createAdminClient();
-  const createPayload = resolved.kind === 'phone'
-    ? {
-        phone: resolved.phone,
-        email: resolved.email, // synth email so signInWithPassword works
-        password,
-        phone_confirm: true,
-        email_confirm: true,
-        user_metadata: { display_name },
-      }
-    : {
-        email: resolved.email,
-        password,
-        email_confirm: true,
-        user_metadata: { display_name },
-      };
-  const { data: created, error: createErr } = await admin.auth.admin.createUser(createPayload);
-  if (createErr) {
-    const msg = createErr.message?.toLowerCase() ?? '';
-    if (msg.includes('already') || msg.includes('exists') || msg.includes('registered')) {
-      const noun = resolved.kind === 'email' ? 'email' : 'phone';
-      return { error: `An account with this ${noun} already exists. Try signing in instead.` };
-    }
-    return { error: createErr.message };
+  const account = await createConfirmedAccount({ resolved, password, displayName: display_name });
+  if (account.existed) {
+    const noun = resolved.kind === 'email' ? 'email' : 'phone';
+    return { error: `An account with this ${noun} already exists. Try signing in instead.` };
   }
-  if (!created.user) {
+  if (account.error) {
+    return { error: account.error };
+  }
+  if (!account.user) {
     return { error: 'Could not create the account. Try again in a moment.' };
   }
 
   // Optional gender lands on the profile (the handle_new_user trigger has
   // already created the row) so mixed / same-gender events can seat them.
   if (gender) {
-    const { error: genderErr } = await admin.from('profiles').update({ gender }).eq('id', created.user.id);
+    const admin = createAdminClient();
+    const { error: genderErr } = await admin.from('profiles').update({ gender }).eq('id', account.user.id);
     // Non-fatal — the account works without it — but don't lose it silently.
     if (genderErr) console.error('[signup] failed to persist gender', genderErr.message);
   }
