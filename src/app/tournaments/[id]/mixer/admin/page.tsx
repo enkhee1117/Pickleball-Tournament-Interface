@@ -3,12 +3,10 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
 import { formatInviteCode } from '@/lib/invite-codes';
-import { TopBar } from '@/components/ui/TopBar';
 import { Chip } from '@/components/ui/Chip';
-import { Icons } from '@/components/ui/icons';
+import { DesktopSurface, BallMark } from '@/components/desktop';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 import { ShareCodeCard } from '../../invite/ShareCodeCard';
-import { MixerModeSwitch } from '../MixerModeSwitch';
 import { MixerRealtimeSync } from '../MixerRealtimeSync';
 import {
   drawMixerRound,
@@ -32,14 +30,10 @@ import {
   formatLockDuration,
   getOrganizerTab,
   normalizePrizeBuckets,
-  runEventBody,
-  runEventHeadline,
 } from '../_components/admin-helpers';
 import { normalizePaymentMethods } from '../_components/payment-methods';
 import {
-  AdminLink,
   Notice,
-  OrganizerTabNav,
   PaymentButton,
   PrizeBucket,
   RoundRail,
@@ -100,7 +94,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const currentRound = currentMixerRound(roundRows);
   const roster = (players ?? []) as PlayerRow[];
 
-  const [{ data: pairings }, { data: scores }, { data: payments }, { data: states }, { data: betsSummary }, { data: snapshot }] = await Promise.all([
+  const [{ data: pairings }, { data: scores }, { data: payments }, { data: states }, { data: betsSummary }, { data: snapshot }, { data: voteRows }] = await Promise.all([
     currentRound
       ? supabase.from('mixer_pairings').select('id,player_a_id,player_b_id,court_no').eq('round_id', currentRound.id).order('court_no', { ascending: true })
       : Promise.resolve({ data: [] }),
@@ -113,6 +107,11 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
     // per-row (bettor_player_id, chips) — only market liquidity totals.
     supabase.rpc('app_mixer_bets_summary', { p_tournament_id: id }),
     supabase.from('mixer_final_snapshots').select('standings,raffle_tickets,raffle_winner,bet_settlements').eq('tournament_id', id).maybeSingle(),
+    // Blind-safe participation: only which players have voted this round —
+    // never who they voted for. Distinct voter_player_id → the ballot ring.
+    currentRound
+      ? supabase.from('mixer_votes').select('voter_player_id').eq('round_id', currentRound.id)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const pairingRows = (pairings ?? []) as PairingRow[];
@@ -141,30 +140,54 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const canStartPlay = currentRound?.state === 'revealed';
   const canMarkDone = (currentRound?.state === 'playing' || currentRound?.state === 'revealed') && (currentCourtCount === 0 || scoredCourtCount >= currentCourtCount);
 
-  return (
-    <div className="flex min-h-full flex-col bg-paper">
-      <MixerRealtimeSync tournamentId={id} />
-      <div className="bg-ink px-[18px] pb-[18px] text-paper">
-        <TopBar
-          dark
-          title={t.name}
-          sub="Organizer mode"
-          left={<Link href={`/tournaments/${id}`} className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.back}</Link>}
-          right={
-            <div className="flex items-center gap-1">
-              <Link href={`/tournaments/${id}/invite`} aria-label="Invite players" className="flex h-10 w-10 items-center justify-center rounded-xl">{Icons.share}</Link>
-            </div>
-          }
-        />
-        <MixerModeSwitch tournamentId={id} active="organizer" />
-        <div className="pl-1">
-          <Chip tone="live">{currentRound ? currentRound.state : 'SETUP'}</Chip>
-          <div className="serif mt-2 text-[34px] leading-none">Run the event</div>
-          <div className="mt-1 text-xs opacity-60">{roster.length} players · {cfg?.courts ?? 3} courts</div>
-        </div>
-      </div>
+  // Ballot participation (blind — who has voted, never who for) for the ring.
+  const voterSet = new Set(((voteRows ?? []) as { voter_player_id: string }[]).map((v) => v.voter_player_id));
+  const votedNames = roster.filter((p) => voterSet.has(p.id)).map((p) => p.display_name);
+  const votedCount = votedNames.length;
+  // Armed-draw weights derived from the tuned formula knobs (alpha/beta/gamma).
+  const wSum = Number(cfg?.alpha ?? 0) + Number(cfg?.beta ?? 0) + Number(cfg?.gamma ?? 0);
+  const wPct = (w: number | undefined) => (wSum > 0 ? Math.round((Number(w ?? 0) / wSum) * 100) : 0);
+  const anonCount = roster.filter((p) => !p.profile_id).length;
+  const entryFee = Number(cfg?.entry_fee ?? 0);
+  const stepIndex = ((s: string | undefined) => {
+    switch (s) {
+      case 'open':
+        return 1;
+      case 'locked':
+        return 2;
+      case 'drawing':
+        return 3;
+      case 'revealed':
+        return 4;
+      case 'playing':
+        return 4;
+      case 'done':
+        return 5;
+      default:
+        return 0;
+    }
+  })(currentRound?.state);
 
-      <div className="flex-1 overflow-y-auto px-[18px] py-4 pb-24">
+  return (
+    <DesktopSurface variant="night" withCommandBar>
+      <MixerRealtimeSync tournamentId={id} />
+      <div className="mx-auto grid w-full max-w-[1440px] grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)]">
+        <CockpitSidebar
+          tournamentId={id}
+          eventName={t.name}
+          state={currentRound?.state ?? null}
+          roundNo={currentRound?.round_no ?? null}
+          roundsTotal={cfg?.rounds ?? null}
+          playerCount={roster.length}
+          active={activeTab}
+          pendingPayments={pendingPayments}
+        />
+        <div className="min-w-0">
+          <CockpitTopbar
+            title={COCKPIT_TITLES[activeTab] ?? 'Cockpit'}
+            sub={cockpitSub(activeTab, currentRound?.round_no ?? null, currentRound?.state ?? null, roster.length, paidCount, pendingPayments)}
+          />
+          <div id="main" className="px-5 pb-24 pt-6 lg:px-7">
         {sp.error && <Notice tone="error">{sp.error}</Notice>}
         {sp.ok && <Notice tone="ok">{sp.ok}</Notice>}
 
@@ -179,65 +202,168 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
           </form>
         ) : (
           <>
-            <OrganizerTabNav tournamentId={id} active={activeTab} pendingPayments={pendingPayments} />
-
             {activeTab === 'run' && (
               <>
-                <Section title="Round state">
-                  <div className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-3">Round {currentRound.round_no} of {cfg.rounds}</div>
-                        <div className="serif mt-1 text-[26px] leading-none text-ink">{runEventHeadline(currentRound.state)}</div>
-                        <div className="mt-2 text-sm leading-5 text-ink-3">{runEventBody(currentRound.state, cfg.lock_mode)}</div>
+                <CockpitStateBar stepIndex={stepIndex} roundNo={currentRound.round_no} roundsTotal={cfg.rounds} />
+
+                <div className="grid gap-[18px] xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+                  {/* LEFT — mission control */}
+                  <div className="flex flex-col gap-[18px]">
+                    {/* Ballot status */}
+                    <div
+                      className="rounded-[18px] p-5"
+                      style={{
+                        background: 'linear-gradient(150deg, color-mix(in oklch, var(--accent) 22%, var(--surface-card)), var(--surface-inset) 70%)',
+                        border: '1px solid color-mix(in oklch, var(--accent) 26%, var(--line))',
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h3 className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>Ballot status</h3>
+                          <div className="text-[12.5px]" style={{ color: 'var(--text3)' }}>
+                            {cfg.lock_mode === 'manual' ? 'Manual lock · all rounds lock together' : `Timer lock · ${formatLockDuration(cfg.lock_seconds)} window`}
+                          </div>
+                          <div className="mono mt-3 text-[54px] font-bold leading-none tracking-[-.03em]" style={{ color: 'var(--text)' }}>
+                            {votedCount}
+                            <span className="text-[20px]" style={{ color: 'var(--text3)' }}> / {roster.length}</span>
+                          </div>
+                          <div className="mono text-[11px] uppercase tracking-[.1em]" style={{ color: 'var(--text3)' }}>ballots in</div>
+                        </div>
+                        <Ring pct={roster.length ? Math.round((votedCount / roster.length) * 100) : 0} label={`${votedCount}/${roster.length}`} />
                       </div>
-                      <Chip tone={currentRound.state === 'open' || currentRound.state === 'playing' ? 'live' : 'court'}>{currentRound.state}</Chip>
+                      <div className="mt-4 flex items-center gap-2.5">
+                        <Facepile names={votedNames} />
+                        <div className="text-[13.5px]" style={{ color: 'var(--text2)' }}>
+                          <b style={{ color: 'var(--text)' }}>{votedCount} of {roster.length}</b> players have voted
+                        </div>
+                      </div>
+                      <BlindNote />
+                      <div className="mt-4 grid grid-cols-2 gap-2.5">
+                        <StateButton tournamentId={id} roundId={currentRound.id} state="open" label="Open ballot" disabled={!canOpenBallot} />
+                        <StateButton tournamentId={id} roundId={currentRound.id} state="locked" label="Lock all ballots" disabled={!canLockBallot} />
+                      </div>
                     </div>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <Stat label="Players" value={roster.length} />
-                      <Stat label="Courts" value={cfg.courts} />
-                      <Stat label="Vote window" value={cfg.lock_mode === 'manual' ? 'Manual' : formatLockDuration(cfg.lock_seconds)} />
-                      <Stat label="Pool chips" value={betChips} />
+
+                    {/* The draw */}
+                    <div className="rounded-[18px] p-5" style={PANEL}>
+                      <h3 className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: 'var(--text)' }}>
+                        The draw
+                        <span className="chip">{canDraw ? 'Armed' : 'Armed after lock'}</span>
+                      </h3>
+                      <div className="mb-3.5 text-[12.5px]" style={{ color: 'var(--text3)' }}>
+                        Weighted by your Setup — the reveal plays on the present screen and every phone at once.
+                      </div>
+                      <div className="mb-3.5 flex gap-2">
+                        <WeightTile v={`${wPct(cfg.alpha)}%`} l="Votes" />
+                        <WeightTile v={`${wPct(cfg.beta)}%`} l="Skill balance" />
+                        <WeightTile v={`${wPct(cfg.gamma)}%`} l="Novelty" />
+                      </div>
+                      <form action={drawMixerRound}>
+                        <input type="hidden" name="tournament_id" value={id} />
+                        <input type="hidden" name="round_id" value={currentRound.id} />
+                        <button
+                          disabled={!canDraw}
+                          className="w-full rounded-2xl px-4 py-4 text-[16px] font-semibold disabled:cursor-not-allowed disabled:opacity-45"
+                          style={{ background: 'var(--accent)', color: 'var(--accent-ink)' }}
+                        >
+                          🎲 Run the draw
+                        </button>
+                      </form>
                     </div>
-                    <RoundRail rounds={roundRows} activeRoundId={currentRound.id} />
-                  </div>
-                </Section>
 
-                <Section title="Run controls">
-                  <div className="grid grid-cols-2 gap-2">
-                    <StateButton tournamentId={id} roundId={currentRound.id} state="open" label="Open ballot" disabled={!canOpenBallot} />
-                    <StateButton tournamentId={id} roundId={currentRound.id} state="locked" label="Lock ballot" disabled={!canLockBallot} />
-                    <form action={drawMixerRound}>
-                      <input type="hidden" name="tournament_id" value={id} />
-                      <input type="hidden" name="round_id" value={currentRound.id} />
-                      <button disabled={!canDraw} className="w-full rounded-2xl px-4 py-3 text-sm font-semibold disabled:opacity-40" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
-                        Draw & reveal
-                      </button>
-                    </form>
-                    <StateButton tournamentId={id} roundId={currentRound.id} state="playing" label="Start play" disabled={!canStartPlay} />
-                    <StateButton tournamentId={id} roundId={currentRound.id} state="done" label={currentCourtCount > 0 && scoredCourtCount < currentCourtCount ? `Score ${currentCourtCount - scoredCourtCount} court${currentCourtCount - scoredCourtCount === 1 ? '' : 's'}` : 'Mark done'} disabled={!canMarkDone} />
+                    {/* Round controls */}
+                    <div className="rounded-[18px] p-5" style={PANEL}>
+                      <h3 className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>Round controls</h3>
+                      <div className="mb-3 text-[12.5px]" style={{ color: 'var(--text3)' }}>
+                        Each draw reveals the next unfinished round in order; ballots for every round lock together.
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <StateButton tournamentId={id} roundId={currentRound.id} state="playing" label="Start play" disabled={!canStartPlay} />
+                        <StateButton
+                          tournamentId={id}
+                          roundId={currentRound.id}
+                          state="done"
+                          label={currentCourtCount > 0 && scoredCourtCount < currentCourtCount ? `Score ${currentCourtCount - scoredCourtCount} court${currentCourtCount - scoredCourtCount === 1 ? '' : 's'}` : 'Mark done'}
+                          disabled={!canMarkDone}
+                        />
+                      </div>
+                      <form action={finalizeMixerEvent} className="mt-2.5">
+                        <input type="hidden" name="tournament_id" value={id} />
+                        <button
+                          className="w-full rounded-2xl px-4 py-3 text-sm font-semibold"
+                          style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}
+                        >
+                          Finalize standings, raffle &amp; pools
+                        </button>
+                      </form>
+                      <div className="mt-3">
+                        <RoundRail rounds={roundRows} activeRoundId={currentRound.id} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-2 rounded-2xl bg-white p-3 text-xs leading-5 text-ink-3" style={{ border: '1px solid var(--line)' }}>
-                    Players vote for every configured round up front. Lock ballot seals all unfinished rounds; each draw then reveals the next unfinished round in order.
-                  </div>
-                  <form action={finalizeMixerEvent} className="mt-2">
-                    <input type="hidden" name="tournament_id" value={id} />
-                    <button className="w-full rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>
-                      Finalize standings, raffle, and pools
-                    </button>
-                  </form>
-                </Section>
 
-                <Section title="Live surfaces">
-                  <div className="grid grid-cols-2 gap-2">
-                    <AdminLink href={`/tournaments/${id}/mixer`} title="Player mode" sub="Vote, match, pool, and me" />
-                    <AdminLink href={`/tournaments/${id}/mixer/present`} title="Present" sub="Reveal and raffle board" />
-                    <AdminLink href={`/tournaments/${id}/mixer/present/between`} title="Between-rounds board" sub="Projector standings & check-in" />
-                    <AdminLink href={`/tournaments/${id}/mixer/score`} title="Score entry" sub="Post scores, watch standings rise" />
-                    <AdminLink href={`/tournaments/${id}/mixer/recovery`} title="Roster recovery" sub="Odd count, no-shows, early leaves" />
-                    <AdminLink href={`/tournaments/${id}/recap`} title="Recap & export" sub="Podium, superlatives, CSV & share" />
+                  {/* RIGHT — live read-outs */}
+                  <div className="flex flex-col gap-[18px]">
+                    <div className="rounded-[18px] p-5" style={PANEL}>
+                      <h3 className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: 'var(--text)' }}>
+                        Live courts
+                        {currentCourtCount > 0 && <span className="chip chip-live"><span className="dot" />R{currentRound.round_no}</span>}
+                      </h3>
+                      {currentCourtCount === 0 ? (
+                        <div className="mt-2 text-[13px]" style={{ color: 'var(--text3)' }}>No courts revealed yet — run the draw to seat this round.</div>
+                      ) : (
+                        <div className="mt-3 flex flex-col gap-2">
+                          {[...new Set(pairingRows.map((p) => p.court_no))].map((courtNo) => {
+                            const teams = pairingRows.filter((p) => p.court_no === courtNo);
+                            const score = scoreRows.find((s) => s.court_no === courtNo);
+                            const live = !!score && !score.completed_at;
+                            return (
+                              <CourtMini
+                                key={courtNo}
+                                courtNo={courtNo}
+                                teamA={teams[0] ? `${name(teams[0].player_a_id)} & ${name(teams[0].player_b_id)}` : '—'}
+                                teamB={teams[1] ? `${name(teams[1].player_a_id)} & ${name(teams[1].player_b_id)}` : '—'}
+                                scoreA={score?.team_a_score ?? 0}
+                                scoreB={score?.team_b_score ?? 0}
+                                live={live}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-[18px] p-5" style={PANEL}>
+                      <h3 className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>Roster health</h3>
+                      <div className="mt-2">
+                        <MiniStat label="Confirmed & paid" value={paidCount} tone="accent" />
+                        <MiniStat label="Payment pending" value={pendingPayments} tone="serve" />
+                        <MiniStat label="Anonymous joins" value={anonCount} />
+                        <MiniStat label="Fees collected" value={`$${Math.round(paidCount * entryFee)} / ${Math.round(roster.length * entryFee)}`} />
+                      </div>
+                    </div>
+
+                    <div className="rounded-[18px] p-5" style={PANEL}>
+                      <h3 className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>Pool &amp; raffle</h3>
+                      <div className="mt-2">
+                        <MiniStat label="Betting pool chips" value={betChips} />
+                        <MiniStat label="Prize" value={cfg.raffle_prize || 'Not set'} text />
+                      </div>
+                    </div>
+
+                    <div className="rounded-[18px] p-5" style={PANEL}>
+                      <h3 className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>Live surfaces</h3>
+                      <div className="mt-3 grid gap-2">
+                        <SurfaceLink href={`/tournaments/${id}/mixer/present`} title="Present" sub="Reveal & raffle board" />
+                        <SurfaceLink href={`/tournaments/${id}/mixer/present/between`} title="Between-rounds board" sub="Standings & check-in" />
+                        <SurfaceLink href={`/tournaments/${id}/mixer/score`} title="Score entry" sub="Post scores courtside" />
+                        <SurfaceLink href={`/tournaments/${id}/mixer/recovery`} title="Roster recovery" sub="Odd count, no-shows" />
+                        <SurfaceLink href={`/tournaments/${id}/recap`} title="Recap & export" sub="Podium, CSV & share" />
+                        <SurfaceLink href={`/tournaments/${id}/mixer`} title="Player mode" sub="See it as a player" />
+                      </div>
+                    </div>
                   </div>
-                </Section>
+                </div>
               </>
             )}
 
@@ -383,7 +509,322 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
             )}
           </>
         )}
+          </div>
+        </div>
+      </div>
+    </DesktopSurface>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Desktop night cockpit chrome (handoff admin.html): 248px sidebar + topbar,
+// mission-control Run pane primitives. Blind-vote guardrail: participation
+// only — the ring and facepile show who has voted, never who they voted for.
+// ---------------------------------------------------------------------------
+
+const PANEL: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line)' };
+
+const COCKPIT_TITLES: Record<string, string> = {
+  run: 'Run event',
+  roster: 'Roster',
+  scores: 'Scores',
+  prizes: 'Prizes',
+  setup: 'Setup',
+};
+
+function cockpitSub(
+  tab: string,
+  roundNo: number | null,
+  state: string | null,
+  players: number,
+  paid: number,
+  pending: number,
+): string {
+  switch (tab) {
+    case 'run':
+      return roundNo ? `Round ${roundNo} · ${state ?? 'setup'}` : 'Set up the event to begin';
+    case 'roster':
+      return `${players} players · ${paid} paid · ${pending} pending`;
+    case 'scores':
+      return 'Post scores court by court · game to 11, win by 2';
+    case 'prizes':
+      return 'Entry pot, raffle & pooled betting';
+    case 'setup':
+      return 'Tokens, lock mode, draw weighting & payments';
+    default:
+      return '';
+  }
+}
+
+const NAV_ITEMS: { tab: string; label: string; icon: React.ReactNode }[] = [
+  { tab: 'run', label: 'Run event', icon: <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /> },
+  { tab: 'roster', label: 'Roster', icon: <path d="M9 8a3 3 0 106 0 3 3 0 00-6 0zM4 19c.8-3 2.8-4.4 5-4.4s4.2 1.4 5 4.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /> },
+  { tab: 'scores', label: 'Scores', icon: <><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" /><path d="M8 9h8M8 13h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></> },
+  { tab: 'prizes', label: 'Prizes', icon: <path d="M7 4h10v3a5 5 0 01-10 0V4zM9 15h6M8 20h8M12 15v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /> },
+  { tab: 'setup', label: 'Setup', icon: <><circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.5" /><path d="M12 3.5v2M12 18.5v2M4.5 7l1.7 1M17.8 16l1.7 1M4.5 17l1.7-1M17.8 8l1.7-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></> },
+];
+
+function CockpitSidebar({
+  tournamentId,
+  eventName,
+  state,
+  roundNo,
+  roundsTotal,
+  playerCount,
+  active,
+  pendingPayments,
+}: {
+  tournamentId: string;
+  eventName: string;
+  state: string | null;
+  roundNo: number | null;
+  roundsTotal: number | null;
+  playerCount: number;
+  active: string;
+  pendingPayments: number;
+}) {
+  const live = state === 'open' || state === 'playing';
+  return (
+    <aside
+      className="flex flex-col gap-1.5 border-b p-4 lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r"
+      style={{ background: 'var(--surface-nav)', borderColor: 'var(--line)' }}
+    >
+      <div className="flex items-center gap-2.5 px-2 pb-4 pt-1.5" style={{ color: 'var(--text)' }}>
+        <BallMark size={26} />
+        <span className="serif text-[20px]">Try to Dink</span>
+        <span className="mono ml-auto rounded-md px-2 py-[3px] text-[10px] font-bold text-white" style={{ background: 'oklch(0.55 0.2 25)' }}>
+          ★ 250
+        </span>
+      </div>
+      <div className="mb-2 rounded-xl px-3 py-2.5" style={{ background: 'var(--surface-raise)', border: '1px solid var(--line)' }}>
+        <div className="flex items-center gap-2 text-[14px] font-semibold" style={{ color: 'var(--text)' }}>
+          <span className={live ? 'chip chip-live' : 'chip'} style={{ padding: '2px 7px' }}>
+            {live ? <span className="dot" /> : null}
+            {live ? 'Live' : (state ?? 'setup')}
+          </span>
+          <span className="truncate">{eventName}</span>
+        </div>
+        <div className="mono mt-1 text-[10.5px] tracking-[.06em]" style={{ color: 'var(--text3)' }}>
+          {playerCount} PLAYERS{roundNo && roundsTotal ? ` · ROUND ${roundNo}/${roundsTotal}` : ''}
+        </div>
+      </div>
+      <div className="mono px-2.5 pb-1.5 pt-2 text-[10px] uppercase tracking-[.14em]" style={{ color: 'var(--text3)' }}>Cockpit</div>
+      {NAV_ITEMS.map((item) => {
+        const on = active === item.tab;
+        return (
+          <Link
+            key={item.tab}
+            href={`/tournaments/${tournamentId}/mixer/admin?tab=${item.tab}`}
+            className="flex items-center gap-3 rounded-[11px] border px-3 py-2.5 text-[14px] font-medium"
+            style={
+              on
+                ? { background: 'color-mix(in oklch, var(--accent) 16%, transparent)', color: 'var(--text)', borderColor: 'color-mix(in oklch, var(--accent) 34%, transparent)' }
+                : { color: 'var(--text2)', borderColor: 'transparent' }
+            }
+          >
+            <span className="grid w-5 place-items-center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                {item.icon}
+              </svg>
+            </span>
+            {item.label}
+            {item.tab === 'prizes' && pendingPayments > 0 ? (
+              <span className="mono ml-auto rounded-full px-[7px] py-px text-[10px] font-bold text-white" style={{ background: 'var(--serve)' }}>
+                {pendingPayments}
+              </span>
+            ) : null}
+          </Link>
+        );
+      })}
+      <div className="hidden flex-1 lg:block" />
+      <div className="mono px-2.5 pb-1.5 pt-2 text-[10px] uppercase tracking-[.14em]" style={{ color: 'var(--text3)' }}>Viewing as</div>
+      <div className="flex gap-1 rounded-[11px] p-[3px]" style={{ background: 'var(--surface-raise)', border: '1px solid var(--line)' }}>
+        <Link href={`/tournaments/${tournamentId}/mixer`} className="flex-1 rounded-lg py-2 text-center text-[12.5px] font-semibold" style={{ color: 'var(--text3)' }}>
+          Player
+        </Link>
+        <span className="flex-1 rounded-lg py-2 text-center text-[12.5px] font-semibold" style={{ background: 'var(--accent)', color: 'var(--accent-ink)' }}>
+          Admin
+        </span>
+      </div>
+      <Link
+        href={`/tournaments/${tournamentId}/mixer/present`}
+        className="mt-2 flex items-center justify-center gap-2 rounded-[11px] py-2.5 text-[13px] font-semibold"
+        style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.7" />
+          <path d="M8 20h8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+        Open present screen
+      </Link>
+    </aside>
+  );
+}
+
+function CockpitTopbar({ title, sub }: { title: string; sub: string }) {
+  return (
+    <div
+      className="sticky top-0 z-20 flex h-[66px] items-center gap-4 border-b px-5 lg:px-7"
+      style={{ background: 'color-mix(in oklch, var(--bg) 82%, transparent)', backdropFilter: 'blur(10px)', borderColor: 'var(--line)' }}
+    >
+      <div
+        className="absolute inset-x-0 top-0 h-[3px]"
+        style={{ background: 'linear-gradient(90deg, oklch(0.55 0.2 25) 0 40%, #fff 40% 60%, oklch(0.42 0.14 258) 60%)' }}
+      />
+      <div>
+        <h1 className="text-[19px] font-semibold" style={{ color: 'var(--text)' }}>{title}</h1>
+        <div className="mono text-[11px] tracking-[.06em]" style={{ color: 'var(--text3)' }}>{sub}</div>
       </div>
     </div>
+  );
+}
+
+function CockpitStateBar({ stepIndex, roundNo, roundsTotal }: { stepIndex: number; roundNo: number; roundsTotal: number }) {
+  const steps = ['Open', 'Voting', 'Lock', 'Draw', 'Live', 'Scored'];
+  return (
+    <div
+      className="mb-5 flex flex-wrap items-center gap-2.5 rounded-2xl p-3.5"
+      style={{ background: 'var(--surface-card)', border: '1px solid var(--line)' }}
+    >
+      {steps.map((label, i) => {
+        const done = i < stepIndex;
+        const cur = i === stepIndex;
+        return (
+          <div key={label} className="flex items-center gap-2.5">
+            <div
+              className="flex items-center gap-2 rounded-[10px] px-3 py-1.5 text-[13px] font-semibold"
+              style={
+                cur
+                  ? { background: 'color-mix(in oklch, var(--serve) 14%, transparent)', color: 'var(--text)' }
+                  : { color: done ? 'var(--text2)' : 'var(--text3)' }
+              }
+            >
+              <span
+                className="mono grid h-5 w-5 place-items-center rounded-full text-[10px]"
+                style={
+                  done
+                    ? { background: 'var(--accent)', color: 'var(--accent-ink)' }
+                    : cur
+                      ? { background: 'var(--serve)', color: '#fff' }
+                      : { border: '1.5px solid var(--line-2)' }
+                }
+              >
+                {i + 1}
+              </span>
+              {label}
+            </div>
+            {i < steps.length - 1 ? <span style={{ color: 'var(--text3)' }}>→</span> : null}
+          </div>
+        );
+      })}
+      <span className="chip chip-live ml-auto"><span className="dot" />Round {roundNo} of {roundsTotal}</span>
+    </div>
+  );
+}
+
+function Ring({ pct, label }: { pct: number; label: string }) {
+  return (
+    <div
+      className="relative grid h-24 w-24 shrink-0 place-items-center rounded-full"
+      style={{ background: `conic-gradient(var(--accent) ${pct}%, var(--line-2) 0)` }}
+    >
+      <div className="absolute rounded-full" style={{ inset: 9, background: 'var(--surface-inset)' }} />
+      <span className="mono relative text-[18px] font-bold" style={{ color: 'var(--text)' }}>{label}</span>
+    </div>
+  );
+}
+
+function initialsOf(name: string) {
+  return name.split(' ').map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+}
+
+function Facepile({ names }: { names: string[] }) {
+  const shown = names.slice(0, 5);
+  const extra = names.length - shown.length;
+  return (
+    <div className="flex">
+      {shown.map((n, i) => (
+        <span
+          key={n + i}
+          className="av"
+          style={{ width: 32, height: 32, marginLeft: i === 0 ? 0 : -10, fontSize: 11, color: 'var(--accent-ink)', background: 'var(--accent)', border: '2px solid var(--surface-card)' }}
+          aria-hidden
+        >
+          {initialsOf(n)}
+        </span>
+      ))}
+      {extra > 0 ? (
+        <span
+          className="mono grid place-items-center rounded-full text-[11px] font-bold"
+          style={{ width: 32, height: 32, marginLeft: -10, background: 'var(--surface-raise)', border: '2px solid var(--surface-card)', color: 'var(--text2)' }}
+        >
+          +{extra}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function BlindNote() {
+  return (
+    <div
+      className="mt-3.5 flex items-center gap-2 rounded-[10px] border border-dashed px-3 py-2.5 text-[12px]"
+      style={{ background: 'var(--surface-inset)', borderColor: 'var(--line-2)', color: 'var(--text3)' }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M4 4l16 16M6.2 6.7C3.9 8.2 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.6 0 3-.45 4.2-1.1M10 5.8c.65-.13 1.3-.2 2-.2 6 0 9.5 6.4 9.5 6.4a17 17 0 01-2.3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+      Blind ballot — even you can&apos;t see picks or tallies until the draw.
+    </div>
+  );
+}
+
+function WeightTile({ v, l }: { v: string; l: string }) {
+  return (
+    <div className="flex-1 rounded-xl p-2.5 text-center" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)' }}>
+      <div className="mono text-[19px] font-bold" style={{ color: 'var(--accent)' }}>{v}</div>
+      <div className="mono mt-0.5 text-[9.5px] uppercase tracking-[.1em]" style={{ color: 'var(--text3)' }}>{l}</div>
+    </div>
+  );
+}
+
+function CourtMini({ courtNo, teamA, teamB, scoreA, scoreB, live }: { courtNo: number; teamA: string; teamB: string; scoreA: number; scoreB: number; live: boolean }) {
+  return (
+    <div
+      className="flex items-center gap-3 rounded-xl p-3"
+      style={{ border: '1px solid var(--line)', borderLeft: live ? '3px solid var(--serve)' : '1px solid var(--line)' }}
+    >
+      <span className="mono w-12 text-[11px]" style={{ color: 'var(--text3)' }}>CT {courtNo}</span>
+      <div className="min-w-0 flex-1 text-[13px]" style={{ color: 'var(--text)' }}>
+        <div className="flex justify-between gap-2"><span className="truncate">{teamA}</span><span className="mono font-bold">{scoreA}</span></div>
+        <div className="flex justify-between gap-2"><span className="truncate">{teamB}</span><span className="mono font-bold">{scoreB}</span></div>
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, tone, text }: { label: string; value: string | number; tone?: 'accent' | 'serve'; text?: boolean }) {
+  const color = tone === 'accent' ? 'var(--accent)' : tone === 'serve' ? 'var(--serve)' : 'var(--text)';
+  return (
+    <div className="flex items-center justify-between border-b py-2.5 last:border-b-0" style={{ borderColor: 'var(--line)' }}>
+      <span className="text-[13px]" style={{ color: 'var(--text2)' }}>{label}</span>
+      <span className={text ? 'text-[13px] font-semibold' : 'mono text-[15px] font-bold'} style={{ color }}>{value}</span>
+    </div>
+  );
+}
+
+function SurfaceLink({ href, title, sub }: { href: string; title: string; sub: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between gap-2 rounded-xl px-3.5 py-2.5"
+      style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)' }}
+    >
+      <span className="min-w-0">
+        <span className="block text-[13.5px] font-semibold" style={{ color: 'var(--text)' }}>{title}</span>
+        <span className="block text-[11.5px]" style={{ color: 'var(--text3)' }}>{sub}</span>
+      </span>
+      <span style={{ color: 'var(--text3)' }}>›</span>
+    </Link>
   );
 }
