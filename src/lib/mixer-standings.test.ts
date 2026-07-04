@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeStandings, ordinal, sortStandings, type CourtResult } from './standings';
+import { computeStandings, ordinal, sortStandings, type CourtResult } from './mixer-standings';
 
 const names = new Map([
   ['me', 'Maya Chen'],

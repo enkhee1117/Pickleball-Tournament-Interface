@@ -232,6 +232,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                   <div className="grid grid-cols-2 gap-2">
                     <AdminLink href={`/tournaments/${id}/mixer`} title="Player mode" sub="Vote, match, pool, and me" />
                     <AdminLink href={`/tournaments/${id}/mixer/present`} title="Present" sub="Reveal and raffle board" />
+                    <AdminLink href={`/tournaments/${id}/mixer/present/between`} title="Between-rounds board" sub="Projector standings & check-in" />
                     <AdminLink href={`/tournaments/${id}/mixer/score`} title="Score entry" sub="Post scores, watch standings rise" />
                   </div>
                 </Section>

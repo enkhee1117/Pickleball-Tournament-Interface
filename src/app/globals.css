@@ -106,6 +106,40 @@
   --text3: var(--ink-3);
 }
 
+/* Fixed projector show theme — the present/projector screen is a shared STAGE,
+   not a personal setting, so it always uses this high-contrast dark palette
+   regardless of the user's chosen theme. Scope it on any element. */
+.theme-show {
+  color-scheme: dark;
+  --paper: oklch(0.155 0.024 264);
+  --paper-2: oklch(0.27 0.036 266);
+  --card: oklch(0.205 0.028 264);
+  --ink: oklch(0.97 0.008 264);
+  --ink-2: oklch(0.79 0.026 264);
+  --ink-3: oklch(0.66 0.03 264);
+  --line: oklch(0.31 0.03 264);
+  --line-2: oklch(0.4 0.04 266);
+  --court: oklch(0.84 0.19 138);
+  --court-deep: oklch(0.84 0.19 138);
+  --court-soft: oklch(0.4 0.1 145);
+  --serve: oklch(0.74 0.18 52);
+  --berry: oklch(0.66 0.21 20);
+  --sky: oklch(0.78 0.12 230);
+  --amber: oklch(0.84 0.15 74);
+  --accent: oklch(0.84 0.19 138);
+  --accent-ink: oklch(0.22 0.06 142);
+  --bg: oklch(0.155 0.024 264);
+  --bg2: oklch(0.205 0.028 264);
+  --bg3: oklch(0.27 0.036 266);
+  --surface-nav: oklch(0.175 0.026 264);
+  --surface-card: oklch(0.205 0.028 264);
+  --surface-inset: oklch(0.185 0.022 264);
+  --surface-raise: oklch(0.25 0.03 264);
+  --text: var(--ink);
+  --text2: var(--ink-2);
+  --text3: var(--ink-3);
+}
+
 /* Liberty 250 — seasonal, opt-in. Theme-independent celebration chrome. */
 :root {
   --flag-red: oklch(0.55 0.2 25);
