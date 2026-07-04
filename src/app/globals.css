@@ -153,6 +153,34 @@
   --show-galaxy-veil: radial-gradient(ellipse 90% 60% at 50% -8%, color-mix(in oklch, var(--accent) 14%, transparent), transparent 60%), radial-gradient(ellipse 70% 50% at 50% 118%, color-mix(in oklch, var(--sky) 10%, transparent), transparent 55%), linear-gradient(180deg, oklch(0.11 0.05 270 / .8), oklch(0.09 0.05 265 / .9));
 }
 
+/* Mixer PLAYER surface — follows the user's Bright/Dark theme (unlike the
+   projector, which is a shared stage and stays fixed-dark). The player pages
+   consume the same --night-* names as the projector, so instead of forking
+   every component we remap those names to the live theme tokens on the player
+   root only. In Dark this lands on the same palette as before; in Bright the
+   whole player surface goes light, matching the organizer cockpit. */
+.mixer-themed {
+  --night-bg: var(--paper);
+  --night-nav: var(--surface-nav);
+  --night-card: var(--card);
+  --night-card-glass: color-mix(in oklch, var(--card) 96%, transparent);
+  --night-inset: var(--surface-raise);
+  --night-line: var(--line-2);
+  --night-line-2: var(--line-2);
+  --night-text: var(--ink);
+  --night-text2: var(--text2);
+  --night-text3: var(--text3);
+  --night-nav-link: var(--text2);
+  --night-nav-link-strong: var(--ink);
+  --night-scrim: color-mix(in oklch, var(--paper) 94%, transparent);
+  --night-court-ink: var(--accent-ink);
+  --night-court-ink-soft: color-mix(in oklch, var(--accent-ink) 22%, transparent);
+  --night-serve-bg: var(--surface-raise);
+  --night-down: var(--berry);
+  --night-down-num: var(--berry);
+  --night-down-text: var(--berry);
+}
+
 /* Liberty 250 — seasonal, opt-in. Theme-independent celebration chrome. */
 :root {
   --flag-red: oklch(0.55 0.2 25);
