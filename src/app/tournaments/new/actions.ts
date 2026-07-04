@@ -33,6 +33,8 @@ type CreateInput = {
   name: string;
   format: WizardFormat | string;
   pairing?: WizardPairing;
+  // Partner-mixer only: mixed | same | open (see genderModeFor).
+  mixerGenderMode?: string;
   playerCount?: number;
   // Preferred: rich per-player metadata. Falls back to playerNames for
   // older callers and the placeholder flow.
@@ -108,7 +110,7 @@ export async function createTournamentClient(input: CreateInput): Promise<Create
     p_format: dbFmt,
     p_whatsapp_group_url: null,
     p_player_count: seedCount,
-    p_gender_mode: genderModeFor(input.format),
+    p_gender_mode: genderModeFor(input.format, input.mixerGenderMode),
     // Wizard pairings 'balanced' / 'snake' / 'random' map directly to the
     // tournament-level pairing_mode; 'manual' (fp-only) doesn't generate
     // matches automatically so any value is fine — store 'random'.
@@ -232,7 +234,7 @@ export async function createTournamentClient(input: CreateInput): Promise<Create
     const playerNames = rosterRows.map((r) => r.display_name).filter(Boolean);
     const genders = rosterRows.map((r) => r.gender ?? null);
     const duprs = rosterRows.map((r) => (r.dupr != null ? Number(r.dupr) : null));
-    const genderMode = genderModeFor(input.format);
+    const genderMode = genderModeFor(input.format, input.mixerGenderMode);
     const pairingMode: 'random' | 'balanced' | 'snake' =
       input.pairing === 'balanced' || input.pairing === 'snake' ? input.pairing : 'random';
 

@@ -9,7 +9,7 @@ import { Icons } from '@/components/ui/icons';
 import { BallMark } from '@/components/desktop';
 import { formatInviteCode } from '@/lib/invite-codes';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
-import { AnonymousMixerJoinButton } from './AnonymousMixerJoinButton';
+import { QuickJoinForm } from './QuickJoinForm';
 import { PushRegistration } from './PushRegistration';
 import { MixerCourtCall, MixerPresenceCheckIn } from './MixerCourtCall';
 import { bindMixerRosterEntry } from './actions';
@@ -68,7 +68,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     { data: states },
     { data: member },
   ] = await Promise.all([
-    supabase.from('tournaments').select('id,name,format,status,invite_code,owner_user_id').eq('id', id).single(),
+    supabase.from('tournaments').select('id,name,format,status,invite_code,owner_user_id,gender_mode').eq('id', id).single(),
     supabase.from('event_config').select('*').eq('tournament_id', id).maybeSingle(),
     supabase.from('mixer_rounds').select('id,round_no,state,lock_at').eq('tournament_id', id).order('round_no', { ascending: true }),
     supabase.from('tournament_players').select('id,display_name,profile_id,gender,dupr').eq('tournament_id', id).order('created_at', { ascending: true }),
@@ -173,7 +173,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
         <div className="px-[18px] pt-6">
           <div className="rounded-2xl bg-white p-5" style={{ border: '1px solid var(--line)' }}>
             <div className="mono text-[10px] uppercase tracking-[0.1em] text-ink-3">You&apos;re in · {t.name}</div>
-            <div className="mt-4"><AnonymousMixerJoinButton tournamentId={id} inviteCode={t.invite_code} /></div>
+            <div className="mt-4"><QuickJoinForm tournamentId={id} inviteCode={t.invite_code} /></div>
             <Link href={`/login?next=${encodeURIComponent(`/tournaments/${id}/mixer`)}`} className="mt-3 block text-center text-[13px] font-semibold text-ink-3">
               Already have an account? Sign in →
             </Link>
@@ -228,6 +228,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
           myPlayer={myPlayer}
           myState={myState}
           votes={voteRows}
+          genderMode={t.gender_mode ?? 'mixed'}
         />
       )}
       {tab === 'match' && (

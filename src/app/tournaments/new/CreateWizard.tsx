@@ -38,6 +38,9 @@ type WizardData = {
   name: string;
   format: FormatId;
   pairing: PairingId;
+  // Partner-mixer only: who pairs with whom. Classic formats derive this
+  // from the format id (rr-mixed, fp-same, …).
+  mixerGenderMode: GenderMode;
   playerCount: number;
   courts: number;
   rounds: number;
@@ -79,6 +82,7 @@ export function CreateWizard() {
     name: '',
     format: 'mixer',
     pairing: 'balanced',
+    mixerGenderMode: 'mixed',
     playerCount: 8,
     courts: 3,
     rounds: 5,
@@ -96,7 +100,7 @@ export function CreateWizard() {
 
   const manualFp = !shouldAutoGenerate(data.format, data.pairing);
   const isMixer = isPartnerMixer(data.format);
-  const genderMode = genderModeFor(data.format);
+  const genderMode = genderModeFor(data.format, data.mixerGenderMode);
   const steps = isMixer ? MIXER_STEP_LABELS : CLASSIC_STEP_LABELS;
 
   // Pairing choices vary by format — reset to a sane default whenever the
@@ -133,6 +137,7 @@ export function CreateWizard() {
         name: data.name.trim(),
         format: data.format,
         pairing: data.pairing,
+        mixerGenderMode: data.mixerGenderMode,
         playerCount: data.playerCount,
         players:
           data.rosterMode === 'names'
@@ -185,7 +190,7 @@ export function CreateWizard() {
       {step === 1 && <StepFormat data={data} set={set} />}
       {isMixer ? (
         <>
-          {step === 2 && <StepRoster data={data} set={set} genderMode={genderMode} />}
+          {step === 2 && <StepRoster data={data} set={set} genderMode={genderMode} isMixer />}
           {step === 3 && <StepMixerVoting data={data} set={set} />}
           {step === 4 && <StepMixerPrizes data={data} set={set} />}
           {step === 5 && <StepReview data={data} manualTeams={false} genderMode={genderMode} />}
@@ -294,7 +299,7 @@ function WizardSummary({ data, isMixer, manualFp }: { data: WizardData; isMixer:
     ['Players', String(data.playerCount)],
   ];
   if (isMixer) {
-    rows.push(['Courts', String(data.courts)], ['Rounds', String(data.rounds)], ['Tokens', String(data.startTokens)], ['Entry', data.entryFee > 0 ? `$${data.entryFee}` : 'Free']);
+    rows.push(['Pairing', GENDER_MODE_LABEL[data.mixerGenderMode]], ['Courts', String(data.courts)], ['Rounds', String(data.rounds)], ['Tokens', String(data.startTokens)], ['Entry', data.entryFee > 0 ? `$${data.entryFee}` : 'Free']);
   } else {
     rows.push(['Pairing', data.pairing], ['Setup', manualFp ? 'Manual teams' : 'Auto-generated']);
   }
@@ -499,14 +504,25 @@ function StepPairing({ data, set }: { data: WizardData; set: <K extends keyof Wi
   );
 }
 
+// The three partner-mixer pairing philosophies (see 0047 migration). "Open"
+// exists for the skewed-roster reality: forcing gender rules on a 12-men /
+// 2-women league night would bench people.
+const MIXER_GENDER_OPTS: Array<{ id: GenderMode; title: string; desc: string; emoji: string }> = [
+  { id: 'mixed', title: 'Mixed pairs', desc: 'Every team is one man + one woman. Classic mixer.', emoji: '🚻' },
+  { id: 'same', title: 'Same gender', desc: 'Teams are M+M and F+F; courts grouped by gender.', emoji: '👥' },
+  { id: 'open', title: 'Open (gender-blind)', desc: 'Anyone pairs with anyone. Best for skewed groups — e.g. 12 men, 2 women.', emoji: '🌐' },
+];
+
 function StepRoster({
   data,
   set,
   genderMode,
+  isMixer = false,
 }: {
   data: WizardData;
   set: <K extends keyof WizardData>(k: K, v: WizardData[K]) => void;
   genderMode: GenderMode;
+  isMixer?: boolean;
 }) {
   const updatePlayer = (idx: number, patch: Partial<WizardPlayer>) => {
     const next = data.players.slice();
@@ -554,6 +570,41 @@ function StepRoster({
       <div className="mb-[18px] text-[13px] text-ink-3">
         Pick a count. Toggle below to type names now or use placeholders and rename later.
       </div>
+
+      {isMixer && (
+        <div className="mb-4">
+          <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-3">
+            Who pairs with whom?
+          </div>
+          <div className="grid gap-2">
+            {MIXER_GENDER_OPTS.map((o) => {
+              const on = data.mixerGenderMode === o.id;
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => set('mixerGenderMode', o.id)}
+                  className="flex items-center gap-3 rounded-2xl p-3.5 text-left transition-colors"
+                  style={{
+                    background: on ? 'var(--court)' : '#fff',
+                    border: `1.5px solid ${on ? 'var(--court-deep)' : 'var(--line)'}`,
+                    color: 'var(--ink)',
+                  }}
+                >
+                  <div className="text-[22px]">{o.emoji}</div>
+                  <div className="flex-1">
+                    <div className="text-[14px] font-semibold tracking-tight">{o.title}</div>
+                    <div className="mt-0.5 text-xs" style={{ color: on ? 'oklch(0.3 0.04 140)' : 'var(--ink-3)' }}>
+                      {o.desc}
+                    </div>
+                  </div>
+                  {on && <span style={{ color: 'var(--ink)' }}>{Icons.check}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div
         className="mb-4 rounded-[18px] bg-white p-[22px] text-center"
@@ -1067,6 +1118,11 @@ const PAIRING_LABEL: Record<PairingId, string> = {
   snake: 'Snake seeding',
   manual: 'Manual',
 };
+const GENDER_MODE_LABEL: Record<GenderMode, string> = {
+  mixed: 'Mixed pairs (M+F)',
+  same: 'Same gender (M+M / F+F)',
+  open: 'Open · gender-blind',
+};
 
 function formatLockDuration(seconds: number) {
   const hours = Math.floor(seconds / 3600);
@@ -1098,6 +1154,7 @@ function StepReview({
     ? [
         ['Name', data.name || '—'],
         ['Format', FORMAT_LABEL[data.format]],
+        ['Pairing rule', GENDER_MODE_LABEL[data.mixerGenderMode]],
         ['Players', `${data.playerCount}${data.rosterMode === 'names' ? ' (named)' : ''}`],
         ...(showGenderRow
           ? ([['Gender split', `M ${males} · F ${females}${ungendered ? ` · ${ungendered} untagged` : ''}`]] as Array<

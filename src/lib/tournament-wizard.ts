@@ -46,8 +46,22 @@ export function isPartnerMixer(format: WizardFormat | DbFormat | string): boolea
 // the DB and generator understand. Plain DB formats default to 'open'.
 export type GenderMode = 'open' | 'mixed' | 'same';
 
-export function genderModeFor(format: WizardFormat | DbFormat | string): GenderMode {
-  if (format === 'mixer' || format === 'partner_mixer') return 'mixed';
+export function isGenderMode(value: string | null | undefined): value is GenderMode {
+  return value === 'open' || value === 'mixed' || value === 'same';
+}
+
+// Partner mixers choose their own gender mode in the wizard (mixerGenderMode):
+//   mixed — every team is one man + one woman (the classic mixer)
+//   same  — teams are M+M and F+F, courts grouped by gender
+//   open  — gender-blind, for skewed rosters (e.g. 12 men, 2 women)
+// Classic formats still derive the mode from the format id.
+export function genderModeFor(
+  format: WizardFormat | DbFormat | string,
+  mixerGenderMode?: GenderMode | string | null,
+): GenderMode {
+  if (format === 'mixer' || format === 'partner_mixer') {
+    return isGenderMode(mixerGenderMode) ? mixerGenderMode : 'mixed';
+  }
   if (format === 'rr-mixed' || format === 'fp-mixed') return 'mixed';
   if (format === 'rr-same' || format === 'fp-same') return 'same';
   return 'open';

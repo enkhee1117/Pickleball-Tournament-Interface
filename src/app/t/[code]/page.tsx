@@ -13,7 +13,7 @@ import {
   type StandingsMatch,
 } from '@/lib/scoring';
 import { RecordingsMenu } from '@/components/RecordingsMenu';
-import { AnonymousMixerJoinButton } from '@/app/tournaments/[id]/mixer/AnonymousMixerJoinButton';
+import { QuickJoinForm } from '@/app/tournaments/[id]/mixer/QuickJoinForm';
 import { joinPublicTournament } from './actions';
 
 type PageProps = {
@@ -297,7 +297,7 @@ function CtaBar({
   if (format === 'partner_mixer') {
     return (
       <div className="grid gap-2 px-[18px] pt-3.5">
-        <AnonymousMixerJoinButton tournamentId={tournamentId} inviteCode={inviteCode} />
+        <QuickJoinForm tournamentId={tournamentId} inviteCode={inviteCode} />
         <Link
           href={`/login?next=${encodeURIComponent(`/t/${inviteCode}`)}`}
           className="block w-full rounded-2xl px-5 py-3 text-center text-[13px] font-semibold tracking-tight"
