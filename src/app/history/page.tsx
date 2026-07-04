@@ -1,11 +1,12 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import type { Tournament } from '@/lib/types';
-import { TopBar } from '@/components/ui/TopBar';
+import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
+import { DesktopNav, DesktopSurface } from '@/components/desktop';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { Chip } from '@/components/ui/Chip';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
-import { Icons } from '@/components/ui/icons';
 import { computePlayerStandings, type StandingsMatch } from '@/lib/scoring';
 import { MatchSearch } from './MatchSearch';
 import { dismissSelfLink } from './dismiss-action';
@@ -48,27 +49,17 @@ type MatchRow = {
 
 export default async function HistoryPage() {
   const supabase = await createClient();
+  const cookieStore = await cookies();
+  const theme = readThemeFromCookie(cookieStore.get(THEME_COOKIE)?.value);
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
     return (
-      <div className="flex min-h-full flex-col bg-paper">
-        <TopBar
-          title="Stats"
-          left={
-            <Link
-              href="/"
-              aria-label="Back"
-              className="flex h-10 w-10 items-center justify-center rounded-xl"
-              style={{ color: 'var(--ink)' }}
-            >
-              {Icons.back}
-            </Link>
-          }
-        />
-        <div className="flex flex-1 flex-col items-center justify-center px-[18px] pb-24 text-center">
+      <DesktopSurface withCommandBar>
+        <DesktopNav theme={theme} active="Stats" />
+        <main id="main" className="flex flex-col items-center justify-center px-[18px] pt-24 text-center">
           <div className="serif text-[28px] leading-[1.1] text-ink">
             Sign in to see <span className="italic" style={{ color: 'var(--court-deep)' }}>your stats</span>.
           </div>
@@ -79,8 +70,8 @@ export default async function HistoryPage() {
           >
             Sign in
           </Link>
-        </div>
-      </div>
+        </main>
+      </DesktopSurface>
     );
   }
 
@@ -153,34 +144,23 @@ export default async function HistoryPage() {
   const aggregate = aggregateStats(myMatches, linked);
 
   return (
-    <div className="flex min-h-full flex-col bg-paper">
-      <TopBar
-        title="Stats"
-        left={
-          <Link
-            href="/"
-            aria-label="Back"
-            className="flex h-10 w-10 items-center justify-center rounded-xl"
-            style={{ color: 'var(--ink)' }}
-          >
-            {Icons.back}
-          </Link>
-        }
-      />
-
-      <div className="flex-1 overflow-y-auto px-[18px] pb-24">
-        <div className="serif px-1 py-2 text-[28px] leading-[1.1] text-ink">
-          Your <span className="italic" style={{ color: 'var(--court-deep)' }}>scorecard</span>
-          .
+    <DesktopSurface withCommandBar>
+      <DesktopNav theme={theme} active="Stats" />
+      <main id="main" className="mx-auto w-full max-w-[1080px] px-4 pb-24 pt-7 sm:px-6 lg:px-8">
+        {/* trophy-case hero */}
+        <div className="mb-6">
+          <div className="eyebrow mb-2">Your season</div>
+          <h1 className="serif text-[34px] leading-none text-ink sm:text-[42px]">
+            The <span className="italic" style={{ color: 'var(--court-deep)' }}>trophy case</span>.
+          </h1>
+          <div className="mt-2 text-sm text-ink-3">Every night you&apos;ve played, tallied up.</div>
         </div>
 
-        {linked.length > 0 && (
-          <div className="mb-[22px] grid grid-cols-3 gap-2.5">
-            <StatTile label="Played" value={aggregate.matchesPlayed} icon="🎾" />
-            <StatTile label="Won" value={aggregate.wins} icon="🏆" />
-            <StatTile label="Win %" value={aggregate.winPct === null ? '—' : `${aggregate.winPct}%`} icon="📈" />
-          </div>
-        )}
+        <div className="mb-7 grid grid-cols-3 gap-3">
+          <TrophyCard icon="🏆" value={aggregate.wins} label="Matches won" />
+          <TrophyCard icon="🎾" value={tournamentIds.length} label="Events played" />
+          <TrophyCard icon="📈" value={aggregate.winPct === null ? '—' : `${aggregate.winPct}%`} label="Win rate" />
+        </div>
 
         {unclaimed.length > 0 && (
           <div
@@ -393,20 +373,17 @@ export default async function HistoryPage() {
             })}
           </div>
         )}
-      </div>
-    </div>
+      </main>
+    </DesktopSurface>
   );
 }
 
-function StatTile({ label, value, icon }: { label: string; value: number | string; icon: string }) {
+function TrophyCard({ label, value, icon }: { label: string; value: number | string; icon: string }) {
   return (
-    <div
-      className="rounded-2xl bg-white p-3.5 text-center"
-      style={{ border: '1px solid var(--line)' }}
-    >
-      <div className="text-[28px]">{icon}</div>
-      <div className="mono mt-1 text-[22px] font-bold tracking-tight text-ink">{value}</div>
-      <div className="text-[11px] uppercase tracking-[0.04em] text-ink-3">{label}</div>
+    <div className="rounded-[18px] bg-white p-5 text-center" style={{ border: '1px solid var(--line)' }}>
+      <div className="text-[34px] leading-none">{icon}</div>
+      <div className="disp mt-2 text-[34px] font-extrabold tracking-tight text-ink">{value}</div>
+      <div className="mono mt-1 text-[10.5px] uppercase tracking-[0.1em] text-ink-3">{label}</div>
     </div>
   );
 }
