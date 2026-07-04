@@ -30,22 +30,50 @@ export function MatchTab({
   const myTeamIndex = Math.max(0, courtTeams.findIndex((p) => p.id === myPairing.id));
   const opponent = courtTeams.find((p) => p.id !== myPairing.id);
   const score = scores.find((s) => s.court_no === myPairing.court_no);
+  const isLive = !score?.completed_at;
   const myScore = !score ? 0 : myTeamIndex === 0 ? score.team_a_score : score.team_b_score;
   const theirScore = !score ? 0 : myTeamIndex === 0 ? score.team_b_score : score.team_a_score;
+  const yourTeam = `${name(myPairing.player_a_id)} & ${name(myPairing.player_b_id)}`;
+  const oppTeam = opponent ? `${name(opponent.player_a_id)} & ${name(opponent.player_b_id)}` : null;
   return (
     <div className="px-[18px]">
-      <div className="rounded-[18px] p-5" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
-        <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--court)' }}>Your team</div>
-        <div className="serif mt-2 text-[32px] leading-none">
-          {name(myPairing.player_a_id)} & {name(myPairing.player_b_id)}
-        </div>
-        <div className="mt-2 text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>Court {myPairing.court_no}</div>
-        {opponent && (
-          <div className="mt-3 text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>
-            vs {name(opponent.player_a_id)} & {name(opponent.player_b_id)}
+      {isLive ? (
+        // In-app "you're up" court call / go-time takeover (notify.html): the
+        // seat is real (this player is drawn on this court, unscored).
+        <div
+          className="relative overflow-hidden rounded-[18px] p-5"
+          style={{
+            background: 'radial-gradient(ellipse 120% 80% at 50% 0%, color-mix(in oklch, var(--serve) 30%, transparent), transparent 60%), oklch(0.16 0.03 40)',
+            border: '1px solid color-mix(in oklch, var(--serve) 45%, oklch(0.36 0.04 266))',
+          }}
+        >
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--serve)' }}>
+            <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full" style={{ background: 'var(--serve)' }} />
+            Take the court
           </div>
-        )}
-      </div>
+          <div className="disp mt-2 text-[72px] font-black leading-[0.85] text-white" style={{ textShadow: '0 0 40px color-mix(in oklch, var(--serve) 55%, transparent)' }}>
+            Court {myPairing.court_no}
+          </div>
+          <div className="serif mt-2 text-[26px] leading-none text-white">It&apos;s go time.</div>
+          <div className="mt-4 flex items-center gap-3 text-sm">
+            <span className="font-bold" style={{ color: 'var(--court)' }}>{yourTeam}</span>
+            {oppTeam && <span className="mono text-[11px]" style={{ color: 'rgba(255,255,255,.6)' }}>VS</span>}
+            {oppTeam && <span style={{ color: 'rgba(255,255,255,.85)' }}>{oppTeam}</span>}
+          </div>
+          <div className="mt-3 text-[12px]" style={{ color: 'rgba(255,255,255,.6)' }}>
+            First serve when all teams check in. Head over — your seat is held.
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-[18px] p-5" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
+          <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--court)' }}>Your team</div>
+          <div className="serif mt-2 text-[32px] leading-none">{yourTeam}</div>
+          <div className="mt-2 text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>Court {myPairing.court_no}</div>
+          {oppTeam && (
+            <div className="mt-3 text-sm" style={{ color: 'oklch(0.78 0.028 264)' }}>vs {oppTeam}</div>
+          )}
+        </div>
+      )}
       <div className="mt-3 rounded-[18px] p-5 text-center" style={{ background: 'oklch(0.215 0.03 264)', border: '1px solid oklch(0.36 0.04 266)' }}>
         <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'oklch(0.7 0.03 264)' }}>Score</div>
         <div className="mono mt-2 text-[54px] font-bold" style={{ color: 'var(--court)' }}>{myScore}-{theirScore}</div>
