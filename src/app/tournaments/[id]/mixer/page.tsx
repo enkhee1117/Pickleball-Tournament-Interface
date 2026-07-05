@@ -12,6 +12,7 @@ import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 import { QuickJoinForm } from './QuickJoinForm';
 import { PushRegistration } from './PushRegistration';
 import { MixerCourtCall, MixerPresenceCheckIn } from './MixerCourtCall';
+import { RevealTakeover } from './_components/RevealTakeover';
 import { bindMixerRosterEntry } from './actions';
 import { ActionForm } from './_components/ActionForm';
 import { MixerBettingPanel } from './MixerBettingPanel';
@@ -169,6 +170,36 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     };
   }
 
+  // The in-app draw reveal — the projector ceremony, phone-native. Fires once
+  // per round (localStorage inside RevealTakeover) when the draw has seated (or
+  // benched) this player. Independent of the court-call ack so it always plays
+  // on a fresh draw, and skipped once the game has been scored.
+  const reveal = computeReveal();
+  function computeReveal() {
+    if (!myPlayer || !currentRound) return null;
+    if (!['revealed', 'playing'].includes(currentRound.state)) return null;
+    const nameOf = (pid: string) => roster.find((p) => p.id === pid)?.display_name ?? 'TBD';
+    const mine = pairingRows.find((p) => p.player_a_id === myPlayer.id || p.player_b_id === myPlayer.id);
+    if (mine) {
+      if (scoreRows.find((s) => s.court_no === mine.court_no && s.wave_no === mine.wave_no)?.completed_at) return null;
+      const partnerId = mine.player_a_id === myPlayer.id ? mine.player_b_id : mine.player_a_id;
+      const opponent = pairingRows.find((p) => p.court_no === mine.court_no && p.wave_no === mine.wave_no && p.id !== mine.id) ?? null;
+      return {
+        roundId: currentRound.id,
+        roundNo: currentRound.round_no,
+        courtNo: mine.court_no as number | null,
+        waveNo: mine.wave_no,
+        partnerName: nameOf(partnerId) as string | null,
+        opponentTeam: opponent ? `${nameOf(opponent.player_a_id)} & ${nameOf(opponent.player_b_id)}` : null,
+        sittingOut: false,
+      };
+    }
+    if (sitOutIds.includes(myPlayer.id)) {
+      return { roundId: currentRound.id, roundNo: currentRound.round_no, courtNo: null, waveNo: 1, partnerName: null, opponentTeam: null, sittingOut: true };
+    }
+    return null;
+  }
+
   // Show the quiet presence check-in when the player is at a live event, not
   // currently court-called, and hasn't checked in yet — this is what fills the
   // present-between face-wall between rounds.
@@ -217,6 +248,17 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   return (
     <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={myPlayer} isManager={isManager}>
       <PushRegistration />
+      {reveal && (
+        <RevealTakeover
+          roundId={reveal.roundId}
+          roundNo={reveal.roundNo}
+          courtNo={reveal.courtNo}
+          waveNo={reveal.waveNo}
+          partnerName={reveal.partnerName}
+          opponentTeam={reveal.opponentTeam}
+          sittingOut={reveal.sittingOut}
+        />
+      )}
       {courtCall && (
         <MixerCourtCall
           tournamentId={id}
@@ -247,7 +289,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
         />
       )}
       {tab === 'match' && (
-        <MatchTab roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} />
+        <MatchTab tournamentId={id} round={currentRound} roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} />
       )}
       {tab === 'courts' && (
         <CourtsTab roster={roster} pairings={pairingRows} scores={scoreRows} sitOuts={sitOutIds} myPlayer={myPlayer} round={currentRound} />

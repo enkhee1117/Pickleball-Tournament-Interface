@@ -454,6 +454,38 @@ export async function scoreMixerCourt(formData: FormData): Promise<ActionResult>
   return { ok: true, message: 'Score posted' };
 }
 
+// Player-facing score entry (ux-score.html): a player posts the final for the
+// court/game they're actually on. Participant-gated in the DB
+// (app_mixer_player_score_court); returns a result so the Match tab reflects
+// "posted" in place. The organizer keeps their own override via scoreMixerCourt.
+export async function submitMixerScoreAsPlayer(input: {
+  tournamentId: string;
+  roundId: string;
+  courtNo: number;
+  waveNo: number;
+  teamAScore: number;
+  teamBScore: number;
+}): Promise<ActionResult> {
+  const { tournamentId, roundId, courtNo, waveNo, teamAScore, teamBScore } = input;
+  if (!tournamentId || !roundId) return { ok: false, error: 'Missing round.' };
+  const clamp = (n: number) => Math.max(0, Math.min(999, Math.trunc(Number(n) || 0)));
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_mixer_player_score_court', {
+    p_round_id: roundId,
+    p_court_no: Math.max(1, Math.trunc(courtNo)),
+    p_wave_no: Math.max(1, Math.trunc(waveNo)),
+    p_team_a_score: clamp(teamAScore),
+    p_team_b_score: clamp(teamBScore),
+  });
+  if (error) return { ok: false, error: formatPgError(error) };
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  revalidatePath(`${mixerPath(tournamentId)}/present`);
+  return { ok: true, message: 'Score posted' };
+}
+
 export async function placeMixerBet(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const bettorPlayerId = fieldString(formData, 'bettor_player_id');
