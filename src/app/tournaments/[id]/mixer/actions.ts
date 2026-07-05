@@ -337,7 +337,25 @@ export async function reopenMixerRound(formData: FormData): Promise<ActionResult
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
   revalidatePath(`${mixerPath(tournamentId)}/present`);
-  return { ok: true, message: 'Round reopened — pairings cleared, voting is live again' };
+  return { ok: true, message: 'Round reopened — pairings and scores cleared, voting is live again' };
+}
+
+// Recompute every player's pairing pool from the current roster + gender mode.
+// The fix-up for a night where pools drifted out of sync (e.g. players claimed
+// pre-seeded slots of the wrong gender), and the prep step for a clean redraw
+// after the roster or configuration changed. Only touches pools; wallets,
+// votes, and any existing pairings are left alone until you reopen + redraw.
+export async function repoolMixerRoster(formData: FormData): Promise<ActionResult> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_mixer_repool_roster', { p_tournament_id: tournamentId });
+  if (error) return { ok: false, error: formatPgError(error) };
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  return { ok: true, message: 'Teams re-pooled from genders — reopen the round and run the draw to apply' };
 }
 
 export async function resetMixerRoundVotes(formData: FormData): Promise<ActionResult> {

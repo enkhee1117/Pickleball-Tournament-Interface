@@ -32,12 +32,13 @@ import type {
   TournamentRow,
 } from './_types';
 import { MatchTab } from './_components/MatchTab';
+import { CourtsTab } from './_components/CourtsTab';
 import { MeTab } from './_components/MeTab';
 import { Notice } from './_components/mixer-night';
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: 'vote' | 'match' | 'betting' | 'me'; round?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ tab?: 'vote' | 'match' | 'courts' | 'betting' | 'me'; round?: string; ok?: string; error?: string }>;
 };
 
 type VoteRow = {
@@ -96,7 +97,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const myPlayer = user ? roster.find((p) => p.profile_id === user.id) ?? null : null;
   const myState = myPlayer ? stateRows.find((s) => s.player_id === myPlayer.id) ?? null : null;
 
-  const [{ data: votes }, { data: pairings }, { data: scores }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }] = await Promise.all([
+  const [{ data: votes }, { data: pairings }, { data: scores }, { data: sitOuts }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }] = await Promise.all([
     roundIds.length > 0 && myPlayer
       ? supabase.from('mixer_votes').select('round_id,target_player_id,up_tokens,down_tokens').in('round_id', roundIds).eq('voter_player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
@@ -105,6 +106,9 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
       : Promise.resolve({ data: [] }),
     currentRound
       ? supabase.from('mixer_scores').select('court_no,wave_no,team_a_score,team_b_score,completed_at').eq('round_id', currentRound.id)
+      : Promise.resolve({ data: [] }),
+    currentRound
+      ? supabase.from('mixer_sit_outs').select('player_id').eq('round_id', currentRound.id)
       : Promise.resolve({ data: [] }),
     myPlayer
       ? supabase.from('bets').select('market_place,bettor_player_id,pick_player_id,chips').eq('tournament_id', id).eq('bettor_player_id', myPlayer.id)
@@ -129,6 +133,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     .map((r) => r.round_id);
   const pairingRows = (pairings ?? []) as PairingRow[];
   const scoreRows = (scores ?? []) as ScoreRow[];
+  const sitOutIds = ((sitOuts ?? []) as { player_id: string }[]).map((s) => s.player_id);
   const betRows = (bets ?? []) as BetRow[];
   const paymentRows = (payments ?? []) as PaymentRow[];
   const final = snapshot as SnapshotRow | null;
@@ -244,6 +249,9 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
       {tab === 'match' && (
         <MatchTab roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} />
       )}
+      {tab === 'courts' && (
+        <CourtsTab roster={roster} pairings={pairingRows} scores={scoreRows} sitOuts={sitOutIds} myPlayer={myPlayer} round={currentRound} />
+      )}
       {tab === 'betting' && (
         <MixerBettingPanel tournamentId={id} roster={roster} myPlayer={myPlayer} myState={myState} bets={betRows} config={cfg} />
       )}
@@ -273,6 +281,7 @@ function MixerShell({
   const tabs: [string, string][] = [
     ['vote', 'Vote'],
     ['match', 'Match'],
+    ['courts', 'Courts'],
     ['betting', 'Pool'],
     ['me', 'Me'],
   ];
@@ -357,7 +366,7 @@ function MixerShell({
       </div>
 
       {/* Bottom tab bar — mobile only */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 mx-auto grid max-w-md grid-cols-4 gap-1 p-2 lg:hidden" style={{ background: 'var(--night-bg)', borderTop: '1px solid var(--night-line)' }}>
+      <div className="fixed bottom-0 left-0 right-0 z-30 mx-auto grid max-w-md grid-cols-5 gap-1 p-2 lg:hidden" style={{ background: 'var(--night-bg)', borderTop: '1px solid var(--night-line)' }}>
         {tabs.map(([id, label]) => (
           <Link key={id} href={href(id)} className="rounded-xl py-3 text-center text-[12px] font-bold" style={{
             background: tab === id ? 'var(--court)' : 'transparent',
