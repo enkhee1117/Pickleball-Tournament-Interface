@@ -1,18 +1,23 @@
-import type { PairingRow, PlayerRow, ScoreRow, StandingItem } from '../_types';
+import type { PairingRow, PlayerRow, RoundRow, ScoreRow, StandingItem } from '../_types';
 import { gameSlotLabel } from '@/lib/mixer-standings';
 import { EmptyNight, ordinal } from './mixer-night';
+import { MatchScoreEntry } from './MatchScoreEntry';
 
-// The player's "Match" tab — shows their current pairing/court/score plus a
-// mini live standings block. When the event is finalized, defers to the
-// final-standings view instead.
+// The player's "Match" tab — shows their current pairing/court, courtside score
+// entry for their own game, plus a mini live standings block. When the event is
+// finalized, defers to the final-standings view instead.
 
 export function MatchTab({
+  tournamentId,
+  round,
   roster,
   pairings,
   scores,
   myPlayer,
   standings,
 }: {
+  tournamentId: string;
+  round: RoundRow;
   roster: PlayerRow[];
   pairings: PairingRow[];
   scores: ScoreRow[];
@@ -112,10 +117,26 @@ export function MatchTab({
           )}
         </div>
       )}
-      <div className="mt-3 rounded-[18px] p-5 text-center" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
-        <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--night-text3)' }}>Score</div>
-        <div className="mono mt-2 text-[54px] font-bold" style={{ color: 'var(--court)' }}>{myScore}-{theirScore}</div>
-      </div>
+      {opponent && !waitingForHeats ? (
+        <MatchScoreEntry
+          tournamentId={tournamentId}
+          roundId={round.id}
+          courtNo={myPairing.court_no}
+          waveNo={myPairing.wave_no}
+          teamALabel={`${name(courtTeams[0].player_a_id)} & ${name(courtTeams[0].player_b_id)}`}
+          teamBLabel={`${name(courtTeams[1].player_a_id)} & ${name(courtTeams[1].player_b_id)}`}
+          myTeam={myTeamIndex === 0 ? 'a' : 'b'}
+          initialA={score?.team_a_score ?? 0}
+          initialB={score?.team_b_score ?? 0}
+          posted={!!score?.completed_at}
+          canScore={['revealed', 'playing'].includes(round.state)}
+        />
+      ) : (
+        <div className="mt-3 rounded-[18px] p-5 text-center" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
+          <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--night-text3)' }}>Score</div>
+          <div className="mono mt-2 text-[54px] font-bold" style={{ color: 'var(--court)' }}>{myScore}-{theirScore}</div>
+        </div>
+      )}
       <StandingsMini roster={roster} pairings={pairings} scores={scores} />
     </div>
   );
