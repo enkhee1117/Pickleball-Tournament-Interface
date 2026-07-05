@@ -7,6 +7,7 @@ import {
   isUpvoteAllocationValid,
   mixerPairScore,
   mixerPairWeight,
+  mixerTeamPlan,
   settleParimutuelBets,
   type MixerPlayer,
   type MixerVote,
@@ -31,6 +32,54 @@ describe('mixerPairWeight', () => {
   it('applies repeat decay per previous partnership', () => {
     expect(mixerPairWeight('A', 'B', [], { 'A:B': 1 })).toBeCloseTo(0.2, 5);
     expect(mixerPairWeight('A', 'B', [], { 'A:B': 2 })).toBeCloseTo(0.04, 5);
+  });
+});
+
+describe('mixerTeamPlan (even-teams rotating bye, migration 0054)', () => {
+  it('balanced even roster: everyone plays, no byes', () => {
+    expect(mixerTeamPlan(8, 8)).toEqual({ sitA: 0, sitB: 0, teams: 8 });
+  });
+
+  it('the live 7M/9F bug: sits 1+3, forms 6 even teams (was 7 → stranded court)', () => {
+    expect(mixerTeamPlan(7, 9)).toEqual({ sitA: 1, sitB: 3, teams: 6 });
+  });
+
+  it('balanced but odd (7/7): one more bye per pool → 6 teams', () => {
+    expect(mixerTeamPlan(7, 7)).toEqual({ sitA: 1, sitB: 1, teams: 6 });
+  });
+
+  it('off-by-one that is already even (8/9): only the overflow sits', () => {
+    expect(mixerTeamPlan(8, 9)).toEqual({ sitA: 0, sitB: 1, teams: 8 });
+  });
+
+  it('cannot make a game (1 vs many): nobody is stranded, teams = 0', () => {
+    expect(mixerTeamPlan(1, 5)).toEqual({ sitA: 1, sitB: 5, teams: 0 });
+  });
+
+  it('empty pool: no teams', () => {
+    expect(mixerTeamPlan(0, 6)).toEqual({ sitA: 0, sitB: 6, teams: 0 });
+  });
+
+  it('symmetric in the two pools', () => {
+    expect(mixerTeamPlan(9, 7)).toEqual({ sitA: 3, sitB: 1, teams: 6 });
+  });
+
+  it('invariants hold across a wide range', () => {
+    for (let a = 0; a <= 20; a += 1) {
+      for (let b = 0; b <= 20; b += 1) {
+        const { sitA, sitB, teams } = mixerTeamPlan(a, b);
+        // teams is always even (no stranded team on a court)
+        expect(teams % 2).toBe(0);
+        // both pools contribute exactly `teams` players — teams are 1a+1b
+        expect(a - sitA).toBe(teams);
+        expect(b - sitB).toBe(teams);
+        // never sit more than necessary: at most one bye-pair beyond the overflow
+        expect(teams).toBeGreaterThanOrEqual(Math.max(0, Math.min(a, b) - 1));
+        expect(teams).toBeLessThanOrEqual(Math.min(a, b));
+        expect(sitA).toBeGreaterThanOrEqual(0);
+        expect(sitB).toBeGreaterThanOrEqual(0);
+      }
+    }
   });
 });
 

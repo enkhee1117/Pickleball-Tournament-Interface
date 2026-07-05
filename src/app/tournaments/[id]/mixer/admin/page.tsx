@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { DesktopSurface, BallMark } from '@/components/desktop';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 import { gameSlotLabel } from '@/lib/mixer-standings';
+import { mixerTeamPlan } from '@/lib/mixer';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import { MixerRealtimeSync } from '../MixerRealtimeSync';
 import { ActionForm } from '../_components/ActionForm';
@@ -36,6 +37,7 @@ import { ConfigForm } from '../_components/ConfigForm';
 import { RosterTable, type RosterTableRow } from '../_components/RosterTable';
 import { mixerAvatarFor } from '../_components/mixer-night';
 import { CountdownTimer } from '../_components/CountdownTimer';
+import { OrganizerRevealTakeover } from '../_components/OrganizerRevealTakeover';
 import {
   formatLockDuration,
   getOrganizerTab,
@@ -82,7 +84,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
     { data: rounds },
     { data: players },
   ] = await Promise.all([
-    supabase.from('tournaments').select('id,name,format,owner_user_id,status,invite_code').eq('id', id).single(),
+    supabase.from('tournaments').select('id,name,format,owner_user_id,status,invite_code,gender_mode').eq('id', id).single(),
     user
       ? supabase.from('tournament_members').select('role').eq('tournament_id', id).eq('user_id', user.id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -150,10 +152,34 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const gameSlots = [...new Map(pairingRows.map((p) => [slotKey(p.court_no, p.wave_no), { courtNo: p.court_no, waveNo: p.wave_no }])).values()]
     .sort((a, b) => a.courtNo - b.courtNo || a.waveNo - b.waveNo);
   const currentCourtCount = gameSlots.length;
+  // Organizer cockpit draw reveal (once per round): the courts the tokens seated.
+  const revealCourts = gameSlots.map(({ courtNo, waveNo }) => {
+    const teams = pairingRows.filter((p) => p.court_no === courtNo && p.wave_no === waveNo);
+    return {
+      label: gameSlotLabel(courtNo, waveNo),
+      teamA: teams[0] ? `${name(teams[0].player_a_id)} & ${name(teams[0].player_b_id)}` : '—',
+      teamB: teams[1] ? `${name(teams[1].player_a_id)} & ${name(teams[1].player_b_id)}` : null,
+    };
+  });
+  const seatedIds = new Set(pairingRows.flatMap((p) => [p.player_a_id, p.player_b_id]));
+  const revealSitting = roster.filter((p) => !p.withdrawn_at && !seatedIds.has(p.id)).map((p) => p.display_name);
+  const showOrganizerReveal = !!currentRound && ['revealed', 'playing'].includes(currentRound.state) && revealCourts.length > 0;
   const scoredCourtCount = scoreRows.filter((score) => score.completed_at).length;
   const canOpenBallot = !!currentRound && !drawStarted && hasLockedBallots;
   const canLockBallot = !!currentRound && hasOpenBallots && !drawStarted;
   const canDraw = currentRound?.state === 'locked';
+
+  // Draw preview + gender-balance guardrail: how the current pools will seat vs
+  // sit next round (mirrors the draw's even-teams plan). Warns the organizer
+  // before they draw when the roster forces people to sit every round.
+  const activeRoster = roster.filter((p) => !p.withdrawn_at);
+  const poolOf = (p: PlayerRow) => stateRows.find((s) => s.player_id === p.id)?.pairing_pool ?? (p.gender === 'f' ? 'b' : 'a');
+  const poolA = activeRoster.filter((p) => poolOf(p) === 'a').length;
+  const poolB = activeRoster.filter((p) => poolOf(p) === 'b').length;
+  const teamPlan = mixerTeamPlan(poolA, poolB);
+  const sittingPerRound = teamPlan.sitA + teamPlan.sitB;
+  const genderMode = (t.gender_mode ?? 'open') as string;
+  const poolsLopsided = Math.abs(poolA - poolB) > 1;
   // Vote simulation writes ballots, which the DB only accepts while the round
   // is open (same rule real voters hit).
   const canSimulate = currentRound?.state === 'open';
@@ -229,6 +255,9 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
     // edge to edge (previously a hardcoded night body framed light content).
     <DesktopSurface variant={theme === 'night' ? 'night' : 'default'} withCommandBar>
       <MixerRealtimeSync tournamentId={id} />
+      {showOrganizerReveal && currentRound && (
+        <OrganizerRevealTakeover roundId={currentRound.id} roundNo={currentRound.round_no} courts={revealCourts} sittingOut={revealSitting} />
+      )}
       <div className="mx-auto grid w-full max-w-[1440px] grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)]">
         <CockpitSidebar
           tournamentId={id}
@@ -343,6 +372,26 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         <WeightTile v={`${wPct(cfg.alpha)}%`} l="Votes" />
                         <WeightTile v={`${wPct(cfg.beta)}%`} l="Skill balance" />
                         <WeightTile v={`${wPct(cfg.gamma)}%`} l="Novelty" />
+                      </div>
+                      {/* Gender-balance guardrail — preview the seating before drawing. */}
+                      <div
+                        className="mb-3.5 rounded-xl p-3 text-[12.5px]"
+                        style={{
+                          background: sittingPerRound > 0 ? 'color-mix(in oklch, var(--amber, oklch(0.8 0.12 85)) 14%, var(--surface-inset))' : 'var(--surface-inset)',
+                          border: `1px solid ${sittingPerRound > 0 ? 'color-mix(in oklch, var(--amber, oklch(0.8 0.12 85)) 45%, var(--line))' : 'var(--line)'}`,
+                        }}
+                      >
+                        <div className="font-semibold" style={{ color: 'var(--text)' }}>
+                          {teamPlan.teams} team{teamPlan.teams === 1 ? '' : 's'} · {teamPlan.teams / 2} game{teamPlan.teams / 2 === 1 ? '' : 's'}
+                          {sittingPerRound > 0 ? ` · ${sittingPerRound} sit each round` : ' · everyone plays'}
+                        </div>
+                        {sittingPerRound > 0 && (
+                          <div className="mt-1" style={{ color: 'var(--text3)' }}>
+                            {genderMode === 'mixed'
+                              ? `${poolA} in pool A, ${poolB} in pool B — mixed doubles pairs one from each side.${poolsLopsided ? ' Balance the roster or switch to Open mode, then Re-pool teams (Rerun & reset), to seat more.' : ' Byes rotate fairly.'}`
+                              : `An odd headcount means ${sittingPerRound} take a rotating bye — byes rotate fairly so no one sits twice before everyone's sat once.`}
+                          </div>
+                        )}
                       </div>
                       <ActionForm action={drawMixerRound}>
                         <input type="hidden" name="tournament_id" value={id} />
