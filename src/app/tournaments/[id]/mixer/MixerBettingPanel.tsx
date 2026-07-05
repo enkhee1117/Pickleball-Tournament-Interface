@@ -185,7 +185,8 @@ function EmptyPool() {
 
 function Dink({ pose, size }: { pose: 'token-t' | 'presenting-t'; size: number }) {
   // Paddle mascot retired — the round "ball" mascot (in /characters) is used now.
-  const file = pose === 'token-t' ? 'voter' : 'host';
+  // Pools deal in chips, so the token slot gets the coin-stack ball.
+  const file = pose === 'token-t' ? 'coinstack' : 'host';
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img

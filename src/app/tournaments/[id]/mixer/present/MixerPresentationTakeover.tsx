@@ -275,7 +275,7 @@ function PlayerLine({ player, compact = false }: { player: PlayerRow; compact?: 
 
 function Dink({ pose, size }: { pose: 'presenting-t' | 'wave' | 'winner'; size: number }) {
   // Paddle mascot retired — the round "ball" mascot (in /characters) is used now.
-  const file = pose === 'winner' ? 'winner' : 'host';
+  const file = pose === 'winner' ? 'winner' : pose === 'wave' ? 'wave' : 'host';
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img

@@ -12,9 +12,9 @@ export type DinkPose = 'token-t' | 'presenting-t' | 'wave' | 'coach' | 'idle';
 // /design-handoff/characters is the only mascot now. Each mixer pose maps to a
 // clean, transparent ball cutout by role, so the old paddle art never renders.
 const BALL_POSE: Record<DinkPose, string> = {
-  wave: 'host', // greeting at the vote header
+  wave: 'wave', // greeting at the vote header — raised-hand wave
   'token-t': 'voter', // token budget — the ball holding a token
-  'presenting-t': 'host', // empty / sealed states
+  'presenting-t': 'host', // empty / sealed states — open-arms welcome
   coach: 'idle',
   idle: 'idle',
 };
