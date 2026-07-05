@@ -85,6 +85,21 @@ function repoMigrationNumbers() {
     .sort((a, b) => a.file.localeCompare(b.file));
 }
 
+// Keep supabase_migrations.schema_migrations honest. version is the numeric
+// prefix (this project uses NNNN, not CLI timestamps); on-conflict-do-nothing
+// so the pre-existing 0050 duplicate and any already-recorded rows are safe.
+async function recordMigration(ref, token, file) {
+  const num = (basename(file).match(/^(\d+)/) ?? [])[1];
+  if (!num) return;
+  const name = basename(file, '.sql').replace(/^\d+_/, '');
+  const escaped = name.replace(/'/g, "''");
+  await runSql(
+    ref,
+    token,
+    `insert into supabase_migrations.schema_migrations (version, name) values ('${num}', '${escaped}') on conflict (version) do nothing`,
+  );
+}
+
 async function main() {
   const env = readEnvLocal();
   const ref = projectRef(env);
@@ -113,12 +128,24 @@ async function main() {
     return;
   }
 
-  // Apply a migration file.
+  if (arg === '--sync-tracking') {
+    // One-time reconcile: record every repo migration as applied. Use ONLY when
+    // you've confirmed the objects exist (this project applies out-of-band, so
+    // the table drifted). on-conflict-do-nothing keeps it safe/idempotent.
+    for (const { file } of repoMigrationNumbers()) {
+      await recordMigration(ref, token, file);
+    }
+    console.log(`✓ recorded ${repoMigrationNumbers().length} repo migrations in schema_migrations (existing rows kept)`);
+    return;
+  }
+
+  // Apply a migration file, then record it so --status stays accurate.
   const sql = readFileSync(arg, 'utf8');
   console.log(`applying ${basename(arg)} to ${ref} …`);
   await runSql(ref, token, sql);
-  console.log(`✓ applied ${basename(arg)}`);
-  console.log('  (verify the object it defines — schema_migrations is not trustworthy here)');
+  await recordMigration(ref, token, arg);
+  console.log(`✓ applied + recorded ${basename(arg)}`);
+  console.log('  (also verify the object it defines — schema_migrations has drifted historically)');
 }
 
 main().catch((err) => {
