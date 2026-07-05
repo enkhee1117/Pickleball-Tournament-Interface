@@ -211,7 +211,7 @@ export function ScoreFlow({
 
   const commands: Command[] = [
     { group: 'Live', label: 'Present / projector', icon: '▶', run: () => router.push(`/tournaments/${tournamentId}/mixer/present`) },
-    { group: 'Live', label: 'Admin cockpit', icon: '◎', run: () => router.push(`/tournaments/${tournamentId}/mixer/admin`) },
+    { group: 'Live', label: 'Organizer cockpit', icon: '◎', run: () => router.push(`/tournaments/${tournamentId}/mixer/admin`) },
     { group: 'Go to', label: 'Player mode', icon: '▦', run: () => router.push(`/tournaments/${tournamentId}/mixer`) },
     { group: 'Go to', label: 'Tournaments', icon: '★', run: () => router.push('/tournaments') },
   ];

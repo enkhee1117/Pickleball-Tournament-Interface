@@ -127,7 +127,21 @@ export function ConfigForm({
       <details className="mt-3 rounded-2xl bg-paper-2 p-3">
         <summary className="cursor-pointer text-sm font-bold text-ink">Fairness & betting cutoffs</summary>
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <NumberField name="upvote_cap_per_target" label="Upvotes / target" value={cfg.upvote_cap_per_target ?? 3} min={1} max={99} />
+          <label className="block">
+            <span className="text-xs font-semibold text-ink-3">Upvotes / target</span>
+            <div className="mt-1 flex h-11 items-center rounded-xl bg-paper-2 px-3">
+              <input
+                name="upvote_cap_per_target"
+                type="number"
+                min={1}
+                max={99}
+                defaultValue={cfg.upvote_cap_per_target && cfg.upvote_cap_per_target <= 99 ? cfg.upvote_cap_per_target : ''}
+                placeholder="No limit"
+                className="mono w-full bg-transparent text-sm font-bold text-ink outline-none"
+              />
+            </div>
+            <span className="mt-1 block text-[11px] text-ink-3">Blank = no limit (default). Set 1–99 to cap tokens per partner.</span>
+          </label>
           <label className="block">
             <span className="text-xs font-semibold text-ink-3">Betting closes before round</span>
             <input

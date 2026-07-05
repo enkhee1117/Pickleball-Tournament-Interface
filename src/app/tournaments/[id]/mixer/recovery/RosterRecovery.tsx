@@ -60,7 +60,7 @@ export function RosterRecovery({
   const rosterHref = `/tournaments/${tournamentId}/mixer/admin?tab=roster`;
 
   const commands: Command[] = [
-    { group: 'Go to', label: 'Admin cockpit', icon: '◎', run: () => router.push(`/tournaments/${tournamentId}/mixer/admin`) },
+    { group: 'Go to', label: 'Organizer cockpit', icon: '◎', run: () => router.push(`/tournaments/${tournamentId}/mixer/admin`) },
     { group: 'Go to', label: 'Score entry', icon: '#', run: () => router.push(`/tournaments/${tournamentId}/mixer/score`) },
     { group: 'Live', label: 'Between-rounds board', icon: '▶', run: () => router.push(`/tournaments/${tournamentId}/mixer/present/between`) },
   ];
