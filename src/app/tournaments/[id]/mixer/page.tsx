@@ -95,7 +95,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const myPlayer = user ? roster.find((p) => p.profile_id === user.id) ?? null : null;
   const myState = myPlayer ? stateRows.find((s) => s.player_id === myPlayer.id) ?? null : null;
 
-  const [{ data: votes }, { data: pairings }, { data: scores }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }] = await Promise.all([
+  const [{ data: votes }, { data: pairings }, { data: scores }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }] = await Promise.all([
     roundIds.length > 0 && myPlayer
       ? supabase.from('mixer_votes').select('round_id,target_player_id,up_tokens,down_tokens').in('round_id', roundIds).eq('voter_player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
@@ -117,9 +117,15 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     myPlayer
       ? supabase.from('mixer_check_ins').select('checked_in_at,acked_round_id').eq('tournament_id', id).eq('player_id', myPlayer.id).maybeSingle()
       : Promise.resolve({ data: null }),
+    roundIds.length > 0 && myPlayer
+      ? supabase.from('mixer_round_ballots').select('round_id,confirmed_at').in('round_id', roundIds).eq('player_id', myPlayer.id)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const voteRows = (votes ?? []) as VoteRow[];
+  const confirmedRoundIds = ((ballotConfirmations ?? []) as { round_id: string; confirmed_at: string | null }[])
+    .filter((r) => r.confirmed_at != null)
+    .map((r) => r.round_id);
   const pairingRows = (pairings ?? []) as PairingRow[];
   const scoreRows = (scores ?? []) as ScoreRow[];
   const betRows = (bets ?? []) as BetRow[];
@@ -228,6 +234,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
           myPlayer={myPlayer}
           myState={myState}
           votes={voteRows}
+          confirmedRoundIds={confirmedRoundIds}
           genderMode={t.gender_mode ?? 'mixed'}
         />
       )}

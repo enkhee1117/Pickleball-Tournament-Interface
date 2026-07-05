@@ -4,6 +4,8 @@ import { cookies } from 'next/headers';
 import './globals.css';
 import { TabBar } from '@/components/TabBar';
 import { ToastProvider } from '@/components/desktop/ToastProvider';
+import { AccountProvider, type NavAccount } from '@/components/desktop/account-context';
+import { getProfile } from '@/lib/auth';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://trytodink.com';
@@ -64,6 +66,15 @@ const archivo = Archivo({
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const store = await cookies();
   const theme = readThemeFromCookie(store.get(THEME_COOKIE)?.value);
+  const profile = await getProfile();
+  const account: NavAccount | null = profile
+    ? {
+        name: profile.display_name ?? 'Player',
+        handle: (profile.display_name ?? 'player').toLowerCase().split(' ').filter(Boolean)[0] ?? 'player',
+        sub: `Member since ${new Date(profile.created_at).getFullYear()}`,
+        avatarUrl: profile.avatar_url,
+      }
+    : null;
   return (
     <html
       lang="en"
@@ -72,10 +83,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <body className="bg-paper text-ink">
         <ToastProvider>
-          <div className="mx-auto flex min-h-[100dvh] max-w-[480px] flex-col">
-            <main className="flex flex-1 flex-col">{children}</main>
-            <TabBar />
-          </div>
+          <AccountProvider account={account}>
+            <div className="mx-auto flex min-h-[100dvh] max-w-[480px] flex-col">
+              <main className="flex flex-1 flex-col">{children}</main>
+              <TabBar />
+            </div>
+          </AccountProvider>
         </ToastProvider>
       </body>
     </html>

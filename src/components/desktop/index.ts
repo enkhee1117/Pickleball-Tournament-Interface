@@ -7,3 +7,6 @@ export type { DesktopNavProps, NavLink } from './DesktopNav';
 export { DesktopSurface } from './DesktopSurface';
 export { BallMark } from './BallMark';
 export { ThemeToggleButton } from './ThemeToggleButton';
+export { AccountMenu } from './AccountMenu';
+export { AccountProvider, useAccount } from './account-context';
+export type { NavAccount } from './account-context';
