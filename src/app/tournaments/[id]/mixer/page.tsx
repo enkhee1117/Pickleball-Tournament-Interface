@@ -289,7 +289,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
         />
       )}
       {tab === 'match' && (
-        <MatchTab tournamentId={id} round={currentRound} roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} />
+        <MatchTab tournamentId={id} round={currentRound} roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} gameTo={cfg.game_to ?? 11} />
       )}
       {tab === 'courts' && (
         <CourtsTab roster={roster} pairings={pairingRows} scores={scoreRows} sitOuts={sitOutIds} myPlayer={myPlayer} round={currentRound} />

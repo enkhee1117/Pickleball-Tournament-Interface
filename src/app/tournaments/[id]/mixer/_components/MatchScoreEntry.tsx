@@ -8,9 +8,8 @@ import { submitMixerScoreAsPlayer } from '../actions';
 // enforced before Post. Posting hits a participant-gated RPC and shows a clear
 // "Posted to standings" state. Editable until the organizer marks the round done.
 
-const TARGET = 11;
 const WIN_BY = 2;
-const isFinalValid = (a: number, b: number) => (a >= TARGET || b >= TARGET) && Math.abs(a - b) >= WIN_BY;
+const isFinalValid = (a: number, b: number, target: number) => (a >= target || b >= target) && Math.abs(a - b) >= WIN_BY;
 
 export function MatchScoreEntry({
   tournamentId,
@@ -24,6 +23,7 @@ export function MatchScoreEntry({
   initialB,
   posted,
   canScore,
+  gameTo = 11,
 }: {
   tournamentId: string;
   roundId: string;
@@ -36,7 +36,9 @@ export function MatchScoreEntry({
   initialB: number;
   posted: boolean;
   canScore: boolean;
+  gameTo?: number;
 }) {
+  const TARGET = gameTo;
   const [a, setA] = useState(initialA);
   const [b, setB] = useState(initialB);
   const [editing, setEditing] = useState(!posted);
@@ -44,7 +46,7 @@ export function MatchScoreEntry({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const valid = isFinalValid(a, b);
+  const valid = isFinalValid(a, b, TARGET);
   const winner = a === b ? null : a > b ? 'a' : 'b';
 
   function post() {

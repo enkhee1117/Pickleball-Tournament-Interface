@@ -42,6 +42,14 @@ export function ConfigForm({
         <NumberField name="courts" label="Courts" value={cfg.courts} min={1} max={16} />
         <NumberField name="starting_tokens" label="Start tokens" value={cfg.starting_tokens} min={1} max={100} />
         <NumberField name="starting_chips" label="Start chips" value={cfg.starting_chips} min={0} max={100000} />
+        <label className="block">
+          <span className="text-xs font-semibold text-ink-3">Game to (win by 2)</span>
+          <select name="game_to" defaultValue={String(cfg.game_to ?? 11)} className="mono mt-1 h-11 w-full rounded-xl bg-paper-2 px-3 text-sm font-bold text-ink outline-none">
+            <option value="11">11</option>
+            <option value="15">15</option>
+            <option value="21">21</option>
+          </select>
+        </label>
       </div>
 
       <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--line)' }}>

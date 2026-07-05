@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Avatar, type AvatarPlayer } from '@/components/ui/Avatar';
 import { BallMark } from '@/components/desktop/BallMark';
 import { ActionForm } from './ActionForm';
-import { updateMixerPlayerGender, updateMixerPlayerPool, confirmMixerPayment } from '../actions';
+import { updateMixerPlayerGender, updateMixerPlayerPool, confirmMixerPayment, retireMixerPlayer } from '../actions';
 
 export type RosterTableRow = {
   id: string;
@@ -20,6 +20,7 @@ export type RosterTableRow = {
   payment: { label: string; tone: 'ok' | 'pend' } | null;
   paymentId: string | null;
   paymentStatus: string | null;
+  withdrawn: boolean;
 };
 
 // The roster tab's data table — mirrors the desktop handoff (admin.html):
@@ -214,6 +215,30 @@ export function RosterTable({
                         </ActionForm>
                       </div>
                     )}
+
+                    {/* Early-leave: retire keeps completed results, drops the player from future draws. */}
+                    <div className="flex items-center gap-2">
+                      <span className="mono w-16 shrink-0 text-[10px] uppercase tracking-[0.06em] text-ink-3">Status</span>
+                      {r.withdrawn ? (
+                        <ActionForm action={retireMixerPlayer} className="flex-1">
+                          <input type="hidden" name="tournament_id" value={tournamentId} />
+                          <input type="hidden" name="player_id" value={r.id} />
+                          <input type="hidden" name="reinstate" value="true" />
+                          <button className="w-full rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>
+                            Reinstate (retired — results kept)
+                          </button>
+                        </ActionForm>
+                      ) : (
+                        <ActionForm action={retireMixerPlayer} confirm={`Retire ${r.name}? Completed results stay on the board, but they're dropped from future draws. You can reinstate them later.`} className="flex-1">
+                          <input type="hidden" name="tournament_id" value={tournamentId} />
+                          <input type="hidden" name="player_id" value={r.id} />
+                          <input type="hidden" name="reinstate" value="false" />
+                          <button className="w-full rounded-lg px-3 py-2 text-xs font-semibold" style={{ color: 'var(--berry)', border: '1px solid var(--berry)' }}>
+                            Retire (early leave)
+                          </button>
+                        </ActionForm>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

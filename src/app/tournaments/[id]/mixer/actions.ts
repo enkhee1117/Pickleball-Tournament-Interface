@@ -142,10 +142,50 @@ export async function updateMixerConfig(formData: FormData): Promise<ActionResul
   });
   if (error) return { ok: false, error: formatPgError(error) };
 
+  // Game target lives in its own setter so the big config RPC stays untouched.
+  const gameTo = fieldInt(formData, 'game_to', 11, 11, 21);
+  if ([11, 15, 21].includes(gameTo)) {
+    await supabase.rpc('app_mixer_set_game_target', { p_tournament_id: tournamentId, p_game_to: gameTo });
+  }
+
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
   revalidatePath(`${mixerPath(tournamentId)}/present`);
   return { ok: true, message: 'Mixer configuration saved' };
+}
+
+// Live-night recovery (edge-cases.html). Retire/reinstate reuse the 0031 RPCs;
+// swap uses 0058. All manager-gated in the DB.
+export async function retireMixerPlayer(formData: FormData): Promise<ActionResult> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  const playerId = fieldString(formData, 'player_id');
+  const reinstate = fieldString(formData, 'reinstate') === 'true';
+  if (!tournamentId || !playerId) return { ok: false, error: 'Missing player.' };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(reinstate ? 'app_reinstate_player' : 'app_withdraw_player', { p_player_id: playerId });
+  if (error) return { ok: false, error: formatPgError(error) };
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  return { ok: true, message: reinstate ? 'Player reinstated' : 'Player retired — results kept, out of future draws' };
+}
+
+export async function swapMixerPlayer(formData: FormData): Promise<ActionResult> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  const roundId = fieldString(formData, 'round_id');
+  const outPlayer = fieldString(formData, 'out_player');
+  const inPlayer = fieldString(formData, 'in_player');
+  if (!tournamentId || !roundId || !outPlayer || !inPlayer) return { ok: false, error: 'Pick a player to swap out and a replacement.' };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_mixer_swap_player', { p_round_id: roundId, p_out_player: outPlayer, p_in_player: inPlayer });
+  if (error) return { ok: false, error: formatPgError(error) };
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  revalidatePath(`${mixerPath(tournamentId)}/present`);
+  return { ok: true, message: 'Player swapped — the rest of the draw is preserved' };
 }
 
 export async function updateMixerPlayerPool(formData: FormData): Promise<ActionResult> {
