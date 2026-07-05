@@ -7,7 +7,7 @@ import { DesktopSurface } from '@/components/desktop/DesktopSurface';
 import { CommandBar, type Command } from '@/components/desktop/CommandBar';
 import { useToast } from '@/components/desktop/ToastProvider';
 import { useRouter } from 'next/navigation';
-import { computeStandings, ordinal, type CourtResult, type StandingRow } from '@/lib/mixer-standings';
+import { computeStandings, gameSlotLabel, ordinal, type CourtResult, type StandingRow } from '@/lib/mixer-standings';
 import { postCourtScore } from './actions';
 
 const firstName = (n: string) => n.split(' ')[0];
@@ -172,7 +172,7 @@ export function ScoreFlow({
 
     toast({
       type: 'success',
-      title: `Round ${selected.roundNo} · Court ${selected.courtNo} final`,
+      title: `Round ${selected.roundNo} · ${gameSlotLabel(selected.courtNo, selected.waveNo)} final`,
       desc: `${draftA}–${draftB} posted — standings & bracket updated.`,
       duration: 5000,
     });
@@ -196,6 +196,7 @@ export function ScoreFlow({
         tournamentId,
         roundId: selected.roundId,
         courtNo: selected.courtNo,
+        waveNo: selected.waveNo,
         teamAScore: draftA,
         teamBScore: draftB,
       });
@@ -210,7 +211,7 @@ export function ScoreFlow({
 
   const commands: Command[] = [
     { group: 'Live', label: 'Present / projector', icon: '▶', run: () => router.push(`/tournaments/${tournamentId}/mixer/present`) },
-    { group: 'Live', label: 'Admin cockpit', icon: '◎', run: () => router.push(`/tournaments/${tournamentId}/mixer/admin`) },
+    { group: 'Live', label: 'Organizer cockpit', icon: '◎', run: () => router.push(`/tournaments/${tournamentId}/mixer/admin`) },
     { group: 'Go to', label: 'Player mode', icon: '▦', run: () => router.push(`/tournaments/${tournamentId}/mixer`) },
     { group: 'Go to', label: 'Tournaments', icon: '★', run: () => router.push('/tournaments') },
   ];
@@ -235,7 +236,7 @@ export function ScoreFlow({
           {selected ? (
             <span className="chip chip-live whitespace-nowrap">
               <span className="dot" />
-              Court {selected.courtNo} · live
+              {gameSlotLabel(selected.courtNo, selected.waveNo)} · live
             </span>
           ) : null}
         </div>
@@ -251,7 +252,7 @@ export function ScoreFlow({
             <section className="overflow-hidden rounded-[22px]" style={{ background: 'var(--card)', border: '1px solid var(--line)' }} aria-label="Score entry">
               <div className="flex items-center justify-between border-b p-[16px_22px]" style={{ borderColor: 'var(--line)' }}>
                 <span className="mono text-[12px] uppercase tracking-[.12em]" style={{ color: 'var(--ink-3)' }}>
-                  Round {selected.roundNo} · Court {selected.courtNo}
+                  Round {selected.roundNo} · {gameSlotLabel(selected.courtNo, selected.waveNo)}
                 </span>
                 {posted ? <span className="chip">Final</span> : <span className="chip chip-live"><span className="dot" />Live</span>}
               </div>
@@ -270,7 +271,7 @@ export function ScoreFlow({
                           : { background: 'var(--paper-2)', color: 'var(--ink-2)', border: '1px solid var(--line)' }
                       }
                     >
-                      Court {c.courtNo}
+                      {gameSlotLabel(c.courtNo, c.waveNo)}
                       {c.completed ? ' ✓' : ''}
                     </button>
                   ))}

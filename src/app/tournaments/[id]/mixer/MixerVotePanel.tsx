@@ -6,6 +6,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Icons } from '@/components/ui/icons';
 import { eligibleBallotTargets } from '@/lib/mixer';
 import { Dink, mixerAvatarFor } from './_components/mixer-night';
+import { CountdownTimer } from './_components/CountdownTimer';
 import { saveMixerBallot } from './actions';
 
 // Player ballot — rebuilt to the handoff player.html spec: candidate cards
@@ -115,7 +116,13 @@ export function MixerVotePanel({
   // everyone. Mirrors the draw's pairing constraints so players never spend
   // tokens on someone they can't be paired with.
   const targets = eligibleBallotTargets(roster, myPlayer, genderMode, myPool);
-  const upvoteCap = Math.max(1, config.upvote_cap_per_target || 3);
+  // A per-target upvote cap is only a real limit at 1–99; the default is a huge
+  // sentinel (migration 0054) meaning "no limit", which we treat as Infinity so
+  // the stepper never blocks and no "at cap" hint shows.
+  const upvoteCap =
+    config.upvote_cap_per_target != null && config.upvote_cap_per_target <= 99
+      ? Math.max(1, config.upvote_cap_per_target)
+      : Infinity;
   const locked = round.state !== 'open' || (round.lock_at ? new Date(round.lock_at).getTime() <= Date.now() : false);
   const nameOf = (id: string) => roster.find((p) => p.id === id)?.display_name ?? '—';
 
@@ -340,7 +347,7 @@ export function MixerVotePanel({
           style={{ border: `1px dashed ${NIGHT_LINE}`, color: NIGHT_TEXT2 }}
         >
           <span aria-hidden style={{ color: 'var(--court)' }}>{Icons.spark}</span>
-          Blind — no one sees your picks, not even the admin.
+          Blind — no one sees your picks, not even the organizer.
         </div>
       </div>
 
@@ -356,6 +363,13 @@ export function MixerVotePanel({
                 <div className="mono text-[22px] font-bold" style={{ color: 'var(--court)' }}>{left}/{budget}</div>
               </div>
               <TokenMeter left={left} total={budget} />
+              {!locked && round.lock_at && (
+                <div className="mt-2 flex items-center gap-2 text-[12.5px] font-semibold" style={{ color: 'var(--serve)' }}>
+                  <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full" style={{ background: 'var(--serve)' }} />
+                  <span>Voting closes in</span>
+                  <CountdownTimer lockAt={round.lock_at} active={!locked} className="mono" closedLabel="now" />
+                </div>
+              )}
               <div className="mt-3 flex items-center justify-between gap-3 text-xs leading-5" style={{ color: NIGHT_TEXT2 }}>
                 <span>{locked ? 'Ballot is sealed for this round.' : `Spend across all ${eventRoundCount} rounds.`}</span>
                 <button type="button" onClick={() => setShowHow(true)} className="shrink-0 rounded-full px-3 py-1 text-[11px] font-bold" style={{ border: `1px solid ${NIGHT_LINE}` }}>

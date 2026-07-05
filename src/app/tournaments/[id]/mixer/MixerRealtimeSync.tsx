@@ -35,6 +35,12 @@ export function MixerRealtimeSync({ tournamentId }: Props) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mixer_pairings' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mixer_scores' }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mixer_check_ins', filter }, schedule)
+      // Ballot confirmations drive the organizer's live participation ring and a
+      // player's own "locked in" state. Blind-safe: this table holds only
+      // (round, player, confirmed_at) — never the picks — so realtime on it can
+      // never leak the blind vote (unlike mixer_votes, which we deliberately do
+      // NOT subscribe to on the client for exactly that reason).
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mixer_round_ballots', filter }, schedule)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mixer_final_snapshots', filter }, schedule)
       .subscribe();
 

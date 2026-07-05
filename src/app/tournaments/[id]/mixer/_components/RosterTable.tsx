@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Avatar, type AvatarPlayer } from '@/components/ui/Avatar';
 import { BallMark } from '@/components/desktop/BallMark';
+import { ActionForm } from './ActionForm';
 import { updateMixerPlayerGender, updateMixerPlayerPool, confirmMixerPayment } from '../actions';
 
 export type RosterTableRow = {
@@ -152,7 +153,7 @@ export function RosterTable({
                     className="mx-2 mb-2 grid gap-2 rounded-xl p-3"
                     style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)' }}
                   >
-                    <form action={updateMixerPlayerGender} className="flex items-center gap-2">
+                    <ActionForm action={updateMixerPlayerGender} className="flex items-center gap-2">
                       <input type="hidden" name="tournament_id" value={tournamentId} />
                       <input type="hidden" name="player_id" value={r.id} />
                       <span className="mono w-16 shrink-0 text-[10px] uppercase tracking-[0.06em] text-ink-3">Gender</span>
@@ -171,9 +172,9 @@ export function RosterTable({
                       <button className="h-9 rounded-lg px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>
                         Save
                       </button>
-                    </form>
+                    </ActionForm>
 
-                    <form action={updateMixerPlayerPool} className="flex items-center gap-2">
+                    <ActionForm action={updateMixerPlayerPool} className="flex items-center gap-2">
                       <input type="hidden" name="tournament_id" value={tournamentId} />
                       <input type="hidden" name="player_id" value={r.id} />
                       <span className="mono w-16 shrink-0 text-[10px] uppercase tracking-[0.06em] text-ink-3">Pool</span>
@@ -190,27 +191,27 @@ export function RosterTable({
                       <button className="h-9 rounded-lg px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>
                         Save
                       </button>
-                    </form>
+                    </ActionForm>
 
                     {r.paymentId && r.paymentStatus === 'pending' && (
                       <div className="flex items-center gap-2">
                         <span className="mono w-16 shrink-0 text-[10px] uppercase tracking-[0.06em] text-ink-3">Payment</span>
-                        <form action={confirmMixerPayment} className="flex-1">
+                        <ActionForm action={confirmMixerPayment} className="flex-1">
                           <input type="hidden" name="tournament_id" value={tournamentId} />
                           <input type="hidden" name="payment_id" value={r.paymentId} />
                           <input type="hidden" name="status" value="confirmed" />
                           <button className="w-full rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>
                             Mark paid
                           </button>
-                        </form>
-                        <form action={confirmMixerPayment}>
+                        </ActionForm>
+                        <ActionForm action={confirmMixerPayment}>
                           <input type="hidden" name="tournament_id" value={tournamentId} />
                           <input type="hidden" name="payment_id" value={r.paymentId} />
                           <input type="hidden" name="status" value="refunded" />
                           <button className="rounded-lg px-3 py-2 text-xs font-semibold" style={{ color: 'var(--berry)', border: '1px solid var(--berry)' }}>
                             Refund
                           </button>
-                        </form>
+                        </ActionForm>
                       </div>
                     )}
                   </div>

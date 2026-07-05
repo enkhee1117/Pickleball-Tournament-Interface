@@ -12,7 +12,9 @@ import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 import { QuickJoinForm } from './QuickJoinForm';
 import { PushRegistration } from './PushRegistration';
 import { MixerCourtCall, MixerPresenceCheckIn } from './MixerCourtCall';
+import { RevealTakeover } from './_components/RevealTakeover';
 import { bindMixerRosterEntry } from './actions';
+import { ActionForm } from './_components/ActionForm';
 import { MixerBettingPanel } from './MixerBettingPanel';
 import { MixerModeSwitch } from './MixerModeSwitch';
 import { MixerRealtimeSync } from './MixerRealtimeSync';
@@ -31,12 +33,13 @@ import type {
   TournamentRow,
 } from './_types';
 import { MatchTab } from './_components/MatchTab';
+import { CourtsTab } from './_components/CourtsTab';
 import { MeTab } from './_components/MeTab';
 import { Notice } from './_components/mixer-night';
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: 'vote' | 'match' | 'betting' | 'me'; round?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ tab?: 'vote' | 'match' | 'courts' | 'betting' | 'me'; round?: string; ok?: string; error?: string }>;
 };
 
 type VoteRow = {
@@ -95,15 +98,18 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const myPlayer = user ? roster.find((p) => p.profile_id === user.id) ?? null : null;
   const myState = myPlayer ? stateRows.find((s) => s.player_id === myPlayer.id) ?? null : null;
 
-  const [{ data: votes }, { data: pairings }, { data: scores }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }] = await Promise.all([
+  const [{ data: votes }, { data: pairings }, { data: scores }, { data: sitOuts }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }] = await Promise.all([
     roundIds.length > 0 && myPlayer
       ? supabase.from('mixer_votes').select('round_id,target_player_id,up_tokens,down_tokens').in('round_id', roundIds).eq('voter_player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
     currentRound
-      ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no').eq('round_id', currentRound.id).order('court_no', { ascending: true })
+      ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no,wave_no').eq('round_id', currentRound.id).order('court_no', { ascending: true }).order('wave_no', { ascending: true })
       : Promise.resolve({ data: [] }),
     currentRound
-      ? supabase.from('mixer_scores').select('court_no,team_a_score,team_b_score,completed_at').eq('round_id', currentRound.id)
+      ? supabase.from('mixer_scores').select('court_no,wave_no,team_a_score,team_b_score,completed_at').eq('round_id', currentRound.id)
+      : Promise.resolve({ data: [] }),
+    currentRound
+      ? supabase.from('mixer_sit_outs').select('player_id').eq('round_id', currentRound.id)
       : Promise.resolve({ data: [] }),
     myPlayer
       ? supabase.from('bets').select('market_place,bettor_player_id,pick_player_id,chips').eq('tournament_id', id).eq('bettor_player_id', myPlayer.id)
@@ -128,6 +134,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     .map((r) => r.round_id);
   const pairingRows = (pairings ?? []) as PairingRow[];
   const scoreRows = (scores ?? []) as ScoreRow[];
+  const sitOutIds = ((sitOuts ?? []) as { player_id: string }[]).map((s) => s.player_id);
   const betRows = (bets ?? []) as BetRow[];
   const paymentRows = (payments ?? []) as PaymentRow[];
   const final = snapshot as SnapshotRow | null;
@@ -149,17 +156,48 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     if (!['revealed', 'playing'].includes(currentRound.state)) return null;
     const mine = pairingRows.find((p) => p.player_a_id === myPlayer.id || p.player_b_id === myPlayer.id);
     if (!mine) return null;
-    if (scoreRows.find((s) => s.court_no === mine.court_no)?.completed_at) return null;
+    if (scoreRows.find((s) => s.court_no === mine.court_no && s.wave_no === mine.wave_no)?.completed_at) return null;
     if (checkInRow?.acked_round_id === currentRound.id) return null;
     const nameOf = (pid: string) => roster.find((p) => p.id === pid)?.display_name ?? 'TBD';
     const partnerId = mine.player_a_id === myPlayer.id ? mine.player_b_id : mine.player_a_id;
-    const opponent = pairingRows.find((p) => p.court_no === mine.court_no && p.id !== mine.id) ?? null;
+    const opponent = pairingRows.find((p) => p.court_no === mine.court_no && p.wave_no === mine.wave_no && p.id !== mine.id) ?? null;
     return {
       roundId: currentRound.id,
       courtNo: mine.court_no,
+      waveNo: mine.wave_no,
       partnerName: nameOf(partnerId),
       opponentTeam: opponent ? `${nameOf(opponent.player_a_id)} & ${nameOf(opponent.player_b_id)}` : null,
     };
+  }
+
+  // The in-app draw reveal — the projector ceremony, phone-native. Fires once
+  // per round (localStorage inside RevealTakeover) when the draw has seated (or
+  // benched) this player. Independent of the court-call ack so it always plays
+  // on a fresh draw, and skipped once the game has been scored.
+  const reveal = computeReveal();
+  function computeReveal() {
+    if (!myPlayer || !currentRound) return null;
+    if (!['revealed', 'playing'].includes(currentRound.state)) return null;
+    const nameOf = (pid: string) => roster.find((p) => p.id === pid)?.display_name ?? 'TBD';
+    const mine = pairingRows.find((p) => p.player_a_id === myPlayer.id || p.player_b_id === myPlayer.id);
+    if (mine) {
+      if (scoreRows.find((s) => s.court_no === mine.court_no && s.wave_no === mine.wave_no)?.completed_at) return null;
+      const partnerId = mine.player_a_id === myPlayer.id ? mine.player_b_id : mine.player_a_id;
+      const opponent = pairingRows.find((p) => p.court_no === mine.court_no && p.wave_no === mine.wave_no && p.id !== mine.id) ?? null;
+      return {
+        roundId: currentRound.id,
+        roundNo: currentRound.round_no,
+        courtNo: mine.court_no as number | null,
+        waveNo: mine.wave_no,
+        partnerName: nameOf(partnerId) as string | null,
+        opponentTeam: opponent ? `${nameOf(opponent.player_a_id)} & ${nameOf(opponent.player_b_id)}` : null,
+        sittingOut: false,
+      };
+    }
+    if (sitOutIds.includes(myPlayer.id)) {
+      return { roundId: currentRound.id, roundNo: currentRound.round_no, courtNo: null, waveNo: 1, partnerName: null, opponentTeam: null, sittingOut: true };
+    }
+    return null;
   }
 
   // Show the quiet presence check-in when the player is at a live event, not
@@ -192,7 +230,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   if (!myPlayer) {
     return (
       <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={null} isManager={isManager}>
-        <form action={bindMixerRosterEntry} className="px-[18px] pt-6">
+        <ActionForm action={bindMixerRosterEntry} className="px-[18px] pt-6">
           <input type="hidden" name="tournament_id" value={id} />
           <div className="rounded-2xl bg-surface-card p-5" style={{ border: '1px solid var(--line)' }}>
             <div className="serif text-[30px] leading-none text-ink">Claim a roster spot</div>
@@ -202,7 +240,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
               Claim and vote
             </button>
           </div>
-        </form>
+        </ActionForm>
       </MixerShell>
     );
   }
@@ -210,11 +248,23 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   return (
     <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={myPlayer} isManager={isManager}>
       <PushRegistration />
+      {reveal && (
+        <RevealTakeover
+          roundId={reveal.roundId}
+          roundNo={reveal.roundNo}
+          courtNo={reveal.courtNo}
+          waveNo={reveal.waveNo}
+          partnerName={reveal.partnerName}
+          opponentTeam={reveal.opponentTeam}
+          sittingOut={reveal.sittingOut}
+        />
+      )}
       {courtCall && (
         <MixerCourtCall
           tournamentId={id}
           roundId={courtCall.roundId}
           courtNo={courtCall.courtNo}
+          waveNo={courtCall.waveNo}
           partnerName={courtCall.partnerName}
           opponentTeam={courtCall.opponentTeam}
         />
@@ -239,7 +289,10 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
         />
       )}
       {tab === 'match' && (
-        <MatchTab roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} />
+        <MatchTab tournamentId={id} round={currentRound} roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} />
+      )}
+      {tab === 'courts' && (
+        <CourtsTab roster={roster} pairings={pairingRows} scores={scoreRows} sitOuts={sitOutIds} myPlayer={myPlayer} round={currentRound} />
       )}
       {tab === 'betting' && (
         <MixerBettingPanel tournamentId={id} roster={roster} myPlayer={myPlayer} myState={myState} bets={betRows} config={cfg} />
@@ -270,6 +323,7 @@ function MixerShell({
   const tabs: [string, string][] = [
     ['vote', 'Vote'],
     ['match', 'Match'],
+    ['courts', 'Courts'],
     ['betting', 'Pool'],
     ['me', 'Me'],
   ];
@@ -354,7 +408,7 @@ function MixerShell({
       </div>
 
       {/* Bottom tab bar — mobile only */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 mx-auto grid max-w-md grid-cols-4 gap-1 p-2 lg:hidden" style={{ background: 'var(--night-bg)', borderTop: '1px solid var(--night-line)' }}>
+      <div className="fixed bottom-0 left-0 right-0 z-30 mx-auto grid max-w-md grid-cols-5 gap-1 p-2 lg:hidden" style={{ background: 'var(--night-bg)', borderTop: '1px solid var(--night-line)' }}>
         {tabs.map(([id, label]) => (
           <Link key={id} href={href(id)} className="rounded-xl py-3 text-center text-[12px] font-bold" style={{
             background: tab === id ? 'var(--court)' : 'transparent',

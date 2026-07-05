@@ -61,7 +61,7 @@ export function DesktopNav({
         borderBottom: '1px solid var(--line)',
       }}
     >
-      <div className="flex items-center gap-[9px]" style={{ color: 'var(--text)' }}>
+      <div className="flex shrink-0 items-center gap-[9px]" style={{ color: 'var(--text)' }}>
         <BallMark size={30} />
         <span className="serif whitespace-nowrap text-[21px]" style={{ color: 'var(--text)' }}>
           Try to Dink
@@ -73,25 +73,25 @@ export function DesktopNav({
         <button
           type="button"
           onClick={onEventClick}
-          className="inline-flex items-center gap-[9px] rounded-[11px] border px-3 py-[7px] text-[14px] font-semibold"
+          className="hidden min-w-0 items-center gap-[9px] rounded-[11px] border px-3 py-[7px] text-[14px] font-semibold sm:inline-flex"
           style={{ borderColor: 'var(--line)', background: 'var(--surface-card)', color: 'var(--text)' }}
         >
           <span
-            className="h-2 w-2 rounded-full"
+            className="h-2 w-2 shrink-0 rounded-full"
             style={
               live
                 ? { background: 'var(--serve)', boxShadow: '0 0 0 3px color-mix(in oklch, var(--serve) 25%, transparent)' }
                 : { background: 'var(--text3)' }
             }
           />
-          {event}
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <span className="truncate">{event}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
             <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
       ) : null}
 
-      <div className="flex items-center gap-1">
+      <div className="hidden items-center gap-1 lg:flex">
         {links.map((l) => {
           const on = l.label === active;
           return (
@@ -111,14 +111,14 @@ export function DesktopNav({
         })}
       </div>
 
-      <div className="ml-auto flex items-center gap-[10px]">
+      <div className="ml-auto flex shrink-0 items-center gap-[10px]">
         {primaryAction ? (
           primaryHref ? (
-            <Link href={primaryHref} className="btn btn-ghost btn-sm">
+            <Link href={primaryHref} className="btn btn-ghost btn-sm hidden sm:inline-flex">
               {primaryAction}
             </Link>
           ) : (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={onPrimary}>
+            <button type="button" className="btn btn-ghost btn-sm hidden sm:inline-flex" onClick={onPrimary}>
               {primaryAction}
             </button>
           )

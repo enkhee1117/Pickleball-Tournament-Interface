@@ -4,6 +4,7 @@ import { Icons } from '@/components/ui/icons';
 import { confirmMixerPayment, setMixerRoundState } from '../actions';
 import type { RoundRow } from '../_types';
 import type { PaymentMethod } from './payment-methods';
+import { ActionForm } from './ActionForm';
 import { ORGANIZER_TABS, type OrganizerTab } from './admin-helpers';
 import { money } from './admin-helpers';
 
@@ -79,20 +80,20 @@ export function RoundRail({ rounds, activeRoundId }: { rounds: RoundRow[]; activ
 
 export function StateButton({ tournamentId, roundId, state, label, disabled = false }: { tournamentId: string; roundId: string; state: string; label: string; disabled?: boolean }) {
   return (
-    <form action={setMixerRoundState}>
+    <ActionForm action={setMixerRoundState}>
       <input type="hidden" name="tournament_id" value={tournamentId} />
       <input type="hidden" name="round_id" value={roundId} />
       <input type="hidden" name="state" value={state} />
       <button disabled={disabled} className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-ink disabled:opacity-40" style={{ border: '1px solid var(--line)' }}>
         {label}
       </button>
-    </form>
+    </ActionForm>
   );
 }
 
 export function PaymentButton({ tournamentId, paymentId, status, label }: { tournamentId: string; paymentId: string; status: 'confirmed' | 'refunded'; label: string }) {
   return (
-    <form action={confirmMixerPayment}>
+    <ActionForm action={confirmMixerPayment}>
       <input type="hidden" name="tournament_id" value={tournamentId} />
       <input type="hidden" name="payment_id" value={paymentId} />
       <input type="hidden" name="status" value={status} />
@@ -103,7 +104,7 @@ export function PaymentButton({ tournamentId, paymentId, status, label }: { tour
       }}>
         {label}
       </button>
-    </form>
+    </ActionForm>
   );
 }
 
