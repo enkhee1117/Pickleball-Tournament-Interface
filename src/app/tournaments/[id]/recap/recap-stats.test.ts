@@ -12,10 +12,11 @@ const names = new Map([
 // two rounds: team(a,b) wins both; team(c,d) loses both
 function res(roundNo: number, scoreA: number, scoreB: number): CourtResult {
   return {
-    key: `r${roundNo}:1`,
+    key: `r${roundNo}:1:1`,
     roundId: `r${roundNo}`,
     roundNo,
     courtNo: 1,
+    waveNo: 1,
     teamA: [{ id: 'a', name: 'Alex Park' }, { id: 'b', name: 'Priya Shah' }],
     teamB: [{ id: 'c', name: 'Theo Kim' }, { id: 'd', name: 'Maya Chen' }],
     scoreA,

@@ -13,7 +13,7 @@ import { MixerRealtimeSync } from '../MixerRealtimeSync';
 // prefers-reduced-motion — reduced motion jumps straight to the settled board.
 
 export type RevealPlayer = { id: string; name: string; dupr: number | null };
-export type RevealCourt = { courtNo: number; teamA: RevealPlayer[]; teamB: RevealPlayer[] };
+export type RevealCourt = { courtNo: number; waveNo?: number; teamA: RevealPlayer[]; teamB: RevealPlayer[] };
 
 const firstName = (n: string) => n.split(' ')[0];
 const initials = (n: string) =>
@@ -352,7 +352,7 @@ function BoardCourt({
     >
       <div className="mb-5 flex items-center justify-between">
         <span className="mono text-[14px] uppercase tracking-[.12em]" style={{ color: 'var(--text3)' }}>
-          Court
+          {court.waveNo && court.waveNo > 1 ? `Court · Heat ${court.waveNo}` : 'Court'}
         </span>
         <span className="disp text-[20px] font-extrabold" style={{ color: 'var(--accent)' }}>
           {court.courtNo}

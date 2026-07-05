@@ -10,10 +10,11 @@ export interface CourtTeamPlayer {
 }
 
 export interface CourtResult {
-  key: string; // `${roundId}:${courtNo}`
+  key: string; // `${roundId}:${courtNo}:${waveNo}`
   roundId: string;
   roundNo: number;
   courtNo: number;
+  waveNo: number;
   teamA: CourtTeamPlayer[];
   teamB: CourtTeamPlayer[];
   scoreA: number;
@@ -75,32 +76,38 @@ export function sortStandings(rows: StandingRow[]): StandingRow[] {
   );
 }
 
-// Build court results (doubles matchups) from raw pairing + score rows. A court
-// only becomes a matchup once it has two teams (two pairing rows).
+// Build court results (doubles matchups) from raw pairing + score rows. A game
+// only becomes a matchup once it has two teams (two pairing rows). Games are
+// keyed by (round, court, wave): when games outnumber courts a court runs
+// several games in waves, so grouping by court alone would fuse distinct games.
 export function buildCourtResults(
-  pairings: { round_id: string; player_a_id: string; player_b_id: string; court_no: number }[],
-  scores: { round_id: string; court_no: number; team_a_score: number; team_b_score: number; completed_at: string | null }[],
+  pairings: { round_id: string; player_a_id: string; player_b_id: string; court_no: number; wave_no?: number }[],
+  scores: { round_id: string; court_no: number; wave_no?: number; team_a_score: number; team_b_score: number; completed_at: string | null }[],
   roundNoById: Map<string, number>,
   currentRoundId: string | null,
   nameOf: (id: string) => string,
 ): CourtResult[] {
-  const byCourt = new Map<string, typeof pairings>();
+  const byGame = new Map<string, typeof pairings>();
   for (const p of pairings) {
-    const key = `${p.round_id}:${p.court_no}`;
-    byCourt.set(key, [...(byCourt.get(key) ?? []), p]);
+    const key = `${p.round_id}:${p.court_no}:${p.wave_no ?? 1}`;
+    byGame.set(key, [...(byGame.get(key) ?? []), p]);
   }
   const results: CourtResult[] = [];
-  for (const [key, teams] of byCourt) {
+  for (const [key, teams] of byGame) {
     if (teams.length < 2) continue;
     const [teamA, teamB] = teams;
     const roundId = teamA.round_id;
     const courtNo = teamA.court_no;
-    const score = scores.find((s) => s.round_id === roundId && s.court_no === courtNo);
+    const waveNo = teamA.wave_no ?? 1;
+    const score = scores.find(
+      (s) => s.round_id === roundId && s.court_no === courtNo && (s.wave_no ?? 1) === waveNo,
+    );
     results.push({
       key,
       roundId,
       roundNo: roundNoById.get(roundId) ?? 0,
       courtNo,
+      waveNo,
       teamA: [
         { id: teamA.player_a_id, name: nameOf(teamA.player_a_id) },
         { id: teamA.player_b_id, name: nameOf(teamA.player_b_id) },
@@ -115,8 +122,15 @@ export function buildCourtResults(
       editable: currentRoundId != null && roundId === currentRoundId,
     });
   }
-  results.sort((a, b) => a.roundNo - b.roundNo || a.courtNo - b.courtNo);
+  results.sort((a, b) => a.roundNo - b.roundNo || a.courtNo - b.courtNo || a.waveNo - b.waveNo);
   return results;
+}
+
+// Human label for a game slot. Courts are physical; waves (heats) are the
+// sequence a court runs when there are more games than courts. Wave 1 is the
+// first game on that court, so it needs no qualifier.
+export function gameSlotLabel(courtNo: number, waveNo: number): string {
+  return waveNo > 1 ? `Court ${courtNo} · Heat ${waveNo}` : `Court ${courtNo}`;
 }
 
 // Standings using only results up to and including maxRoundNo.

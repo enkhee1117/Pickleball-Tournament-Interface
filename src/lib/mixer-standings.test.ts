@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { computeStandings, ordinal, sortStandings, type CourtResult } from './mixer-standings';
+import {
+  buildCourtResults,
+  computeStandings,
+  gameSlotLabel,
+  ordinal,
+  sortStandings,
+  type CourtResult,
+} from './mixer-standings';
 
 const names = new Map([
   ['me', 'Maya Chen'],
@@ -10,10 +17,11 @@ const names = new Map([
 
 function court(scoreA: number, scoreB: number, completed = true): CourtResult {
   return {
-    key: `r1:1`,
+    key: `r1:1:1`,
     roundId: 'r1',
     roundNo: 1,
     courtNo: 1,
+    waveNo: 1,
     teamA: [
       { id: 'me', name: 'Maya Chen' },
       { id: 'p6', name: 'Eli Brooks' },
@@ -57,6 +65,51 @@ describe('sortStandings', () => {
       { playerId: 'c', name: 'C', wins: 2, losses: 0, pointDiff: 3, points: 22 },
     ]);
     expect(rows.map((r) => r.playerId)).toEqual(['b', 'c', 'a']);
+  });
+});
+
+describe('buildCourtResults with waves', () => {
+  // Two games share court 1 across two waves (heats) — the exact "more games
+  // than courts" case. Grouping must keep them as two distinct matchups, not
+  // fuse the four teams into one, and each wave scores independently.
+  const pairings = [
+    { round_id: 'r1', player_a_id: 'a1', player_b_id: 'b1', court_no: 1, wave_no: 1 },
+    { round_id: 'r1', player_a_id: 'a2', player_b_id: 'b2', court_no: 1, wave_no: 1 },
+    { round_id: 'r1', player_a_id: 'a3', player_b_id: 'b3', court_no: 1, wave_no: 2 },
+    { round_id: 'r1', player_a_id: 'a4', player_b_id: 'b4', court_no: 1, wave_no: 2 },
+  ];
+  const scores = [
+    { round_id: 'r1', court_no: 1, wave_no: 1, team_a_score: 11, team_b_score: 5, completed_at: 't' },
+    { round_id: 'r1', court_no: 1, wave_no: 2, team_a_score: 9, team_b_score: 11, completed_at: 't' },
+  ];
+  const results = buildCourtResults(pairings, scores, new Map([['r1', 1]]), 'r1', (id) => id);
+
+  it('splits one court into a game per wave', () => {
+    expect(results).toHaveLength(2);
+    expect(results.map((r) => r.waveNo)).toEqual([1, 2]);
+  });
+
+  it('scores each wave independently', () => {
+    const wave1 = results.find((r) => r.waveNo === 1)!;
+    const wave2 = results.find((r) => r.waveNo === 2)!;
+    expect([wave1.scoreA, wave1.scoreB]).toEqual([11, 5]);
+    expect([wave2.scoreA, wave2.scoreB]).toEqual([9, 11]);
+  });
+
+  it('attributes points to all four teams, not just the first game', () => {
+    const rows = computeStandings(results, new Map());
+    // 8 players total across the two games — none dropped.
+    expect(rows).toHaveLength(8);
+    // Wave 2: team (a3,b3) scored 9 and lost; team (a4,b4) scored 11 and won.
+    expect(rows.find((r) => r.playerId === 'a3')).toMatchObject({ points: 9, wins: 0, losses: 1 });
+    expect(rows.find((r) => r.playerId === 'b4')).toMatchObject({ points: 11, wins: 1, losses: 0 });
+  });
+});
+
+describe('gameSlotLabel', () => {
+  it('omits the heat qualifier for wave 1 and shows it beyond', () => {
+    expect(gameSlotLabel(2, 1)).toBe('Court 2');
+    expect(gameSlotLabel(1, 2)).toBe('Court 1 · Heat 2');
   });
 });
 

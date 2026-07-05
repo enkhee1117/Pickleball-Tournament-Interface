@@ -38,6 +38,7 @@ type PairingRow = {
   player_a_id: string;
   player_b_id: string;
   court_no: number;
+  wave_no: number;
 };
 
 type SnapshotRow = {
@@ -97,7 +98,7 @@ export default async function MixerPresentPage({ params, searchParams }: PagePro
   const roster = (players ?? []) as PlayerRow[];
   const [{ data: pairings }, { data: sitOuts }, { count: voteCount }] = round
     ? await Promise.all([
-        supabase.from('mixer_pairings').select('id,player_a_id,player_b_id,court_no').eq('round_id', round.id).order('court_no', { ascending: true }),
+        supabase.from('mixer_pairings').select('id,player_a_id,player_b_id,court_no,wave_no').eq('round_id', round.id).order('court_no', { ascending: true }).order('wave_no', { ascending: true }),
         supabase.from('mixer_sit_outs').select('player_id').eq('round_id', round.id),
         supabase.from('mixer_votes').select('id', { count: 'exact', head: true }).eq('round_id', round.id),
       ])
@@ -118,8 +119,13 @@ export default async function MixerPresentPage({ params, searchParams }: PagePro
   // organizer chrome below.
   const nameOf = (pid: string) => roster.find((p) => p.id === pid);
   const revealCourts: RevealCourt[] = (() => {
-    const byCourt = new Map<number, PairingRow[]>();
-    for (const p of pairingRows) byCourt.set(p.court_no, [...(byCourt.get(p.court_no) ?? []), p]);
+    // One reveal card per game slot (court + wave): a court running two heats
+    // shows both games, not a fused four-team card.
+    const byGame = new Map<string, PairingRow[]>();
+    for (const p of pairingRows) {
+      const key = `${p.court_no}:${p.wave_no}`;
+      byGame.set(key, [...(byGame.get(key) ?? []), p]);
+    }
     const toPlayers = (pair: PairingRow | undefined) =>
       pair
         ? [pair.player_a_id, pair.player_b_id].map((pid) => {
@@ -127,10 +133,10 @@ export default async function MixerPresentPage({ params, searchParams }: PagePro
             return { id: pid, name: pl?.display_name ?? 'TBD', dupr: pl?.dupr ?? null };
           })
         : [];
-    return [...byCourt.entries()]
-      .filter(([, teams]) => teams.length >= 2)
-      .sort((a, b) => a[0] - b[0])
-      .map(([courtNo, teams]) => ({ courtNo, teamA: toPlayers(teams[0]), teamB: toPlayers(teams[1]) }));
+    return [...byGame.values()]
+      .filter((teams) => teams.length >= 2)
+      .sort((a, b) => a[0].court_no - b[0].court_no || a[0].wave_no - b[0].wave_no)
+      .map((teams) => ({ courtNo: teams[0].court_no, waveNo: teams[0].wave_no, teamA: toPlayers(teams[0]), teamB: toPlayers(teams[1]) }));
   })();
   const isReveal = standings.length === 0 && revealCourts.length > 0;
 
