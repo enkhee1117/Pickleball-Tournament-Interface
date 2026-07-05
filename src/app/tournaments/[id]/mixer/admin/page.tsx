@@ -3,14 +3,11 @@ import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
-import { formatInviteCode } from '@/lib/invite-codes';
-import { Chip } from '@/components/ui/Chip';
 import { DesktopSurface, BallMark } from '@/components/desktop';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 import { gameSlotLabel } from '@/lib/mixer-standings';
 import { mixerTeamPlan } from '@/lib/mixer';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
-import { ShareCodeCard } from '../../invite/ShareCodeCard';
 import { MixerRealtimeSync } from '../MixerRealtimeSync';
 import { ActionForm } from '../_components/ActionForm';
 import { ConfirmForm } from '@/components/ui/ConfirmForm';
@@ -21,14 +18,11 @@ import {
   initializeMixerEvent,
   reopenMixerRound,
   repoolMixerRoster,
-  retireMixerPlayer,
   swapMixerPlayer,
   resetMixerEvent,
   resetMixerRoundVotes,
   scoreMixerCourt,
   setMixerVotingWindow,
-  updateMixerPlayerPool,
-  updateMixerPlayerGender,
 } from '../actions';
 import type {
   ConfigRow,
@@ -41,6 +35,8 @@ import type {
   TournamentRow,
 } from '../_types';
 import { ConfigForm } from '../_components/ConfigForm';
+import { RosterTable, type RosterTableRow } from '../_components/RosterTable';
+import { mixerAvatarFor } from '../_components/mixer-night';
 import { CountdownTimer } from '../_components/CountdownTimer';
 import { OrganizerRevealTakeover } from '../_components/OrganizerRevealTakeover';
 import {
@@ -51,7 +47,6 @@ import {
 import { normalizePaymentMethods } from '../_components/payment-methods';
 import {
   Notice,
-  PaymentButton,
   PrizeBucket,
   RoundRail,
   Section,
@@ -96,7 +91,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
       : Promise.resolve({ data: null }),
     supabase.from('event_config').select('*').eq('tournament_id', id).maybeSingle(),
     supabase.from('mixer_rounds').select('id,round_no,state,lock_at').eq('tournament_id', id).order('round_no', { ascending: true }),
-    supabase.from('tournament_players').select('id,display_name,gender,profile_id,withdrawn_at').eq('tournament_id', id).order('created_at', { ascending: true }),
+    supabase.from('tournament_players').select('id,display_name,gender,profile_id,dupr,withdrawn_at').eq('tournament_id', id).order('created_at', { ascending: true }),
   ]);
 
   if (!tournament) notFound();
@@ -209,6 +204,36 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const wPct = (w: number | undefined) => (wSum > 0 ? Math.round((Number(w ?? 0) / wSum) * 100) : 0);
   const anonCount = roster.filter((p) => !p.profile_id).length;
   const entryFee = Number(cfg?.entry_fee ?? 0);
+
+  // Roster tab data table (mirrors the desktop handoff). One row per player,
+  // folding in each player's entry payment + token balance so the table is a
+  // single source of truth instead of the old split card sections.
+  const selfPlayerId = user ? roster.find((p) => p.profile_id === user.id)?.id ?? null : null;
+  const startingTokens = Number(cfg?.starting_tokens ?? 0);
+  const rosterTableRows: RosterTableRow[] = roster.map((p, index) => {
+    const state = stateRows.find((s) => s.player_id === p.id);
+    const entry = paymentRows.find((pay) => pay.player_id === p.id && pay.type === 'entry');
+    const payment = entry
+      ? entry.status === 'confirmed'
+        ? { label: `Paid · ${entry.method}`, tone: 'ok' as const }
+        : { label: `Pending · ${entry.method}`, tone: 'pend' as const }
+      : null;
+    return {
+      id: p.id,
+      name: p.display_name,
+      sub: p.id === selfPlayerId ? 'ME' : `P${index + 1}`,
+      avatar: mixerAvatarFor(p, selfPlayerId ?? undefined),
+      anon: !p.profile_id,
+      dupr: p.dupr,
+      gender: p.gender,
+      pool: state?.pairing_pool ?? (p.gender === 'f' ? 'b' : 'a'),
+      tokens: state ? state.tokens_base_remaining + state.tokens_bought_remaining : startingTokens,
+      payment,
+      paymentId: entry?.id ?? null,
+      paymentStatus: entry?.status ?? null,
+      withdrawn: !!p.withdrawn_at,
+    };
+  });
   const stepIndex = ((s: string | undefined) => {
     switch (s) {
       case 'open':
@@ -551,106 +576,11 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
             )}
 
             {activeTab === 'roster' && (
-              <>
-                <Section title="Invite players">
-                  <ShareCodeCard
-                    inviteCode={formatInviteCode(t.invite_code)}
-                    rawInviteCode={t.invite_code}
-                    tournamentId={t.id}
-                    tournamentName={t.name}
-                  />
-                  <Link
-                    href={`/tournaments/${id}/invite`}
-                    className="block rounded-2xl bg-white px-4 py-3 text-center text-sm font-bold text-ink"
-                    style={{ border: '1px solid var(--line)' }}
-                  >
-                    Manage roster and personal invites
-                  </Link>
-                </Section>
-
-                <Section title="Roster health">
-                  <div className="grid gap-2">
-                    {roster.map((p) => {
-                      const state = stateRows.find((s) => s.player_id === p.id);
-                      const pool = state?.pairing_pool ?? (p.gender === 'f' ? 'b' : 'a');
-                      return (
-                        <div key={p.id} className="rounded-xl bg-white p-3 text-sm" style={{ border: '1px solid var(--line)' }}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="font-semibold text-ink">{p.display_name}</div>
-                              <div className="mt-1 text-xs text-ink-3">
-                                {p.profile_id ? 'linked' : 'anonymous'} · gender {p.gender ?? 'unset'} · sit-outs {state?.sit_out_count ?? 0}
-                              </div>
-                            </div>
-                            <Chip tone={pool === 'a' ? 'court' : 'ghost'}>Pool {pool.toUpperCase()}</Chip>
-                          </div>
-                          <ActionForm action={updateMixerPlayerGender} className="mt-3 flex items-center gap-2">
-                            <input type="hidden" name="tournament_id" value={id} />
-                            <input type="hidden" name="player_id" value={p.id} />
-                            <select name="gender" defaultValue={p.gender ?? ''} className="h-10 flex-1 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink" aria-label={`Gender for ${p.display_name}`}>
-                              <option value="">Gender —</option>
-                              <option value="f">Woman</option>
-                              <option value="m">Man</option>
-                              <option value="x">Nonbinary</option>
-                            </select>
-                            <button className="h-10 rounded-xl px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Save</button>
-                          </ActionForm>
-                          <ActionForm action={updateMixerPlayerPool} className="mt-2 flex items-center gap-2">
-                            <input type="hidden" name="tournament_id" value={id} />
-                            <input type="hidden" name="player_id" value={p.id} />
-                            <select name="pairing_pool" defaultValue={pool} className="h-10 flex-1 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink">
-                              <option value="a">Pool A</option>
-                              <option value="b">Pool B</option>
-                            </select>
-                            <button className="h-10 rounded-xl px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Save</button>
-                          </ActionForm>
-                          {/* Early-leave: retire keeps completed results, drops the player from future draws. */}
-                          {p.withdrawn_at ? (
-                            <ActionForm action={retireMixerPlayer} className="mt-2">
-                              <input type="hidden" name="tournament_id" value={id} />
-                              <input type="hidden" name="player_id" value={p.id} />
-                              <input type="hidden" name="reinstate" value="true" />
-                              <button className="w-full rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>Reinstate player</button>
-                            </ActionForm>
-                          ) : (
-                            <ActionForm action={retireMixerPlayer} confirm={`Retire ${p.display_name}? Their completed results stay on the board, but they're dropped from future draws. You can reinstate them later.`} className="mt-2">
-                              <input type="hidden" name="tournament_id" value={id} />
-                              <input type="hidden" name="player_id" value={p.id} />
-                              <input type="hidden" name="reinstate" value="false" />
-                              <button className="w-full rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'var(--surface-raise)', color: 'oklch(0.55 0.2 12)', border: '1px solid color-mix(in oklch, oklch(0.55 0.2 12) 35%, var(--line))' }}>Retire (early leave)</button>
-                            </ActionForm>
-                          )}
-                          {p.withdrawn_at && <div className="mt-2 text-[11px] font-semibold" style={{ color: 'oklch(0.55 0.2 12)' }}>Retired — results kept, out of future draws.</div>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Section>
-
-                <Section title="Payments">
-                  {paymentRows.length === 0 ? (
-                    <div className="rounded-2xl bg-white p-4 text-sm text-ink-3" style={{ border: '1px dashed var(--line)' }}>No payment records yet.</div>
-                  ) : (
-                    <div className="grid gap-2">
-                      {paymentRows.map((p) => (
-                        <div key={p.id} className="rounded-xl bg-white p-3 text-sm" style={{ border: '1px solid var(--line)' }}>
-                          <div className="flex justify-between">
-                            <span className="font-semibold text-ink">{name(p.player_id!)}</span>
-                            <span className="mono text-ink">${p.amount}</span>
-                          </div>
-                          <div className="mt-1 text-xs text-ink-3">{p.type} · {p.method} · {p.status}</div>
-                          {p.status === 'pending' && (
-                            <div className="mt-3 flex gap-2">
-                              <PaymentButton tournamentId={id} paymentId={p.id} status="confirmed" label="Confirm" />
-                              <PaymentButton tournamentId={id} paymentId={p.id} status="refunded" label="Refund" />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Section>
-              </>
+              <RosterTable
+                tournamentId={id}
+                inviteHref={`/tournaments/${id}/invite`}
+                rows={rosterTableRows}
+              />
             )}
 
             {activeTab === 'scores' && (
