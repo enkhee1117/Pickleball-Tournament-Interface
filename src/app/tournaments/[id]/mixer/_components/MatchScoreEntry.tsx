@@ -39,6 +39,7 @@ export function MatchScoreEntry({
   gameTo?: number;
 }) {
   const TARGET = gameTo;
+  const SPINE = posted ? 'var(--court)' : 'var(--serve)';
   const [a, setA] = useState(initialA);
   const [b, setB] = useState(initialB);
   const [editing, setEditing] = useState(!posted);
@@ -48,6 +49,14 @@ export function MatchScoreEntry({
 
   const valid = isFinalValid(a, b, TARGET);
   const winner = a === b ? null : a > b ? 'a' : 'b';
+
+  // One-tap "win": set this team to the target, or opponent+win-by on a deuce.
+  function quickWin(side: 'a' | 'b') {
+    const other = side === 'a' ? b : a;
+    const val = other >= TARGET - 1 ? other + WIN_BY : TARGET;
+    if (side === 'a') setA(val);
+    else setB(val);
+  }
 
   function post() {
     setError(null);
@@ -88,19 +97,22 @@ export function MatchScoreEntry({
   }
 
   return (
-    <div className="mt-3 rounded-[18px] p-5" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
+    <div className="mt-3 rounded-[18px] p-5" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)', borderLeft: `4px solid ${SPINE}` }}>
       <div className="mb-3 flex items-center justify-between">
-        <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--night-text3)' }}>Enter the score</div>
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--night-text3)' }}>
+          {canScore && <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full" style={{ background: 'var(--serve)' }} />}
+          Enter the score
+        </div>
         <div className="mono text-[10px] uppercase tracking-[0.1em]" style={{ color: 'var(--night-text3)' }}>Game to {TARGET}, win by {WIN_BY}</div>
       </div>
 
-      <TeamScoreRow label={teamALabel} accent="var(--court)" value={a} onChange={setA} mine={myTeam === 'a'} disabled={!canScore || pending} />
+      <TeamScoreRow label={teamALabel} accent="var(--court)" value={a} onChange={setA} onWin={() => quickWin('a')} winLabel={TARGET} mine={myTeam === 'a'} disabled={!canScore || pending} />
       <div className="my-2 flex items-center gap-3">
         <div className="h-px flex-1" style={{ background: 'var(--night-line)' }} />
         <span className="mono text-[10px] tracking-[0.12em]" style={{ color: 'var(--night-text3)' }}>VS</span>
         <div className="h-px flex-1" style={{ background: 'var(--night-line)' }} />
       </div>
-      <TeamScoreRow label={teamBLabel} accent="var(--serve)" value={b} onChange={setB} mine={myTeam === 'b'} disabled={!canScore || pending} />
+      <TeamScoreRow label={teamBLabel} accent="var(--serve)" value={b} onChange={setB} onWin={() => quickWin('b')} winLabel={TARGET} mine={myTeam === 'b'} disabled={!canScore || pending} />
 
       {error && <div className="mt-3 text-[12.5px]" style={{ color: 'var(--serve)' }}>{error}</div>}
 
@@ -133,6 +145,8 @@ function TeamScoreRow({
   accent,
   value,
   onChange,
+  onWin,
+  winLabel,
   mine,
   disabled,
 }: {
@@ -140,6 +154,8 @@ function TeamScoreRow({
   accent: string;
   value: number;
   onChange: (n: number) => void;
+  onWin: () => void;
+  winLabel: number;
   mine: boolean;
   disabled: boolean;
 }) {
@@ -155,6 +171,7 @@ function TeamScoreRow({
           <span className="truncate text-[14px] font-semibold">{mine ? `${label} (you)` : label}</span>
         </div>
       </div>
+      <button type="button" aria-label={`Set ${label} to the winning score`} disabled={disabled} onClick={onWin} className="mono shrink-0 rounded-full px-2.5 py-1.5 text-[13px] font-bold disabled:opacity-40" style={{ border: `1px solid color-mix(in oklch, ${accent} 45%, var(--night-line))`, color: accent }}>{winLabel}</button>
       <button type="button" aria-label={`Remove a point from ${label}`} disabled={disabled || value <= 0} onClick={() => onChange(Math.max(0, value - 1))} className={btn} style={{ border: '1px solid var(--night-line)', color: 'var(--night-text)' }}>−</button>
       <span className="mono w-10 text-center text-[30px] font-bold" style={{ color: accent }}>{value}</span>
       <button type="button" aria-label={`Add a point to ${label}`} disabled={disabled || value >= 99} onClick={() => onChange(Math.min(99, value + 1))} className={btn} style={{ background: accent, color: 'var(--night-court-ink)' }}>+</button>

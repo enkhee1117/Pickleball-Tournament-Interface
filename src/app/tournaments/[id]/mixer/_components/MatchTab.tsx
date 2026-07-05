@@ -1,7 +1,8 @@
 import type { PairingRow, PlayerRow, RoundRow, ScoreRow, StandingItem } from '../_types';
 import { gameSlotLabel } from '@/lib/mixer-standings';
-import { EmptyNight, ordinal } from './mixer-night';
+import { EmptyNight } from './mixer-night';
 import { MatchScoreEntry } from './MatchScoreEntry';
+import { MixerFinalStandings } from './MixerFinalStandings';
 
 // The player's "Match" tab — shows their current pairing/court, courtside score
 // entry for their own game, plus a mini live standings block. When the event is
@@ -27,7 +28,7 @@ export function MatchTab({
   gameTo?: number;
 }) {
   if (standings.length > 0) {
-    return <FinalStandingsNight standings={standings} myPlayer={myPlayer} />;
+    return <MixerFinalStandings standings={standings} roster={roster} myPlayerId={myPlayer.id} />;
   }
   const myPairing = pairings.find((p) => p.player_a_id === myPlayer.id || p.player_b_id === myPlayer.id);
   const name = (id: string) => roster.find((p) => p.id === id)?.display_name ?? 'TBD';
@@ -183,28 +184,3 @@ function StandingsMini({ roster, pairings, scores }: { roster: PlayerRow[]; pair
   );
 }
 
-function FinalStandingsNight({ standings, myPlayer }: { standings: StandingItem[]; myPlayer: PlayerRow }) {
-  return (
-    <div className="px-[18px]">
-      <div className="mb-3 rounded-2xl p-5" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
-        <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--court)' }}>Final standings</div>
-        <div className="serif mt-2 text-[34px] leading-none">Mixer complete</div>
-        <div className="mt-1 text-sm" style={{ color: 'var(--night-text2)' }}>Podium markets and raffle are settled from these results.</div>
-      </div>
-      <div className="grid gap-2">
-        {standings.slice(0, 12).map((row) => {
-          const me = row.playerId === myPlayer.id;
-          return (
-            <div key={row.playerId} className="flex items-center justify-between rounded-2xl p-3" style={{ background: me ? 'color-mix(in oklch, var(--court) 18%, var(--night-card))' : 'var(--night-card)', border: me ? '1px solid var(--court)' : '1px solid var(--night-line)' }}>
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--night-text3)' }}>{ordinal(row.rank)}</div>
-                <div className="text-sm font-bold">{me ? 'You' : row.displayName}</div>
-              </div>
-              <div className="mono text-xl font-bold" style={{ color: 'var(--court)' }}>{row.points}</div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}

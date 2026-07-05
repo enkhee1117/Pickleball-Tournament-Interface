@@ -4,7 +4,9 @@ import {
   computeStandings,
   gameSlotLabel,
   ordinal,
+  playerGamesMap,
   sortStandings,
+  tallyGames,
   type CourtResult,
 } from './mixer-standings';
 
@@ -103,6 +105,45 @@ describe('buildCourtResults with waves', () => {
     // Wave 2: team (a3,b3) scored 9 and lost; team (a4,b4) scored 11 and won.
     expect(rows.find((r) => r.playerId === 'a3')).toMatchObject({ points: 9, wins: 0, losses: 1 });
     expect(rows.find((r) => r.playerId === 'b4')).toMatchObject({ points: 11, wins: 1, losses: 0 });
+  });
+});
+
+describe('tallyGames', () => {
+  // Three games: one final, one live (current round, no score), one upcoming
+  // (future round, not editable). Final counts once; live counts once; both
+  // unfinished count toward "left".
+  const mk = (over: Partial<CourtResult>): CourtResult => ({ ...court(0, 0, false), ...over });
+  const results = [
+    mk({ key: 'a', completed: true, editable: true }),
+    mk({ key: 'b', completed: false, editable: true }),
+    mk({ key: 'c', completed: false, editable: false }),
+  ];
+
+  it('counts final, live and left', () => {
+    expect(tallyGames(results)).toEqual({ total: 3, fin: 1, live: 1, left: 2 });
+  });
+
+  it('is all-zero-ish on an empty board', () => {
+    expect(tallyGames([])).toEqual({ total: 0, fin: 0, live: 0, left: 0 });
+  });
+});
+
+describe('playerGamesMap', () => {
+  const mk = (over: Partial<CourtResult>): CourtResult => ({ ...court(0, 0, false), ...over });
+  // Maya (id 'me') plays two games: one completed, one live.
+  const results = [
+    mk({ key: 'a', completed: true, editable: false }),
+    mk({ key: 'b', completed: false, editable: true }),
+  ];
+  const map = playerGamesMap(results);
+
+  it('counts scheduled and played, and flags on-court', () => {
+    expect(map.get('me')).toEqual({ played: 1, scheduled: 2, onCourt: true });
+  });
+
+  it('does not flag on-court when the live game is already final', () => {
+    const done = playerGamesMap([mk({ completed: true, editable: true })]);
+    expect(done.get('me')).toEqual({ played: 1, scheduled: 1, onCourt: false });
   });
 });
 

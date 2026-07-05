@@ -13,7 +13,6 @@ import { ActionForm } from '../_components/ActionForm';
 import { ConfirmForm } from '@/components/ui/ConfirmForm';
 import { simulateRoundVotesAction, playRoundAction, autoNightAction, seedTestTournamentAction } from '../sim-actions';
 import {
-  drawMixerRound,
   finalizeMixerEvent,
   initializeMixerEvent,
   reopenMixerRound,
@@ -39,6 +38,7 @@ import { RosterTable, type RosterTableRow } from '../_components/RosterTable';
 import { mixerAvatarFor } from '../_components/mixer-night';
 import { CountdownTimer } from '../_components/CountdownTimer';
 import { OrganizerRevealTakeover } from '../_components/OrganizerRevealTakeover';
+import { DrawArmedModal } from '../_components/DrawArmedModal';
 import {
   formatLockDuration,
   getOrganizerTab,
@@ -399,17 +399,21 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                           </div>
                         )}
                       </div>
-                      <ActionForm action={drawMixerRound}>
-                        <input type="hidden" name="tournament_id" value={id} />
-                        <input type="hidden" name="round_id" value={currentRound.id} />
-                        <button
-                          disabled={!canDraw}
-                          className="w-full rounded-2xl px-4 py-4 text-[16px] font-semibold disabled:cursor-not-allowed disabled:opacity-45"
-                          style={{ background: 'var(--accent)', color: 'var(--accent-ink)' }}
-                        >
-                          🎲 Run the draw
-                        </button>
-                      </ActionForm>
+                      <DrawArmedModal
+                        tournamentId={id}
+                        roundId={currentRound.id}
+                        roundNo={currentRound.round_no}
+                        canDraw={canDraw}
+                        weights={{ votes: wPct(cfg.alpha), skill: wPct(cfg.beta), novelty: wPct(cfg.gamma) }}
+                        teams={teamPlan.teams}
+                        games={teamPlan.teams / 2}
+                        sittingPerRound={sittingPerRound}
+                        poolLabel={
+                          genderMode === 'mixed'
+                            ? `${poolA} in pool A, ${poolB} in pool B.`
+                            : 'Byes rotate fairly so no one sits twice before everyone has sat once.'
+                        }
+                      />
                     </div>
 
                     {/* Round controls */}
