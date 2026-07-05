@@ -467,7 +467,7 @@ export async function requestMixerPayment(formData: FormData): Promise<ActionRes
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
-  return { ok: true, message: 'Payment request sent' };
+  return { ok: true, message: 'Marked as paid — organizer will confirm' };
 }
 
 export async function confirmMixerPayment(formData: FormData): Promise<ActionResult> {
