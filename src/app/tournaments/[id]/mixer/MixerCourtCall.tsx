@@ -14,12 +14,14 @@ export function MixerCourtCall({
   tournamentId,
   roundId,
   courtNo,
+  waveNo = 1,
   partnerName,
   opponentTeam,
 }: {
   tournamentId: string;
   roundId: string;
   courtNo: number;
+  waveNo?: number;
   partnerName: string;
   opponentTeam: string | null;
 }) {
@@ -65,6 +67,7 @@ export function MixerCourtCall({
           Your court is ready
         </div>
         <div className="disp mt-2 text-[30px] font-extrabold leading-none">Court {courtNo} — go now</div>
+        {waveNo > 1 && <div className="mono mt-1 text-[10px] uppercase tracking-[0.12em]" style={{ opacity: 0.9 }}>Heat {waveNo}</div>}
         <div className="mt-2 text-[13px]" style={{ opacity: 0.95 }}>
           You &amp; {partnerName}
           {opponentTeam ? ` vs. ${opponentTeam}` : ''}. Other teams are checking in.

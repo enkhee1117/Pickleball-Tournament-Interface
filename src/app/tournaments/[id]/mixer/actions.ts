@@ -407,6 +407,7 @@ export async function scoreMixerCourt(formData: FormData): Promise<ActionResult>
   const tournamentId = fieldString(formData, 'tournament_id');
   const roundId = fieldString(formData, 'round_id');
   const courtNo = fieldInt(formData, 'court_no', 1, 1, 99);
+  const waveNo = fieldInt(formData, 'wave_no', 1, 1, 99);
   const scoreA = fieldInt(formData, 'team_a_score', 0, 0, 999);
   const scoreB = fieldInt(formData, 'team_b_score', 0, 0, 999);
   if (!tournamentId || !roundId) return { ok: false, error: 'Missing round.' };
@@ -415,6 +416,7 @@ export async function scoreMixerCourt(formData: FormData): Promise<ActionResult>
   const { error } = await supabase.rpc('app_mixer_score_court', {
     p_round_id: roundId,
     p_court_no: courtNo,
+    p_wave_no: waveNo,
     p_team_a_score: scoreA,
     p_team_b_score: scoreB,
   });

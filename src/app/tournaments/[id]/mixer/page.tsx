@@ -101,10 +101,10 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
       ? supabase.from('mixer_votes').select('round_id,target_player_id,up_tokens,down_tokens').in('round_id', roundIds).eq('voter_player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
     currentRound
-      ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no').eq('round_id', currentRound.id).order('court_no', { ascending: true })
+      ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no,wave_no').eq('round_id', currentRound.id).order('court_no', { ascending: true }).order('wave_no', { ascending: true })
       : Promise.resolve({ data: [] }),
     currentRound
-      ? supabase.from('mixer_scores').select('court_no,team_a_score,team_b_score,completed_at').eq('round_id', currentRound.id)
+      ? supabase.from('mixer_scores').select('court_no,wave_no,team_a_score,team_b_score,completed_at').eq('round_id', currentRound.id)
       : Promise.resolve({ data: [] }),
     myPlayer
       ? supabase.from('bets').select('market_place,bettor_player_id,pick_player_id,chips').eq('tournament_id', id).eq('bettor_player_id', myPlayer.id)
@@ -150,14 +150,15 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     if (!['revealed', 'playing'].includes(currentRound.state)) return null;
     const mine = pairingRows.find((p) => p.player_a_id === myPlayer.id || p.player_b_id === myPlayer.id);
     if (!mine) return null;
-    if (scoreRows.find((s) => s.court_no === mine.court_no)?.completed_at) return null;
+    if (scoreRows.find((s) => s.court_no === mine.court_no && s.wave_no === mine.wave_no)?.completed_at) return null;
     if (checkInRow?.acked_round_id === currentRound.id) return null;
     const nameOf = (pid: string) => roster.find((p) => p.id === pid)?.display_name ?? 'TBD';
     const partnerId = mine.player_a_id === myPlayer.id ? mine.player_b_id : mine.player_a_id;
-    const opponent = pairingRows.find((p) => p.court_no === mine.court_no && p.id !== mine.id) ?? null;
+    const opponent = pairingRows.find((p) => p.court_no === mine.court_no && p.wave_no === mine.wave_no && p.id !== mine.id) ?? null;
     return {
       roundId: currentRound.id,
       courtNo: mine.court_no,
+      waveNo: mine.wave_no,
       partnerName: nameOf(partnerId),
       opponentTeam: opponent ? `${nameOf(opponent.player_a_id)} & ${nameOf(opponent.player_b_id)}` : null,
     };
@@ -216,6 +217,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
           tournamentId={id}
           roundId={courtCall.roundId}
           courtNo={courtCall.courtNo}
+          waveNo={courtCall.waveNo}
           partnerName={courtCall.partnerName}
           opponentTeam={courtCall.opponentTeam}
         />

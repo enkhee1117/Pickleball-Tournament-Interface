@@ -7,6 +7,7 @@ import { formatInviteCode } from '@/lib/invite-codes';
 import { Chip } from '@/components/ui/Chip';
 import { DesktopSurface, BallMark } from '@/components/desktop';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
+import { gameSlotLabel } from '@/lib/mixer-standings';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import { ShareCodeCard } from '../../invite/ShareCodeCard';
 import { MixerRealtimeSync } from '../MixerRealtimeSync';
@@ -104,10 +105,10 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
 
   const [{ data: pairings }, { data: scores }, { data: payments }, { data: states }, { data: betsSummary }, { data: snapshot }, { data: voteRows }] = await Promise.all([
     currentRound
-      ? supabase.from('mixer_pairings').select('id,player_a_id,player_b_id,court_no').eq('round_id', currentRound.id).order('court_no', { ascending: true })
+      ? supabase.from('mixer_pairings').select('id,player_a_id,player_b_id,court_no,wave_no').eq('round_id', currentRound.id).order('court_no', { ascending: true }).order('wave_no', { ascending: true })
       : Promise.resolve({ data: [] }),
     currentRound
-      ? supabase.from('mixer_scores').select('court_no,team_a_score,team_b_score,completed_at').eq('round_id', currentRound.id)
+      ? supabase.from('mixer_scores').select('court_no,wave_no,team_a_score,team_b_score,completed_at').eq('round_id', currentRound.id)
       : Promise.resolve({ data: [] }),
     supabase.from('payments').select('id,player_id,type,amount,method,status').eq('tournament_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('player_event_state').select('player_id,pairing_pool,tokens_base_remaining,tokens_bought_remaining,chips_remaining,sit_out_count').eq('tournament_id', id),
@@ -140,7 +141,13 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const drawStarted = roundRows.some((round) => ['drawing', 'revealed', 'playing', 'done'].includes(round.state));
   const hasOpenBallots = roundRows.some((round) => round.state === 'open');
   const hasLockedBallots = roundRows.some((round) => round.state === 'locked');
-  const currentCourtCount = new Set(pairingRows.map((pairing) => pairing.court_no)).size;
+  // A "game slot" is one matchup = (court, wave). When games outnumber courts a
+  // court hosts several waves (heats), so the round's game count is the number
+  // of distinct (court, wave) pairs, not distinct courts.
+  const slotKey = (courtNo: number, waveNo: number) => `${courtNo}:${waveNo}`;
+  const gameSlots = [...new Map(pairingRows.map((p) => [slotKey(p.court_no, p.wave_no), { courtNo: p.court_no, waveNo: p.wave_no }])).values()]
+    .sort((a, b) => a.courtNo - b.courtNo || a.waveNo - b.waveNo);
+  const currentCourtCount = gameSlots.length;
   const scoredCourtCount = scoreRows.filter((score) => score.completed_at).length;
   const canOpenBallot = !!currentRound && !drawStarted && hasLockedBallots;
   const canLockBallot = !!currentRound && hasOpenBallots && !drawStarted;
@@ -318,7 +325,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                           tournamentId={id}
                           roundId={currentRound.id}
                           state="done"
-                          label={currentCourtCount > 0 && scoredCourtCount < currentCourtCount ? `Score ${currentCourtCount - scoredCourtCount} court${currentCourtCount - scoredCourtCount === 1 ? '' : 's'}` : 'Mark done'}
+                          label={currentCourtCount > 0 && scoredCourtCount < currentCourtCount ? `Score ${currentCourtCount - scoredCourtCount} game${currentCourtCount - scoredCourtCount === 1 ? '' : 's'}` : 'Mark done'}
                           disabled={!canMarkDone}
                         />
                       </div>
@@ -377,14 +384,15 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         <div className="mt-2 text-[13px]" style={{ color: 'var(--text3)' }}>No courts revealed yet — run the draw to seat this round.</div>
                       ) : (
                         <div className="mt-3 flex flex-col gap-2">
-                          {[...new Set(pairingRows.map((p) => p.court_no))].map((courtNo) => {
-                            const teams = pairingRows.filter((p) => p.court_no === courtNo);
-                            const score = scoreRows.find((s) => s.court_no === courtNo);
+                          {gameSlots.map(({ courtNo, waveNo }) => {
+                            const teams = pairingRows.filter((p) => p.court_no === courtNo && p.wave_no === waveNo);
+                            const score = scoreRows.find((s) => s.court_no === courtNo && s.wave_no === waveNo);
                             const live = !!score && !score.completed_at;
                             return (
                               <CourtMini
-                                key={courtNo}
+                                key={slotKey(courtNo, waveNo)}
                                 courtNo={courtNo}
+                                waveNo={waveNo}
                                 teamA={teams[0] ? `${name(teams[0].player_a_id)} & ${name(teams[0].player_b_id)}` : '—'}
                                 teamB={teams[1] ? `${name(teams[1].player_a_id)} & ${name(teams[1].player_b_id)}` : '—'}
                                 scoreA={score?.team_a_score ?? 0}
@@ -525,12 +533,15 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                   </div>
                 ) : (
                   <div className="grid gap-3">
-                    {[...new Set(pairingRows.map((p) => p.court_no))].map((courtNo) => {
-                      const teams = pairingRows.filter((p) => p.court_no === courtNo);
-                      const score = scoreRows.find((s) => s.court_no === courtNo);
+                    {gameSlots.map(({ courtNo, waveNo }) => {
+                      const teams = pairingRows.filter((p) => p.court_no === courtNo && p.wave_no === waveNo);
+                      const score = scoreRows.find((s) => s.court_no === courtNo && s.wave_no === waveNo);
                       return (
-                        <div key={courtNo} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
-                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-3">Court {courtNo}</div>
+                        <div key={slotKey(courtNo, waveNo)} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-3">
+                            {gameSlotLabel(courtNo, waveNo)}
+                            {waveNo > 1 && <span className="ml-2 font-medium normal-case text-ink-3">waits for Heat {waveNo - 1}</span>}
+                          </div>
                           <div className="grid gap-1 text-sm font-semibold text-ink">
                             {teams.map((team, idx) => (
                               <div key={team.id}>{idx === 0 ? 'A' : 'B'} · {name(team.player_a_id)} & {name(team.player_b_id)}</div>
@@ -540,6 +551,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                             <input type="hidden" name="tournament_id" value={id} />
                             <input type="hidden" name="round_id" value={currentRound.id} />
                             <input type="hidden" name="court_no" value={courtNo} />
+                            <input type="hidden" name="wave_no" value={waveNo} />
                             <input name="team_a_score" type="number" min={0} defaultValue={score?.team_a_score ?? 0} className="mono h-10 w-16 rounded-xl bg-paper-2 text-center text-ink" />
                             <span className="text-xs text-ink-3">to</span>
                             <input name="team_b_score" type="number" min={0} defaultValue={score?.team_b_score ?? 0} className="mono h-10 w-16 rounded-xl bg-paper-2 text-center text-ink" />
@@ -863,13 +875,13 @@ function WeightTile({ v, l }: { v: string; l: string }) {
   );
 }
 
-function CourtMini({ courtNo, teamA, teamB, scoreA, scoreB, live }: { courtNo: number; teamA: string; teamB: string; scoreA: number; scoreB: number; live: boolean }) {
+function CourtMini({ courtNo, waveNo, teamA, teamB, scoreA, scoreB, live }: { courtNo: number; waveNo: number; teamA: string; teamB: string; scoreA: number; scoreB: number; live: boolean }) {
   return (
     <div
       className="flex items-center gap-3 rounded-xl p-3"
       style={{ border: '1px solid var(--line)', borderLeft: live ? '3px solid var(--serve)' : '1px solid var(--line)' }}
     >
-      <span className="mono w-12 text-[11px]" style={{ color: 'var(--text3)' }}>CT {courtNo}</span>
+      <span className="mono w-12 text-[11px]" style={{ color: 'var(--text3)' }}>CT {courtNo}{waveNo > 1 ? `·H${waveNo}` : ''}</span>
       <div className="min-w-0 flex-1 text-[13px]" style={{ color: 'var(--text)' }}>
         <div className="flex justify-between gap-2"><span className="truncate">{teamA}</span><span className="mono font-bold">{scoreA}</span></div>
         <div className="flex justify-between gap-2"><span className="truncate">{teamB}</span><span className="mono font-bold">{scoreB}</span></div>

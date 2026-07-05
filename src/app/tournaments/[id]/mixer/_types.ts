@@ -76,10 +76,15 @@ export type PairingRow = {
   player_a_id: string;
   player_b_id: string;
   court_no: number;
+  // Wave (heat) within the round: when games outnumber courts, a court runs
+  // several games in sequence. (court_no, wave_no) identifies one game; wave 1
+  // plays first, higher waves wait for the court. Defaults to 1 (games ≤ courts).
+  wave_no: number;
 };
 
 export type ScoreRow = {
   court_no: number;
+  wave_no: number;
   team_a_score: number;
   team_b_score: number;
   completed_at: string | null;
