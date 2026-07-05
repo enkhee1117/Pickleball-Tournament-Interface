@@ -123,7 +123,15 @@ export async function updateMixerConfig(formData: FormData): Promise<ActionResul
     p_prize_buckets: prizeBuckets,
     p_payment_methods: paymentMethods,
     p_raffle_prize: fieldString(formData, 'raffle_prize') || 'Raffle prize',
-    p_upvote_cap: fieldInt(formData, 'upvote_cap_per_target', 3, 1, 99),
+    // Blank = "no limit": send null so update_config PRESERVES the current cap
+    // (default 1,000,000 ≈ unlimited) rather than re-imposing one. A typed value
+    // sets a real 1–99 cap.
+    p_upvote_cap: (() => {
+      const raw = String(formData.get('upvote_cap_per_target') ?? '').trim();
+      if (!raw) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 1 ? Math.min(99, Math.trunc(n)) : null;
+    })(),
     p_bet_lock_round_no: (() => {
       const raw = String(formData.get('bet_lock_round_no') ?? '').trim();
       if (!raw) return null;
@@ -584,7 +592,9 @@ export async function setMixerAddon(formData: FormData): Promise<ActionResult> {
     p_prize_buckets: c.prize_buckets,
     p_payment_methods: c.payment_methods,
     p_raffle_prize: c.raffle_prize,
-    p_upvote_cap: c.upvote_cap_per_target ?? 3,
+    // Preserve a real cap (1–99); send null for the unlimited sentinel so
+    // toggling an add-on never quietly re-imposes a cap on an unlimited event.
+    p_upvote_cap: c.upvote_cap_per_target && c.upvote_cap_per_target <= 99 ? c.upvote_cap_per_target : null,
     p_bet_lock_round_no: c.bet_lock_round_no,
     p_clear_bet_lock_round: c.bet_lock_round_no == null,
   });
