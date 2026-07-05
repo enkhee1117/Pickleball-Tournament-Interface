@@ -12,6 +12,8 @@ import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import { ShareCodeCard } from '../../invite/ShareCodeCard';
 import { MixerRealtimeSync } from '../MixerRealtimeSync';
 import { ActionForm } from '../_components/ActionForm';
+import { ConfirmForm } from '@/components/ui/ConfirmForm';
+import { simulateRoundVotesAction, playRoundAction, autoNightAction, seedTestTournamentAction } from '../sim-actions';
 import {
   drawMixerRound,
   finalizeMixerEvent,
@@ -152,6 +154,9 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const canOpenBallot = !!currentRound && !drawStarted && hasLockedBallots;
   const canLockBallot = !!currentRound && hasOpenBallots && !drawStarted;
   const canDraw = currentRound?.state === 'locked';
+  // Vote simulation writes ballots, which the DB only accepts while the round
+  // is open (same rule real voters hit).
+  const canSimulate = currentRound?.state === 'open';
   const canStartPlay = currentRound?.state === 'revealed';
   const canMarkDone = (currentRound?.state === 'playing' || currentRound?.state === 'revealed') && (currentCourtCount === 0 || scoredCourtCount >= currentCourtCount);
 
@@ -346,6 +351,16 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
 
                   {/* RIGHT — live read-outs */}
                   <div className="flex flex-col gap-[18px]">
+                    <TestHarnessPanel
+                      tournamentId={id}
+                      roundId={currentRound.id}
+                      roundNo={currentRound.round_no}
+                      canSimulate={canSimulate}
+                      canPlay={currentRound.state !== 'done' && finalStandings.length === 0}
+                      eventFinalized={finalStandings.length > 0}
+                      votedCount={votedCount}
+                      rosterCount={roster.length}
+                    />
                     {/* Recovery controls — mistakes happen on live nights. */}
                     <div className="rounded-[18px] p-5" style={{ border: '1px solid color-mix(in oklch, var(--berry, oklch(0.55 0.2 12)) 35%, var(--line))', background: 'var(--surface-card)' }}>
                       <h3 className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>Rerun &amp; reset</h3>
@@ -871,6 +886,116 @@ function WeightTile({ v, l }: { v: string; l: string }) {
     <div className="flex-1 rounded-xl p-2.5 text-center" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)' }}>
       <div className="mono text-[19px] font-bold" style={{ color: 'var(--accent)' }}>{v}</div>
       <div className="mono mt-0.5 text-[9.5px] uppercase tracking-[.1em]" style={{ color: 'var(--text3)' }}>{l}</div>
+    </div>
+  );
+}
+
+// Organizer test harness — simulate absent players' voting so the whole flow
+// (vote → draw → score → standings) can be exercised without many logins. Every
+// button routes through a manager-gated RPC; a non-manager is refused server-side.
+function TestHarnessPanel({
+  tournamentId,
+  roundId,
+  roundNo,
+  canSimulate,
+  canPlay,
+  eventFinalized,
+  votedCount,
+  rosterCount,
+}: {
+  tournamentId: string;
+  roundId: string;
+  roundNo: number;
+  canSimulate: boolean;
+  canPlay: boolean;
+  eventFinalized: boolean;
+  votedCount: number;
+  rosterCount: number;
+}) {
+  const unvoted = Math.max(0, rosterCount - votedCount);
+  return (
+    <div
+      className="rounded-[18px] p-5"
+      style={{ border: '1px dashed color-mix(in oklch, var(--accent) 45%, var(--line))', background: 'color-mix(in oklch, var(--accent) 6%, var(--surface-card))' }}
+    >
+      <h3 className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: 'var(--text)' }}>
+        🧪 Test harness
+        <span className="chip">Round {roundNo}</span>
+      </h3>
+      <div className="mb-3 text-[12.5px]" style={{ color: 'var(--text3)' }}>
+        Drive the whole flow without 16 logins. Simulated votes obey the same budget, pools and lock as real ones; auto-play
+        also draws and posts random finals.
+      </div>
+
+      <div className="mono mb-1.5 text-[10px] uppercase tracking-[0.1em]" style={{ color: 'var(--text3)' }}>Votes</div>
+      {!canSimulate ? (
+        <div className="rounded-xl px-3 py-2.5 text-[12.5px]" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)', color: 'var(--text3)' }}>
+          Open the ballot to simulate votes for this round.
+        </div>
+      ) : (
+        <div className="grid gap-2">
+          <form action={simulateRoundVotesAction}>
+            <input type="hidden" name="tournament_id" value={tournamentId} />
+            <input type="hidden" name="round_id" value={roundId} />
+            <input type="hidden" name="mode" value="missing" />
+            <button className="w-full rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: 'var(--accent)', color: 'var(--accent-ink)' }}>
+              Fill ballots for {unvoted} unvoted player{unvoted === 1 ? '' : 's'}
+            </button>
+          </form>
+          <ConfirmForm action={simulateRoundVotesAction} confirm={`Wipe every ballot for round ${roundNo} (refunding tokens) and re-roll fresh votes for everyone?`}>
+            <input type="hidden" name="tournament_id" value={tournamentId} />
+            <input type="hidden" name="round_id" value={roundId} />
+            <input type="hidden" name="mode" value="all" />
+            <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
+              Re-roll all ballots
+            </button>
+          </ConfirmForm>
+        </div>
+      )}
+
+      <div className="mono mb-1.5 mt-4 text-[10px] uppercase tracking-[0.1em]" style={{ color: 'var(--text3)' }}>Auto-play</div>
+      {eventFinalized ? (
+        <div className="rounded-xl px-3 py-2.5 text-[12.5px]" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)', color: 'var(--text3)' }}>
+          Event is finalized. Reset it above to run again.
+        </div>
+      ) : (
+        <div className="grid gap-2">
+          <ConfirmForm action={playRoundAction} confirm={`Play round ${roundNo} end to end (simulate any missing votes, lock, draw, and post random finals)?`}>
+            <input type="hidden" name="tournament_id" value={tournamentId} />
+            <button disabled={!canPlay} className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-45" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
+              ▶ Play round {roundNo} to the end
+            </button>
+          </ConfirmForm>
+          <ConfirmForm action={autoNightAction} confirm="Auto-play every remaining round (votes, draws, random scores) and finalize standings, raffle & pools?">
+            <input type="hidden" name="tournament_id" value={tournamentId} />
+            <button disabled={!canPlay} className="w-full rounded-2xl px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45" style={{ background: 'var(--accent)', color: 'var(--accent-ink)' }}>
+              ⏭ Auto-play to finals
+            </button>
+          </ConfirmForm>
+        </div>
+      )}
+
+      <div className="mono mb-1.5 mt-4 text-[10px] uppercase tracking-[0.1em]" style={{ color: 'var(--text3)' }}>Fresh test event</div>
+      <ConfirmForm action={seedTestTournamentAction} confirm="Create a brand-new mixer with a full placeholder roster and auto-play the entire night? You'll land on the new event.">
+        <div className="grid grid-cols-[1fr_auto] gap-2">
+          <input name="name" defaultValue="Test Mixer" aria-label="Test event name" className="h-10 rounded-xl px-3 text-[13px]" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          <select name="player_count" defaultValue="16" aria-label="Player count" className="h-10 rounded-xl px-2 text-[13px]" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+            <option value="8">8</option>
+            <option value="12">12</option>
+            <option value="16">16</option>
+            <option value="20">20</option>
+            <option value="24">24</option>
+          </select>
+        </div>
+        <select name="gender_mode" defaultValue="mixed" aria-label="Gender mode" className="mt-2 h-10 w-full rounded-xl px-2 text-[13px]" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+          <option value="mixed">Mixed doubles</option>
+          <option value="open">Open (gender-blind)</option>
+          <option value="same">Same-gender teams</option>
+        </select>
+        <button className="mt-2 w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
+          🌱 Seed &amp; auto-play a new mixer
+        </button>
+      </ConfirmForm>
     </div>
   );
 }
