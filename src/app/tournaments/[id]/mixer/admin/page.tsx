@@ -16,6 +16,7 @@ import {
   finalizeMixerEvent,
   initializeMixerEvent,
   reopenMixerRound,
+  repoolMixerRoster,
   resetMixerEvent,
   resetMixerRoundVotes,
   scoreMixerCourt,
@@ -346,11 +347,17 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         Fix a draw that fired early or start the night over. Roster and payments always survive.
                       </div>
                       <div className="grid gap-2">
-                        <ConfirmForm action={reopenMixerRound} confirm={`Reopen round ${currentRound.round_no}? Its pairings are cleared and voting goes live again.`}>
+                        <ConfirmForm action={repoolMixerRoster} confirm="Re-pool every player from their gender and the event's gender mode? Wallets and votes are kept. Follow with Reopen + Run the draw to redraw the teams.">
+                          <input type="hidden" name="tournament_id" value={id} />
+                          <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
+                            Re-pool teams from genders (roster/config changed)
+                          </button>
+                        </ConfirmForm>
+                        <ConfirmForm action={reopenMixerRound} confirm={`Reopen round ${currentRound.round_no}? Its pairings AND any scores already entered are cleared, and voting goes live again.`}>
                           <input type="hidden" name="tournament_id" value={id} />
                           <input type="hidden" name="round_id" value={currentRound.id} />
                           <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
-                            Reopen round {currentRound.round_no} (clear draw)
+                            Reopen round {currentRound.round_no} (clear draw + scores)
                           </button>
                         </ConfirmForm>
                         <ConfirmForm action={resetMixerRoundVotes} confirm={`Wipe every ballot for round ${currentRound.round_no} and refund the tokens?`}>
