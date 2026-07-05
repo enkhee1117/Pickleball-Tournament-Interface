@@ -38,6 +38,7 @@ import type {
   TournamentRow,
 } from '../_types';
 import { ConfigForm } from '../_components/ConfigForm';
+import { CountdownTimer } from '../_components/CountdownTimer';
 import {
   formatLockDuration,
   getOrganizerTab,
@@ -106,7 +107,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const currentRound = currentMixerRound(roundRows);
   const roster = (players ?? []) as PlayerRow[];
 
-  const [{ data: pairings }, { data: scores }, { data: payments }, { data: states }, { data: betsSummary }, { data: snapshot }, { data: voteRows }] = await Promise.all([
+  const [{ data: pairings }, { data: scores }, { data: payments }, { data: states }, { data: betsSummary }, { data: snapshot }, { data: ballotRows }] = await Promise.all([
     currentRound
       ? supabase.from('mixer_pairings').select('id,player_a_id,player_b_id,court_no,wave_no').eq('round_id', currentRound.id).order('court_no', { ascending: true }).order('wave_no', { ascending: true })
       : Promise.resolve({ data: [] }),
@@ -119,10 +120,12 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
     // per-row (bettor_player_id, chips) — only market liquidity totals.
     supabase.rpc('app_mixer_bets_summary', { p_tournament_id: id }),
     supabase.from('mixer_final_snapshots').select('standings,raffle_tickets,raffle_winner,bet_settlements').eq('tournament_id', id).maybeSingle(),
-    // Blind-safe participation: only which players have voted this round —
-    // never who they voted for. Distinct voter_player_id → the ballot ring.
+    // Blind-safe participation: who has LOCKED IN their ballot this round (the
+    // "I'm done" signal). mixer_round_ballots holds only (player, confirmed_at)
+    // — never the picks — so it drives the ring without leaking the blind vote.
+    // Realtime on this table (MixerRealtimeSync) makes the ring update live.
     currentRound
-      ? supabase.from('mixer_votes').select('voter_player_id').eq('round_id', currentRound.id)
+      ? supabase.from('mixer_round_ballots').select('player_id,confirmed_at').eq('round_id', currentRound.id)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -161,9 +164,13 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const canStartPlay = currentRound?.state === 'revealed';
   const canMarkDone = (currentRound?.state === 'playing' || currentRound?.state === 'revealed') && (currentCourtCount === 0 || scoredCourtCount >= currentCourtCount);
 
-  // Ballot participation (blind — who has voted, never who for) for the ring.
-  const voterSet = new Set(((voteRows ?? []) as { voter_player_id: string }[]).map((v) => v.voter_player_id));
-  const votedNames = roster.filter((p) => voterSet.has(p.id)).map((p) => p.display_name);
+  // Ballot participation (blind — who has locked in, never who for) for the ring.
+  const confirmedSet = new Set(
+    ((ballotRows ?? []) as { player_id: string; confirmed_at: string | null }[])
+      .filter((b) => b.confirmed_at != null)
+      .map((b) => b.player_id),
+  );
+  const votedNames = roster.filter((p) => confirmedSet.has(p.id)).map((p) => p.display_name);
   const votedCount = votedNames.length;
   // Armed-draw weights derived from the tuned formula knobs (alpha/beta/gamma).
   const wSum = Number(cfg?.alpha ?? 0) + Number(cfg?.beta ?? 0) + Number(cfg?.gamma ?? 0);
@@ -249,6 +256,12 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                           <div className="text-[12.5px]" style={{ color: 'var(--text3)' }}>
                             {cfg.lock_mode === 'manual' ? 'Manual lock · all rounds lock together' : `Timer lock · ${formatLockDuration(cfg.lock_seconds)} window`}
                           </div>
+                          {currentRound.state === 'open' && currentRound.lock_at && (
+                            <div className="mono mt-1 flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: 'var(--serve)' }}>
+                              <span className="inline-block h-1.5 w-1.5 animate-pulse-dot rounded-full" style={{ background: 'var(--serve)' }} />
+                              <CountdownTimer lockAt={currentRound.lock_at} active prefix="Ballots lock in " closedLabel="Locking…" />
+                            </div>
+                          )}
                           <div className="mono mt-3 text-[54px] font-bold leading-none tracking-[-.03em]" style={{ color: 'var(--text)' }}>
                             {votedCount}
                             <span className="text-[20px]" style={{ color: 'var(--text3)' }}> / {roster.length}</span>
@@ -752,7 +765,7 @@ function CockpitSidebar({
           Player
         </Link>
         <span className="flex-1 rounded-lg py-2 text-center text-[12.5px] font-semibold" style={{ background: 'var(--accent)', color: 'var(--accent-ink)' }}>
-          Admin
+          Organizer
         </span>
       </div>
       <Link
