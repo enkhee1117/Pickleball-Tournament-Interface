@@ -322,11 +322,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                           disabled={!canMarkDone}
                         />
                       </div>
-                      <ActionForm
-                        action={finalizeMixerEvent}
-                        className="mt-2.5"
-                        confirm="Finalize the event now? This snapshots standings, draws the raffle, and settles the pools."
-                      >
+                      <ActionForm action={finalizeMixerEvent} className="mt-2.5">
                         <input type="hidden" name="tournament_id" value={id} />
                         <button
                           className="w-full rounded-2xl px-4 py-3 text-sm font-semibold"
