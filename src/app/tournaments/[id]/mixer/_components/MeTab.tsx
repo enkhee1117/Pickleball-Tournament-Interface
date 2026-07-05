@@ -48,6 +48,12 @@ export function MeTab({
   const myTickets = raffleTickets.find((r) => r.playerId === player.id);
   const myStanding = standings.find((s) => s.playerId === player.id);
   const wonRaffle = raffleWinner?.playerId === player.id;
+  // Only surface a fee row when there's actually something to pay — a $0 entry
+  // or a free/disabled boost has no request to make. An existing payment record
+  // keeps its row so the player can still see its status if the fee later drops.
+  const showEntry = config.entry_fee > 0 || !!entry;
+  const showBoost = config.pay_to_play_enabled && (config.boost_price > 0 || !!boost || boostUsed);
+  const hasPayments = showEntry || showBoost;
   return (
     <div className="px-[18px]">
       <div className="rounded-2xl p-5" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
@@ -76,50 +82,58 @@ export function MeTab({
           </div>
         </div>
       )}
-      <div className="mt-3 rounded-2xl p-5" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
-        <div className="serif text-[28px] leading-none">Payments</div>
-        <div className="mt-1 text-xs" style={{ color: 'var(--night-text2)' }}>Send your fee to the organizer, then mark it paid below. They confirm on their side — the app never touches the money.</div>
-        <div className="mt-3 grid gap-2">
-          {paymentMethodRows(methods).map((m) => (
-            <div key={m.key} className="rounded-xl px-3 py-2 text-sm" style={{ background: 'var(--night-inset)' }}>
-              <div className="font-bold">{m.label}</div>
-              <div className="mono mt-1 text-xs" style={{ color: 'var(--night-text2)' }}>{m.handle || 'Pay organizer in person'} · memo: {player.display_name}</div>
+      {(hasPayments || myTickets) && (
+        <div className="mt-3 rounded-2xl p-5" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
+          {hasPayments && (
+            <>
+              <div className="serif text-[28px] leading-none">Payments</div>
+              <div className="mt-1 text-xs" style={{ color: 'var(--night-text2)' }}>Send your fee to the organizer, then mark it paid below. They confirm on their side — the app never touches the money.</div>
+              <div className="mt-3 grid gap-2">
+                {paymentMethodRows(methods).map((m) => (
+                  <div key={m.key} className="rounded-xl px-3 py-2 text-sm" style={{ background: 'var(--night-inset)' }}>
+                    <div className="font-bold">{m.label}</div>
+                    <div className="mono mt-1 text-xs" style={{ color: 'var(--night-text2)' }}>{m.handle || 'Pay organizer in person'} · memo: {player.display_name}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 grid gap-3">
+                {showEntry && (
+                  <PaymentRequest
+                    tournamentId={tournament.id}
+                    playerId={player.id}
+                    type="entry"
+                    title="Entry"
+                    amount={config.entry_fee}
+                    method={primaryMethod}
+                    status={entry?.status}
+                    disabled={!!entry && entry.status !== 'refunded'}
+                  />
+                )}
+                {showBoost && (
+                  <PaymentRequest
+                    tournamentId={tournament.id}
+                    playerId={player.id}
+                    type="pay_to_play"
+                    title={`+${config.boost_tokens} token boost`}
+                    amount={config.boost_price}
+                    method={primaryMethod}
+                    status={boost?.status ?? (boostUsed ? 'confirmed' : undefined)}
+                    disabled={boostUsed || (state?.boosts_used ?? 0) >= config.boost_limit || (!!boost && boost.status !== 'refunded')}
+                  />
+                )}
+              </div>
+            </>
+          )}
+          {myTickets && (
+            <div className={`${hasPayments ? 'mt-4' : ''} rounded-xl p-3 text-sm`} style={{ background: 'var(--night-inset)' }}>
+              <div className="font-bold">Raffle ticket math</div>
+              <div className="mt-1 text-xs leading-5" style={{ color: 'var(--night-text2)' }}>
+                Popularity {Math.round(myTickets.popularityTickets * 10) / 10} + unused base token bonus {Math.round(myTickets.frugalityTickets * 10) / 10}. Bought tokens do not count.
+              </div>
             </div>
-          ))}
-        </div>
-        <div className="mt-4 grid gap-3">
-          <PaymentRequest
-            tournamentId={tournament.id}
-            playerId={player.id}
-            type="entry"
-            title="Entry"
-            amount={config.entry_fee}
-            method={primaryMethod}
-            status={entry?.status}
-            disabled={!!entry && entry.status !== 'refunded'}
-          />
-          {config.pay_to_play_enabled && (
-            <PaymentRequest
-              tournamentId={tournament.id}
-              playerId={player.id}
-              type="pay_to_play"
-              title={`+${config.boost_tokens} token boost`}
-              amount={config.boost_price}
-              method={primaryMethod}
-              status={boost?.status ?? (boostUsed ? 'confirmed' : undefined)}
-              disabled={boostUsed || (state?.boosts_used ?? 0) >= config.boost_limit || (!!boost && boost.status !== 'refunded')}
-            />
           )}
         </div>
-        {myTickets && (
-          <div className="mt-4 rounded-xl p-3 text-sm" style={{ background: 'var(--night-inset)' }}>
-            <div className="font-bold">Raffle ticket math</div>
-            <div className="mt-1 text-xs leading-5" style={{ color: 'var(--night-text2)' }}>
-              Popularity {Math.round(myTickets.popularityTickets * 10) / 10} + unused base token bonus {Math.round(myTickets.frugalityTickets * 10) / 10}. Bought tokens do not count.
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
