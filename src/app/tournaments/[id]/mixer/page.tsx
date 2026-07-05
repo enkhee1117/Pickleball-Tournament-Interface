@@ -13,6 +13,7 @@ import { QuickJoinForm } from './QuickJoinForm';
 import { PushRegistration } from './PushRegistration';
 import { MixerCourtCall, MixerPresenceCheckIn } from './MixerCourtCall';
 import { bindMixerRosterEntry } from './actions';
+import { ActionForm } from './_components/ActionForm';
 import { MixerBettingPanel } from './MixerBettingPanel';
 import { MixerModeSwitch } from './MixerModeSwitch';
 import { MixerRealtimeSync } from './MixerRealtimeSync';
@@ -192,7 +193,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   if (!myPlayer) {
     return (
       <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={null} isManager={isManager}>
-        <form action={bindMixerRosterEntry} className="px-[18px] pt-6">
+        <ActionForm action={bindMixerRosterEntry} className="px-[18px] pt-6">
           <input type="hidden" name="tournament_id" value={id} />
           <div className="rounded-2xl bg-surface-card p-5" style={{ border: '1px solid var(--line)' }}>
             <div className="serif text-[30px] leading-none text-ink">Claim a roster spot</div>
@@ -202,7 +203,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
               Claim and vote
             </button>
           </div>
-        </form>
+        </ActionForm>
       </MixerShell>
     );
   }

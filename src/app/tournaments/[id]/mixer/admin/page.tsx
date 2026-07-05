@@ -10,7 +10,7 @@ import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import { ShareCodeCard } from '../../invite/ShareCodeCard';
 import { MixerRealtimeSync } from '../MixerRealtimeSync';
-import { ConfirmForm } from '@/components/ui/ConfirmForm';
+import { ActionForm } from '../_components/ActionForm';
 import {
   drawMixerRound,
   finalizeMixerEvent,
@@ -205,14 +205,14 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
         {sp.ok && <Notice tone="ok">{sp.ok}</Notice>}
 
         {!cfg || !currentRound ? (
-          <form action={initializeMixerEvent} className="rounded-2xl bg-white p-5 text-center" style={{ border: '1px dashed var(--line)' }}>
+          <ActionForm action={initializeMixerEvent} className="rounded-2xl bg-white p-5 text-center" style={{ border: '1px dashed var(--line)' }}>
             <input type="hidden" name="tournament_id" value={id} />
             <div className="text-[15px] font-semibold text-ink">Mixer config is not initialized</div>
             <div className="mt-1 text-xs text-ink-3">Create default tokens, chips, Round 1, and player event state.</div>
             <button className="mt-4 rounded-2xl px-5 py-3 text-sm font-semibold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
               Initialize Mixer
             </button>
-          </form>
+          </ActionForm>
         ) : (
           <>
             {activeTab === 'run' && (
@@ -257,7 +257,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                       </div>
                       {/* Voting window in HOURS — sets config.lock_seconds and
                           re-arms this round's timer in one tap. */}
-                      <form action={setMixerVotingWindow} className="mt-2.5 flex items-center gap-2">
+                      <ActionForm action={setMixerVotingWindow} className="mt-2.5 flex items-center gap-2">
                         <input type="hidden" name="tournament_id" value={id} />
                         <input type="hidden" name="round_id" value={currentRound.id} />
                         <label className="flex flex-1 items-center gap-2 rounded-xl px-3 py-2" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)' }}>
@@ -276,7 +276,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         <button className="rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
                           Start timer
                         </button>
-                      </form>
+                      </ActionForm>
                     </div>
 
                     {/* The draw */}
@@ -293,7 +293,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         <WeightTile v={`${wPct(cfg.beta)}%`} l="Skill balance" />
                         <WeightTile v={`${wPct(cfg.gamma)}%`} l="Novelty" />
                       </div>
-                      <form action={drawMixerRound}>
+                      <ActionForm action={drawMixerRound}>
                         <input type="hidden" name="tournament_id" value={id} />
                         <input type="hidden" name="round_id" value={currentRound.id} />
                         <button
@@ -303,7 +303,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         >
                           🎲 Run the draw
                         </button>
-                      </form>
+                      </ActionForm>
                     </div>
 
                     {/* Round controls */}
@@ -322,7 +322,11 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                           disabled={!canMarkDone}
                         />
                       </div>
-                      <form action={finalizeMixerEvent} className="mt-2.5">
+                      <ActionForm
+                        action={finalizeMixerEvent}
+                        className="mt-2.5"
+                        confirm="Finalize the event now? This snapshots standings, draws the raffle, and settles the pools."
+                      >
                         <input type="hidden" name="tournament_id" value={id} />
                         <button
                           className="w-full rounded-2xl px-4 py-3 text-sm font-semibold"
@@ -330,7 +334,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         >
                           Finalize standings, raffle &amp; pools
                         </button>
-                      </form>
+                      </ActionForm>
                       <div className="mt-3">
                         <RoundRail rounds={roundRows} activeRoundId={currentRound.id} />
                       </div>
@@ -346,26 +350,26 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         Fix a draw that fired early or start the night over. Roster and payments always survive.
                       </div>
                       <div className="grid gap-2">
-                        <ConfirmForm action={reopenMixerRound} confirm={`Reopen round ${currentRound.round_no}? Its pairings are cleared and voting goes live again.`}>
+                        <ActionForm action={reopenMixerRound} confirm={`Reopen round ${currentRound.round_no}? Its pairings are cleared and voting goes live again.`}>
                           <input type="hidden" name="tournament_id" value={id} />
                           <input type="hidden" name="round_id" value={currentRound.id} />
                           <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
                             Reopen round {currentRound.round_no} (clear draw)
                           </button>
-                        </ConfirmForm>
-                        <ConfirmForm action={resetMixerRoundVotes} confirm={`Wipe every ballot for round ${currentRound.round_no} and refund the tokens?`}>
+                        </ActionForm>
+                        <ActionForm action={resetMixerRoundVotes} confirm={`Wipe every ballot for round ${currentRound.round_no} and refund the tokens?`}>
                           <input type="hidden" name="tournament_id" value={id} />
                           <input type="hidden" name="round_id" value={currentRound.id} />
                           <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
                             Reset round {currentRound.round_no} votes (refund tokens)
                           </button>
-                        </ConfirmForm>
-                        <ConfirmForm action={resetMixerEvent} confirm="Reset the ENTIRE event? All pairings, scores, ballots, and bets are wiped; tokens and chips are restored; every round reopens. Roster and payments are kept.">
+                        </ActionForm>
+                        <ActionForm action={resetMixerEvent} confirm="Reset the ENTIRE event? All pairings, scores, ballots, and bets are wiped; tokens and chips are restored; every round reopens. Roster and payments are kept.">
                           <input type="hidden" name="tournament_id" value={id} />
                           <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-bold" style={{ background: 'color-mix(in oklch, oklch(0.55 0.2 12) 14%, var(--surface-card))', color: 'oklch(0.55 0.2 12)', border: '1px solid color-mix(in oklch, oklch(0.55 0.2 12) 45%, var(--line))' }}>
                             Reset whole event &amp; rerun
                           </button>
-                        </ConfirmForm>
+                        </ActionForm>
                       </div>
                     </div>
                     <div className="rounded-[18px] p-5" style={PANEL}>
@@ -465,7 +469,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                             </div>
                             <Chip tone={pool === 'a' ? 'court' : 'ghost'}>Pool {pool.toUpperCase()}</Chip>
                           </div>
-                          <form action={updateMixerPlayerGender} className="mt-3 flex items-center gap-2">
+                          <ActionForm action={updateMixerPlayerGender} className="mt-3 flex items-center gap-2">
                             <input type="hidden" name="tournament_id" value={id} />
                             <input type="hidden" name="player_id" value={p.id} />
                             <select name="gender" defaultValue={p.gender ?? ''} className="h-10 flex-1 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink" aria-label={`Gender for ${p.display_name}`}>
@@ -475,8 +479,8 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                               <option value="x">Nonbinary</option>
                             </select>
                             <button className="h-10 rounded-xl px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Save</button>
-                          </form>
-                          <form action={updateMixerPlayerPool} className="mt-2 flex items-center gap-2">
+                          </ActionForm>
+                          <ActionForm action={updateMixerPlayerPool} className="mt-2 flex items-center gap-2">
                             <input type="hidden" name="tournament_id" value={id} />
                             <input type="hidden" name="player_id" value={p.id} />
                             <select name="pairing_pool" defaultValue={pool} className="h-10 flex-1 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink">
@@ -484,7 +488,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                               <option value="b">Pool B</option>
                             </select>
                             <button className="h-10 rounded-xl px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Save</button>
-                          </form>
+                          </ActionForm>
                         </div>
                       );
                     })}
@@ -536,7 +540,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                               <div key={team.id}>{idx === 0 ? 'A' : 'B'} · {name(team.player_a_id)} & {name(team.player_b_id)}</div>
                             ))}
                           </div>
-                          <form action={scoreMixerCourt} className="mt-3 flex items-center gap-2">
+                          <ActionForm action={scoreMixerCourt} className="mt-3 flex items-center gap-2">
                             <input type="hidden" name="tournament_id" value={id} />
                             <input type="hidden" name="round_id" value={currentRound.id} />
                             <input type="hidden" name="court_no" value={courtNo} />
@@ -544,7 +548,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                             <span className="text-xs text-ink-3">to</span>
                             <input name="team_b_score" type="number" min={0} defaultValue={score?.team_b_score ?? 0} className="mono h-10 w-16 rounded-xl bg-paper-2 text-center text-ink" />
                             <button className="ml-auto rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Post</button>
-                          </form>
+                          </ActionForm>
                         </div>
                       );
                     })}

@@ -2,11 +2,19 @@
 
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
-import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { fieldInt, fieldString, formatPgError } from '@/lib/forms';
 import { notifySeatedPlayers } from '@/lib/push/notify-seated';
 import type { ConfigRow } from './_types';
+
+// Organizer mutations return a plain result instead of redirect()-ing. A
+// server-action redirect is a full RSC navigation, so every button click used
+// to reload the whole cockpit (the "app refreshed when I clicked Start timer"
+// complaint from PR #106). Returning {ok,error} lets the client drive the UI in
+// place — toasts replace the old ?ok=/?error= query params, and the targeted
+// revalidatePath() calls below still soft-refresh the projector/other views via
+// the RSC payload without a hard navigation. Mirrors saveMixerBallot (#106).
+export type ActionResult = { ok: boolean; message?: string; error?: string };
 
 function mixerPath(tournamentId: string) {
   return `/tournaments/${tournamentId}/mixer`;
@@ -29,20 +37,22 @@ function lockDurationSeconds(formData: FormData): number {
   return Math.max(5, Math.min(604800, hours * 3600 + seconds));
 }
 
-export async function bindMixerRosterEntry(formData: FormData): Promise<void> {
+export async function bindMixerRosterEntry(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const displayName = fieldString(formData, 'display_name');
-  if (!tournamentId) redirect('/tournaments');
+  if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_mixer_bind_roster_entry', {
     p_tournament_id: tournamentId,
     p_display_name: displayName || null,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
+  // Soft-refresh re-runs the page server component; with the seat now bound,
+  // myPlayer is set and the ballot panel replaces this claim form in place.
   revalidatePath(mixerPath(tournamentId));
-  redirect(mixerPath(tournamentId));
+  return { ok: true, message: 'Roster spot claimed' };
 }
 
 // notify.html touchpoint 2 — records the caller present at the event and, when
@@ -68,9 +78,9 @@ export async function checkInToMixer(
   return { ok: true };
 }
 
-export async function updateMixerConfig(formData: FormData): Promise<void> {
+export async function updateMixerConfig(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
-  if (!tournamentId) redirect('/tournaments');
+  if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
 
   const prizeBuckets = {
     tournament: fieldNumber(formData, 'bucket_tournament', 50, 0, 100) / 100,
@@ -122,30 +132,30 @@ export async function updateMixerConfig(formData: FormData): Promise<void> {
     })(),
     p_clear_bet_lock_round: !String(formData.get('bet_lock_round_no') ?? '').trim(),
   });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
   revalidatePath(`${mixerPath(tournamentId)}/present`);
-  redirect(`${mixerPath(tournamentId)}/admin?ok=Mixer%20configuration%20saved`);
+  return { ok: true, message: 'Mixer configuration saved' };
 }
 
-export async function updateMixerPlayerPool(formData: FormData): Promise<void> {
+export async function updateMixerPlayerPool(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const playerId = fieldString(formData, 'player_id');
   const pool = fieldString(formData, 'pairing_pool');
-  if (!tournamentId || !playerId || !pool) redirect('/tournaments');
+  if (!tournamentId || !playerId || !pool) return { ok: false, error: 'Missing player or pool.' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_mixer_update_player_pool', {
     p_player_id: playerId,
     p_pairing_pool: pool,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
-  redirect(`${mixerPath(tournamentId)}/admin?ok=Player%20pool%20updated`);
+  return { ok: true, message: 'Player pool updated' };
 }
 
 // Batched ballot save. The player tracks tokens locally and this writes the
@@ -190,12 +200,12 @@ export async function saveMixerBallot(input: SaveBallotInput): Promise<{ ok: boo
   return { ok: true };
 }
 
-export async function updateMixerPlayerGender(formData: FormData): Promise<void> {
+export async function updateMixerPlayerGender(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const playerId = fieldString(formData, 'player_id');
   const raw = fieldString(formData, 'gender').toLowerCase();
   const gender = raw === 'm' || raw === 'f' || raw === 'x' ? raw : null;
-  if (!tournamentId || !playerId) redirect('/tournaments');
+  if (!tournamentId || !playerId) return { ok: false, error: 'Missing player.' };
 
   const supabase = await createClient();
   // app_update_tournament_player overwrites every column, so read the current
@@ -213,7 +223,7 @@ export async function updateMixerPlayerGender(formData: FormData): Promise<void>
     p_phone: cur?.phone ?? null,
     p_dupr: cur?.dupr ?? null,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
   // Re-pool to match the corrected gender so the ballot (which keys off the
   // server pairing_pool) shows the right side of a mixed draw. f → pool b, else a.
@@ -226,30 +236,42 @@ export async function updateMixerPlayerGender(formData: FormData): Promise<void>
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
-  redirect(`${mixerPath(tournamentId)}/admin?ok=Player%20gender%20updated`);
+  return { ok: true, message: 'Player gender updated' };
 }
 
-export async function setMixerRoundState(formData: FormData): Promise<void> {
+// State-transition messages so a round advance still confirms in place (the old
+// path redirected with no ?ok=, so it was silent; a small toast is friendlier).
+const ROUND_STATE_MESSAGE: Record<string, string> = {
+  open: 'Ballot opened',
+  locked: 'Ballots locked',
+  drawing: 'Draw armed',
+  revealed: 'Pairings revealed',
+  playing: 'Play started',
+  done: 'Round marked done',
+};
+
+export async function setMixerRoundState(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const roundId = fieldString(formData, 'round_id');
   const state = fieldString(formData, 'state');
-  if (!tournamentId || !roundId || !state) redirect('/tournaments');
+  if (!tournamentId || !roundId || !state) return { ok: false, error: 'Missing round or state.' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_mixer_set_round_state', {
     p_round_id: roundId,
     p_state: state,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
-  redirect(`${mixerPath(tournamentId)}/admin`);
+  revalidatePath(`${mixerPath(tournamentId)}/present`);
+  return { ok: true, message: ROUND_STATE_MESSAGE[state] ?? 'Round updated' };
 }
 
-export async function initializeMixerEvent(formData: FormData): Promise<void> {
+export async function initializeMixerEvent(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
-  if (!tournamentId) redirect('/tournaments');
+  if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_ensure_mixer_event', {
@@ -264,90 +286,92 @@ export async function initializeMixerEvent(formData: FormData): Promise<void> {
     p_raffle_enabled: true,
     p_downvotes_enabled: true,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
-  redirect(`${mixerPath(tournamentId)}/admin?ok=Mixer%20initialized`);
+  return { ok: true, message: 'Mixer initialized' };
 }
 
 // Quick voting-window control on the Run Event tab: set the lock window in
 // HOURS and re-arm the current round's timer in one tap. Uses the partial
 // update semantics of app_update_mixer_config (0045: null params keep their
 // current values) so nothing else in the config is touched.
-export async function setMixerVotingWindow(formData: FormData): Promise<void> {
+export async function setMixerVotingWindow(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const roundId = fieldString(formData, 'round_id');
   const hours = fieldInt(formData, 'lock_hours', 24, 1, 168);
-  if (!tournamentId || !roundId) redirect('/tournaments');
+  if (!tournamentId || !roundId) return { ok: false, error: 'Missing round.' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_update_mixer_config', {
     p_tournament_id: tournamentId,
     p_lock_seconds: hours * 3600,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
   // Reopen (or re-arm) the round so lock_at picks up the new window.
   const { error: stateError } = await supabase.rpc('app_mixer_set_round_state', {
     p_round_id: roundId,
     p_state: 'open',
   });
-  if (stateError) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(stateError))}`);
-
-  revalidatePath(mixerPath(tournamentId));
-  revalidatePath(`${mixerPath(tournamentId)}/admin`);
-  redirect(`${mixerPath(tournamentId)}/admin?ok=${encodeURIComponent(`Voting open for ${hours}h`)}`);
-}
-
-// Organizer recovery controls (migration 0048) — reopen a drawn round,
-// wipe & refund a round's ballots, or reset the whole event for a rerun.
-export async function reopenMixerRound(formData: FormData): Promise<void> {
-  const tournamentId = fieldString(formData, 'tournament_id');
-  const roundId = fieldString(formData, 'round_id');
-  if (!tournamentId || !roundId) redirect('/tournaments');
-
-  const supabase = await createClient();
-  const { error } = await supabase.rpc('app_mixer_reopen_round', { p_round_id: roundId });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
-
-  revalidatePath(mixerPath(tournamentId));
-  revalidatePath(`${mixerPath(tournamentId)}/admin`);
-  redirect(`${mixerPath(tournamentId)}/admin?ok=${encodeURIComponent('Round reopened — pairings cleared, voting is live again')}`);
-}
-
-export async function resetMixerRoundVotes(formData: FormData): Promise<void> {
-  const tournamentId = fieldString(formData, 'tournament_id');
-  const roundId = fieldString(formData, 'round_id');
-  if (!tournamentId || !roundId) redirect('/tournaments');
-
-  const supabase = await createClient();
-  const { error } = await supabase.rpc('app_mixer_reset_round_votes', { p_round_id: roundId });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
-
-  revalidatePath(mixerPath(tournamentId));
-  revalidatePath(`${mixerPath(tournamentId)}/admin`);
-  redirect(`${mixerPath(tournamentId)}/admin?ok=${encodeURIComponent('Ballots wiped and tokens refunded for this round')}`);
-}
-
-export async function resetMixerEvent(formData: FormData): Promise<void> {
-  const tournamentId = fieldString(formData, 'tournament_id');
-  if (!tournamentId) redirect('/tournaments');
-
-  const supabase = await createClient();
-  const { error } = await supabase.rpc('app_mixer_reset_event', { p_tournament_id: tournamentId });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+  if (stateError) return { ok: false, error: formatPgError(stateError) };
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
   revalidatePath(`${mixerPath(tournamentId)}/present`);
-  redirect(`${mixerPath(tournamentId)}/admin?ok=${encodeURIComponent('Event reset — all rounds reopened, tokens and chips restored')}`);
+  return { ok: true, message: `Voting open for ${hours}h` };
 }
 
-export async function drawMixerRound(formData: FormData): Promise<void> {
+// Organizer recovery controls (migration 0048) — reopen a drawn round,
+// wipe & refund a round's ballots, or reset the whole event for a rerun.
+export async function reopenMixerRound(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const roundId = fieldString(formData, 'round_id');
-  if (!tournamentId || !roundId) redirect('/tournaments');
+  if (!tournamentId || !roundId) return { ok: false, error: 'Missing round.' };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_mixer_reopen_round', { p_round_id: roundId });
+  if (error) return { ok: false, error: formatPgError(error) };
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  revalidatePath(`${mixerPath(tournamentId)}/present`);
+  return { ok: true, message: 'Round reopened — pairings cleared, voting is live again' };
+}
+
+export async function resetMixerRoundVotes(formData: FormData): Promise<ActionResult> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  const roundId = fieldString(formData, 'round_id');
+  if (!tournamentId || !roundId) return { ok: false, error: 'Missing round.' };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_mixer_reset_round_votes', { p_round_id: roundId });
+  if (error) return { ok: false, error: formatPgError(error) };
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  return { ok: true, message: 'Ballots wiped and tokens refunded for this round' };
+}
+
+export async function resetMixerEvent(formData: FormData): Promise<ActionResult> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('app_mixer_reset_event', { p_tournament_id: tournamentId });
+  if (error) return { ok: false, error: formatPgError(error) };
+
+  revalidatePath(mixerPath(tournamentId));
+  revalidatePath(`${mixerPath(tournamentId)}/admin`);
+  revalidatePath(`${mixerPath(tournamentId)}/present`);
+  return { ok: true, message: 'Event reset — all rounds reopened, tokens and chips restored' };
+}
+
+export async function drawMixerRound(formData: FormData): Promise<ActionResult> {
+  const tournamentId = fieldString(formData, 'tournament_id');
+  const roundId = fieldString(formData, 'round_id');
+  if (!tournamentId || !roundId) return { ok: false, error: 'Missing round.' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_mixer_draw_round', {
@@ -361,30 +385,31 @@ export async function drawMixerRound(formData: FormData): Promise<void> {
     if (error.code === '55000' && /already been drawn/i.test(error.message ?? '')) {
       revalidatePath(mixerPath(tournamentId));
       revalidatePath(`${mixerPath(tournamentId)}/admin`);
-      redirect(`${mixerPath(tournamentId)}/admin?ok=${encodeURIComponent('This round is already drawn')}`);
+      revalidatePath(`${mixerPath(tournamentId)}/present`);
+      return { ok: true, message: 'This round is already drawn' };
     }
-    redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+    return { ok: false, error: formatPgError(error) };
   }
 
   // notify.html touchpoint 1 — the draw just seated players, so fire the
   // lock-screen "You're on Court N" push. Best-effort and quiet-hours aware
   // (only checked-in players in a live event). Runs AFTER the response is
-  // sent so a slow push service never delays the organizer's redirect.
+  // sent so a slow push service never delays the organizer's action.
   after(() => notifySeatedPlayers(tournamentId, roundId));
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
   revalidatePath(`${mixerPath(tournamentId)}/present`);
-  redirect(`${mixerPath(tournamentId)}/admin?ok=Pairings%20revealed`);
+  return { ok: true, message: 'Pairings revealed' };
 }
 
-export async function scoreMixerCourt(formData: FormData): Promise<void> {
+export async function scoreMixerCourt(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const roundId = fieldString(formData, 'round_id');
   const courtNo = fieldInt(formData, 'court_no', 1, 1, 99);
   const scoreA = fieldInt(formData, 'team_a_score', 0, 0, 999);
   const scoreB = fieldInt(formData, 'team_b_score', 0, 0, 999);
-  if (!tournamentId || !roundId) redirect('/tournaments');
+  if (!tournamentId || !roundId) return { ok: false, error: 'Missing round.' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_mixer_score_court', {
@@ -393,20 +418,21 @@ export async function scoreMixerCourt(formData: FormData): Promise<void> {
     p_team_a_score: scoreA,
     p_team_b_score: scoreB,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
-  redirect(`${mixerPath(tournamentId)}/admin?ok=Score%20posted`);
+  revalidatePath(`${mixerPath(tournamentId)}/present`);
+  return { ok: true, message: 'Score posted' };
 }
 
-export async function placeMixerBet(formData: FormData): Promise<void> {
+export async function placeMixerBet(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const bettorPlayerId = fieldString(formData, 'bettor_player_id');
   const pickPlayerId = fieldString(formData, 'pick_player_id');
   const marketPlace = fieldInt(formData, 'market_place', 1, 1, 8);
   const chips = fieldInt(formData, 'chips', 10, 1, 1000);
-  if (!tournamentId || !bettorPlayerId || !pickPlayerId) redirect('/tournaments');
+  if (!tournamentId || !bettorPlayerId || !pickPlayerId) return { ok: false, error: 'Missing bet details.' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_mixer_place_bet', {
@@ -416,19 +442,19 @@ export async function placeMixerBet(formData: FormData): Promise<void> {
     p_pick_player_id: pickPlayerId,
     p_chips: chips,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}?tab=betting&error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
   revalidatePath(mixerPath(tournamentId));
-  redirect(`${mixerPath(tournamentId)}?tab=betting&ok=Bet%20placed`);
+  return { ok: true, message: 'Bet placed' };
 }
 
-export async function requestMixerPayment(formData: FormData): Promise<void> {
+export async function requestMixerPayment(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const playerId = fieldString(formData, 'player_id');
   const type = fieldString(formData, 'type');
   const method = fieldString(formData, 'method') || 'zelle';
   const reference = fieldString(formData, 'reference');
-  if (!tournamentId || !playerId || !type) redirect('/tournaments');
+  if (!tournamentId || !playerId || !type) return { ok: false, error: 'Missing payment details.' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_mixer_request_payment', {
@@ -437,46 +463,46 @@ export async function requestMixerPayment(formData: FormData): Promise<void> {
     p_method: method,
     p_reference: reference || null,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}?tab=me&error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
-  redirect(`${mixerPath(tournamentId)}?tab=me&ok=Payment%20request%20sent`);
+  return { ok: true, message: 'Payment request sent' };
 }
 
-export async function confirmMixerPayment(formData: FormData): Promise<void> {
+export async function confirmMixerPayment(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
   const paymentId = fieldString(formData, 'payment_id');
   const status = fieldString(formData, 'status') || 'confirmed';
-  if (!tournamentId || !paymentId) redirect('/tournaments');
+  if (!tournamentId || !paymentId) return { ok: false, error: 'Missing payment.' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_mixer_confirm_payment', {
     p_payment_id: paymentId,
     p_status: status,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
   revalidatePath(mixerPath(tournamentId));
-  redirect(`${mixerPath(tournamentId)}/admin?ok=Payment%20updated`);
+  return { ok: true, message: 'Payment updated' };
 }
 
-export async function finalizeMixerEvent(formData: FormData): Promise<void> {
+export async function finalizeMixerEvent(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
-  if (!tournamentId) redirect('/tournaments');
+  if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_mixer_finalize_event', {
     p_tournament_id: tournamentId,
   });
-  if (error) redirect(`${mixerPath(tournamentId)}/admin?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
   revalidatePath(mixerPath(tournamentId));
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
   revalidatePath(`${mixerPath(tournamentId)}/present`);
   revalidatePath(`/tournaments/${tournamentId}`);
-  redirect(`${mixerPath(tournamentId)}/admin?ok=Final%20snapshot%20created`);
+  return { ok: true, message: 'Final snapshot created' };
 }
 
 // Toggle a single add-on flag from the dedicated Setup surface. Re-saves the
@@ -490,17 +516,17 @@ const ADDON_COLUMN: Record<string, 'pay_to_play_enabled' | 'betting_enabled' | '
   downvotes: 'downvotes_enabled',
 };
 
-export async function setMixerAddon(formData: FormData): Promise<void> {
+export async function setMixerAddon(formData: FormData): Promise<ActionResult> {
   const tournamentId = fieldString(formData, 'tournament_id');
-  if (!tournamentId) redirect('/tournaments');
+  if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
   const setupPath = `${mixerPath(tournamentId)}/setup`;
   const column = ADDON_COLUMN[fieldString(formData, 'addon')];
-  if (!column) redirect(setupPath);
+  if (!column) return { ok: false, error: 'Unknown add-on.' };
   const enabled = fieldBool(formData, 'enabled');
 
   const supabase = await createClient();
   const { data } = await supabase.from('event_config').select('*').eq('tournament_id', tournamentId).maybeSingle();
-  if (!data) redirect(`${setupPath}?error=${encodeURIComponent('Mixer config is not initialized yet')}`);
+  if (!data) return { ok: false, error: 'Mixer config is not initialized yet' };
   const c = data as ConfigRow;
   const flags = {
     pay_to_play_enabled: c.pay_to_play_enabled,
@@ -542,9 +568,9 @@ export async function setMixerAddon(formData: FormData): Promise<void> {
     p_bet_lock_round_no: c.bet_lock_round_no,
     p_clear_bet_lock_round: c.bet_lock_round_no == null,
   });
-  if (error) redirect(`${setupPath}?error=${encodeURIComponent(formatPgError(error))}`);
+  if (error) return { ok: false, error: formatPgError(error) };
 
   revalidatePath(setupPath);
   revalidatePath(`${mixerPath(tournamentId)}/admin`);
-  redirect(`${setupPath}?ok=${encodeURIComponent('Add-on updated')}`);
+  return { ok: true, message: 'Add-on updated' };
 }

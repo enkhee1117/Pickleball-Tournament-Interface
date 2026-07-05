@@ -1,6 +1,7 @@
 import { updateMixerConfig } from '../actions';
 import type { ConfigRow } from '../_types';
 import type { PaymentMethods } from './payment-methods';
+import { ActionForm } from './ActionForm';
 import { formatLockDuration, money, type PrizeBuckets } from './admin-helpers';
 import {
   NumberField,
@@ -33,7 +34,7 @@ export function ConfigForm({
   const lockHours = Math.floor(cfg.lock_seconds / 3600);
   const lockExtraSeconds = cfg.lock_seconds % 3600;
   return (
-    <form action={updateMixerConfig} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+    <ActionForm action={updateMixerConfig} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
       <input type="hidden" name="tournament_id" value={tournamentId} />
       <div className="grid grid-cols-2 gap-3">
         <NumberField name="rounds" label="Rounds" value={cfg.rounds} min={1} max={50} />
@@ -150,6 +151,6 @@ export function ConfigForm({
       <button className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>
         Save event settings
       </button>
-    </form>
+    </ActionForm>
   );
 }
