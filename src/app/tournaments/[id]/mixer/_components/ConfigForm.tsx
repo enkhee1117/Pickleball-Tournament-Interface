@@ -8,6 +8,7 @@ import {
   RangeField,
   ToggleField,
 } from './admin-ui';
+import { ResetFormulaButton } from './ResetFormulaButton';
 
 // The Setup-tab form. Big by nature — it edits every knob in event_config,
 // including formula parameters and fairness/betting cutoffs (both hidden
@@ -119,6 +120,7 @@ export function ConfigForm({
         <div className="mt-2 text-[11px] text-ink-3">
           score = α·(u+u′) + β·√(u·u′) − γ·(d+d′), floored at −C, then weight = e<sup>score/τ</sup> · decay<sup>prior pairings</sup>.
         </div>
+        <ResetFormulaButton />
       </details>
 
       <details className="mt-3 rounded-2xl bg-paper-2 p-3">
