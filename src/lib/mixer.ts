@@ -130,16 +130,40 @@ export function mixerPairWeight(
   return Math.exp(score / tau) * Math.pow(config.repeatDecay, repeatCount);
 }
 
+export type MixerTeamPlan = { sitA: number; sitB: number; teams: number };
+
+// How many players sit from each pool, and how many teams form — the core of
+// the draw's fairness. Mirrors migration 0054 exactly:
+//   1. Pool overflow: the larger pool sits its extra so both pools match.
+//   2. Even teams: doubles seats TWO teams per game, so an odd team count would
+//      strand one team on a court with no opponent. When the balanced count is
+//      odd, one MORE player per pool takes a rotating bye, dropping to an even
+//      team count. The result is always even and never exceeds min(a, b).
+export function mixerTeamPlan(countA: number, countB: number): MixerTeamPlan {
+  const a = Math.max(0, Math.trunc(countA));
+  const b = Math.max(0, Math.trunc(countB));
+  let sitA = Math.max(0, a - b);
+  let sitB = Math.max(0, b - a);
+  const balanced = Math.min(a - sitA, b - sitB); // == min(a, b)
+  if (balanced % 2 === 1) {
+    sitA += 1;
+    sitB += 1;
+  }
+  return { sitA, sitB, teams: Math.max(0, Math.min(a - sitA, b - sitB)) };
+}
+
 export function chooseMixerSitOuts(players: MixerPlayer[], rng: () => number = Math.random): string[] {
   const byPool: Record<MixerPool, MixerPlayer[]> = {
     a: players.filter((p) => p.pool === 'a'),
     b: players.filter((p) => p.pool === 'b'),
   };
-  const target = Math.min(byPool.a.length, byPool.b.length);
+  // Even-teams aware (0054): never leave an odd team count that would strand a
+  // team on an empty court — the extra bye rotates fairly by fewest-sat first.
+  const plan = mixerTeamPlan(byPool.a.length, byPool.b.length);
   const sitOuts: string[] = [];
 
   for (const pool of ['a', 'b'] as const) {
-    const needed = byPool[pool].length - target;
+    const needed = pool === 'a' ? plan.sitA : plan.sitB;
     if (needed <= 0) continue;
     const ordered = [...byPool[pool]].sort((x, y) => {
       const sx = x.sitOutCount ?? 0;

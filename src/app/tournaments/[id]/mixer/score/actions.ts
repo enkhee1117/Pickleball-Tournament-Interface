@@ -12,16 +12,18 @@ export async function postCourtScore(input: {
   tournamentId: string;
   roundId: string;
   courtNo: number;
+  waveNo: number;
   teamAScore: number;
   teamBScore: number;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { tournamentId, roundId, courtNo, teamAScore, teamBScore } = input;
+  const { tournamentId, roundId, courtNo, waveNo, teamAScore, teamBScore } = input;
   if (!tournamentId || !roundId) return { ok: false, error: 'Missing identifiers' };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc('app_mixer_score_court', {
     p_round_id: roundId,
     p_court_no: courtNo,
+    p_wave_no: waveNo,
     p_team_a_score: teamAScore,
     p_team_b_score: teamBScore,
   });

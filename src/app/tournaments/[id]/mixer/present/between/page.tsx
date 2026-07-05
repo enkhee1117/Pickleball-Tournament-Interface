@@ -41,10 +41,10 @@ export default async function MixerPresentBetweenPage({ params }: PageProps) {
 
   const [{ data: pairings }, { data: scores }, { data: checkIns }] = await Promise.all([
     roundIds.length
-      ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no').in('round_id', roundIds)
+      ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', roundIds)
       : Promise.resolve({ data: [] }),
     roundIds.length
-      ? supabase.from('mixer_scores').select('round_id,court_no,team_a_score,team_b_score,completed_at').in('round_id', roundIds)
+      ? supabase.from('mixer_scores').select('round_id,court_no,wave_no,team_a_score,team_b_score,completed_at').in('round_id', roundIds)
       : Promise.resolve({ data: [] }),
     supabase.from('mixer_check_ins').select('player_id').eq('tournament_id', id),
   ]);

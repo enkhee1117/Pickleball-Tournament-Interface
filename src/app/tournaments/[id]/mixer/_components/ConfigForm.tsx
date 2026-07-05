@@ -1,6 +1,7 @@
 import { updateMixerConfig } from '../actions';
 import type { ConfigRow } from '../_types';
 import type { PaymentMethods } from './payment-methods';
+import { ActionForm } from './ActionForm';
 import { formatLockDuration, money, type PrizeBuckets } from './admin-helpers';
 import {
   NumberField,
@@ -8,6 +9,7 @@ import {
   RangeField,
   ToggleField,
 } from './admin-ui';
+import { ResetFormulaButton } from './ResetFormulaButton';
 
 // The Setup-tab form. Big by nature — it edits every knob in event_config,
 // including formula parameters and fairness/betting cutoffs (both hidden
@@ -33,13 +35,21 @@ export function ConfigForm({
   const lockHours = Math.floor(cfg.lock_seconds / 3600);
   const lockExtraSeconds = cfg.lock_seconds % 3600;
   return (
-    <form action={updateMixerConfig} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+    <ActionForm action={updateMixerConfig} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
       <input type="hidden" name="tournament_id" value={tournamentId} />
       <div className="grid grid-cols-2 gap-3">
         <NumberField name="rounds" label="Rounds" value={cfg.rounds} min={1} max={50} />
         <NumberField name="courts" label="Courts" value={cfg.courts} min={1} max={16} />
         <NumberField name="starting_tokens" label="Start tokens" value={cfg.starting_tokens} min={1} max={100} />
         <NumberField name="starting_chips" label="Start chips" value={cfg.starting_chips} min={0} max={100000} />
+        <label className="block">
+          <span className="text-xs font-semibold text-ink-3">Game to (win by 2)</span>
+          <select name="game_to" defaultValue={String(cfg.game_to ?? 11)} className="mono mt-1 h-11 w-full rounded-xl bg-paper-2 px-3 text-sm font-bold text-ink outline-none">
+            <option value="11">11</option>
+            <option value="15">15</option>
+            <option value="21">21</option>
+          </select>
+        </label>
       </div>
 
       <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--line)' }}>
@@ -119,12 +129,27 @@ export function ConfigForm({
         <div className="mt-2 text-[11px] text-ink-3">
           score = α·(u+u′) + β·√(u·u′) − γ·(d+d′), floored at −C, then weight = e<sup>score/τ</sup> · decay<sup>prior pairings</sup>.
         </div>
+        <ResetFormulaButton />
       </details>
 
       <details className="mt-3 rounded-2xl bg-paper-2 p-3">
         <summary className="cursor-pointer text-sm font-bold text-ink">Fairness & betting cutoffs</summary>
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <NumberField name="upvote_cap_per_target" label="Upvotes / target" value={cfg.upvote_cap_per_target ?? 3} min={1} max={99} />
+          <label className="block">
+            <span className="text-xs font-semibold text-ink-3">Upvotes / target</span>
+            <div className="mt-1 flex h-11 items-center rounded-xl bg-paper-2 px-3">
+              <input
+                name="upvote_cap_per_target"
+                type="number"
+                min={1}
+                max={99}
+                defaultValue={cfg.upvote_cap_per_target && cfg.upvote_cap_per_target <= 99 ? cfg.upvote_cap_per_target : ''}
+                placeholder="No limit"
+                className="mono w-full bg-transparent text-sm font-bold text-ink outline-none"
+              />
+            </div>
+            <span className="mt-1 block text-[11px] text-ink-3">Blank = no limit (default). Set 1–99 to cap tokens per partner.</span>
+          </label>
           <label className="block">
             <span className="text-xs font-semibold text-ink-3">Betting closes before round</span>
             <input
@@ -150,6 +175,6 @@ export function ConfigForm({
       <button className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>
         Save event settings
       </button>
-    </form>
+    </ActionForm>
   );
 }

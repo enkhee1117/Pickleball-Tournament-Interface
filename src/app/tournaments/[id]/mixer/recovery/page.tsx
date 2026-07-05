@@ -60,14 +60,19 @@ export default async function MixerRecoveryPage({ params }: PageProps) {
   if (currentRound) {
     const { data: pairings } = await supabase
       .from('mixer_pairings')
-      .select('id,player_a_id,player_b_id,court_no')
+      .select('id,player_a_id,player_b_id,court_no,wave_no')
       .eq('round_id', currentRound.id)
-      .order('court_no', { ascending: true });
+      .order('court_no', { ascending: true })
+      .order('wave_no', { ascending: true });
     const pairingRows = (pairings ?? []) as PairingRow[];
-    const byCourt = new Map<number, number>();
-    for (const p of pairingRows) byCourt.set(p.court_no, (byCourt.get(p.court_no) ?? 0) + 1);
-    for (const [courtNo, teams] of byCourt) {
-      if (teams < 2) {
+    // A game slot (court + wave) with only one team is the no-show proxy.
+    const byGame = new Map<string, { courtNo: number; count: number }>();
+    for (const p of pairingRows) {
+      const key = `${p.court_no}:${p.wave_no}`;
+      byGame.set(key, { courtNo: p.court_no, count: (byGame.get(key)?.count ?? 0) + 1 });
+    }
+    for (const { courtNo, count } of byGame.values()) {
+      if (count < 2) {
         shortCourt = courtNo;
         break;
       }
