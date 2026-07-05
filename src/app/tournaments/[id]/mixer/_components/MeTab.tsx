@@ -1,6 +1,7 @@
 import { Avatar } from '@/components/ui/Avatar';
 import { formatInviteCode } from '@/lib/invite-codes';
 import { requestMixerPayment } from '../actions';
+import { ActionForm } from './ActionForm';
 import type {
   ConfigRow,
   PaymentRow,
@@ -143,7 +144,7 @@ function PaymentRequest({
   disabled: boolean;
 }) {
   return (
-    <form action={requestMixerPayment} className="rounded-xl p-3" style={{ background: 'var(--night-inset)' }}>
+    <ActionForm action={requestMixerPayment} className="rounded-xl p-3" style={{ background: 'var(--night-inset)' }}>
       <input type="hidden" name="tournament_id" value={tournamentId} />
       <input type="hidden" name="player_id" value={playerId} />
       <input type="hidden" name="type" value={type} />
@@ -157,6 +158,6 @@ function PaymentRequest({
           Request
         </button>
       </div>
-    </form>
+    </ActionForm>
   );
 }

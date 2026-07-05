@@ -8,6 +8,7 @@ import { DesktopNav, DesktopSurface } from '@/components/desktop';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
 import type { ConfigRow, RoundRow, TournamentRow } from '../_types';
 import { setMixerAddon } from '../actions';
+import { ActionForm } from '../_components/ActionForm';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -185,7 +186,7 @@ function AddonCard({
           <span className="mono text-[10px] uppercase tracking-[0.06em]" style={{ color: on ? 'var(--court-deep)' : 'var(--ink-3)' }}>
             {on ? 'On' : 'Off'}
           </span>
-          <form action={setMixerAddon}>
+          <ActionForm action={setMixerAddon}>
             <input type="hidden" name="tournament_id" value={tournamentId} />
             <input type="hidden" name="addon" value={addon} />
             <input type="hidden" name="enabled" value={on ? 'false' : 'true'} />
@@ -197,7 +198,7 @@ function AddonCard({
             >
               <span className="absolute top-[3px] h-[21px] w-[21px] rounded-full bg-white transition-[left]" style={{ left: on ? 24 : 3, boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
             </button>
-          </form>
+          </ActionForm>
         </div>
       </div>
       {on && (
