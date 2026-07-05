@@ -15,6 +15,7 @@ export function MatchTab({
   scores,
   myPlayer,
   standings,
+  gameTo = 11,
 }: {
   tournamentId: string;
   round: RoundRow;
@@ -23,6 +24,7 @@ export function MatchTab({
   scores: ScoreRow[];
   myPlayer: PlayerRow;
   standings: StandingItem[];
+  gameTo?: number;
 }) {
   if (standings.length > 0) {
     return <FinalStandingsNight standings={standings} myPlayer={myPlayer} />;
@@ -130,6 +132,7 @@ export function MatchTab({
           initialB={score?.team_b_score ?? 0}
           posted={!!score?.completed_at}
           canScore={['revealed', 'playing'].includes(round.state)}
+          gameTo={gameTo}
         />
       ) : (
         <div className="mt-3 rounded-[18px] p-5 text-center" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>

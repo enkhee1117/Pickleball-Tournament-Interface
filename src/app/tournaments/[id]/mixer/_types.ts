@@ -42,6 +42,7 @@ export type ConfigRow = {
   raffle_prize: string;
   upvote_cap_per_target: number | null;
   bet_lock_round_no: number | null;
+  game_to?: number;
 };
 
 export type RoundRow = {

@@ -21,6 +21,8 @@ import {
   initializeMixerEvent,
   reopenMixerRound,
   repoolMixerRoster,
+  retireMixerPlayer,
+  swapMixerPlayer,
   resetMixerEvent,
   resetMixerRoundVotes,
   scoreMixerCourt,
@@ -168,6 +170,10 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const seatedIds = new Set(pairingRows.flatMap((p) => [p.player_a_id, p.player_b_id]));
   const revealSitting = roster.filter((p) => !p.withdrawn_at && !seatedIds.has(p.id)).map((p) => p.display_name);
   const showOrganizerReveal = !!currentRound && ['revealed', 'playing'].includes(currentRound.state) && revealCourts.length > 0;
+  // No-show swap candidates: someone seated ↔ someone on the bench.
+  const seatedForSwap = [...seatedIds].map((pid) => roster.find((p) => p.id === pid)).filter((p): p is PlayerRow => !!p);
+  const benchForSwap = roster.filter((p) => !p.withdrawn_at && !seatedIds.has(p.id));
+  const canSwap = !!currentRound && ['revealed', 'playing'].includes(currentRound.state) && seatedForSwap.length > 0 && benchForSwap.length > 0;
   const scoredCourtCount = scoreRows.filter((score) => score.completed_at).length;
   const canOpenBallot = !!currentRound && !drawStarted && hasLockedBallots;
   const canLockBallot = !!currentRound && hasOpenBallots && !drawStarted;
@@ -459,6 +465,27 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         </ActionForm>
                       </div>
                     </div>
+                    {canSwap && (
+                      <div className="rounded-[18px] p-5" style={PANEL}>
+                        <h3 className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>No-show? Swap in a sub</h3>
+                        <div className="mb-3 text-[12.5px]" style={{ color: 'var(--text3)' }}>
+                          A player didn&apos;t show after the draw — swap in someone from the bench. Their court, partner, and opponent are preserved; the no-show takes the bench.
+                        </div>
+                        <ActionForm action={swapMixerPlayer} className="grid gap-2">
+                          <input type="hidden" name="tournament_id" value={id} />
+                          <input type="hidden" name="round_id" value={currentRound.id} />
+                          <select name="out_player" defaultValue="" className="h-10 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink" style={{ border: '1px solid var(--line)' }} required aria-label="Player to swap out">
+                            <option value="" disabled>Swap out (no-show)…</option>
+                            {seatedForSwap.map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}
+                          </select>
+                          <select name="in_player" defaultValue="" className="h-10 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink" style={{ border: '1px solid var(--line)' }} required aria-label="Replacement from bench">
+                            <option value="" disabled>Swap in (from bench)…</option>
+                            {benchForSwap.map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}
+                          </select>
+                          <button className="h-10 rounded-xl px-4 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>Swap players</button>
+                        </ActionForm>
+                      </div>
+                    )}
                     <div className="rounded-[18px] p-5" style={PANEL}>
                       <h3 className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: 'var(--text)' }}>
                         Live courts
@@ -577,6 +604,23 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                             </select>
                             <button className="h-10 rounded-xl px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Save</button>
                           </ActionForm>
+                          {/* Early-leave: retire keeps completed results, drops the player from future draws. */}
+                          {p.withdrawn_at ? (
+                            <ActionForm action={retireMixerPlayer} className="mt-2">
+                              <input type="hidden" name="tournament_id" value={id} />
+                              <input type="hidden" name="player_id" value={p.id} />
+                              <input type="hidden" name="reinstate" value="true" />
+                              <button className="w-full rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>Reinstate player</button>
+                            </ActionForm>
+                          ) : (
+                            <ActionForm action={retireMixerPlayer} confirm={`Retire ${p.display_name}? Their completed results stay on the board, but they're dropped from future draws. You can reinstate them later.`} className="mt-2">
+                              <input type="hidden" name="tournament_id" value={id} />
+                              <input type="hidden" name="player_id" value={p.id} />
+                              <input type="hidden" name="reinstate" value="false" />
+                              <button className="w-full rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'var(--surface-raise)', color: 'oklch(0.55 0.2 12)', border: '1px solid color-mix(in oklch, oklch(0.55 0.2 12) 35%, var(--line))' }}>Retire (early leave)</button>
+                            </ActionForm>
+                          )}
+                          {p.withdrawn_at && <div className="mt-2 text-[11px] font-semibold" style={{ color: 'oklch(0.55 0.2 12)' }}>Retired — results kept, out of future draws.</div>}
                         </div>
                       );
                     })}
