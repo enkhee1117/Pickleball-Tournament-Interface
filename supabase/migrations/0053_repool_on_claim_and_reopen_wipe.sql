@@ -1,4 +1,4 @@
--- 0051 — Keep a joiner's pairing_pool in sync with their real gender, add an
+-- 0053 — Keep a joiner's pairing_pool in sync with their real gender, add an
 -- organizer "re-pool the roster" control, and make Reopen a clean re-run.
 --
 -- Three fixes shipped together:

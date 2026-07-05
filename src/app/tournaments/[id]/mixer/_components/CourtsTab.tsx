@@ -1,5 +1,6 @@
 import { Avatar } from '@/components/ui/Avatar';
 import type { PairingRow, PlayerRow, RoundRow, ScoreRow } from '../_types';
+import { gameSlotLabel } from '@/lib/mixer-standings';
 import { EmptyNight, mixerAvatarFor } from './mixer-night';
 
 // The shared "Courts" board — every court this round at a glance: who's
@@ -9,6 +10,7 @@ import { EmptyNight, mixerAvatarFor } from './mixer-night';
 
 type CourtGroup = {
   courtNo: number;
+  waveNo: number;
   teams: PairingRow[];
   score: ScoreRow | undefined;
 };
@@ -44,11 +46,15 @@ export function CourtsTab({
     );
   }
 
-  const courtNos = [...new Set(pairings.map((p) => p.court_no))].sort((a, b) => a - b);
-  const courts: CourtGroup[] = courtNos.map((courtNo) => ({
+  // Group by game slot (court + wave): when games outnumber courts, a court runs
+  // several heats in sequence — each is its own matchup, scored independently.
+  const slots = [...new Map(pairings.map((p) => [`${p.court_no}:${p.wave_no}`, { courtNo: p.court_no, waveNo: p.wave_no }])).values()]
+    .sort((a, b) => a.courtNo - b.courtNo || a.waveNo - b.waveNo);
+  const courts: CourtGroup[] = slots.map(({ courtNo, waveNo }) => ({
     courtNo,
-    teams: pairings.filter((p) => p.court_no === courtNo),
-    score: scores.find((s) => s.court_no === courtNo),
+    waveNo,
+    teams: pairings.filter((p) => p.court_no === courtNo && p.wave_no === waveNo),
+    score: scores.find((s) => s.court_no === courtNo && s.wave_no === waveNo),
   }));
 
   const sitting = sitOuts
@@ -60,17 +66,17 @@ export function CourtsTab({
       <div className="flex items-baseline justify-between">
         <div className="serif text-[26px] leading-none">Round {round.round_no} courts</div>
         <div className="mono text-[11px] uppercase tracking-[0.08em]" style={{ color: 'var(--night-text3)' }}>
-          {courts.length} court{courts.length === 1 ? '' : 's'}
+          {courts.length} game{courts.length === 1 ? '' : 's'}
         </div>
       </div>
 
-      {courts.map(({ courtNo, teams, score }) => {
+      {courts.map(({ courtNo, waveNo, teams, score }) => {
         const mineHere = !!myId && teams.some((t) => t.player_a_id === myId || t.player_b_id === myId);
         const finished = !!score?.completed_at;
         const live = !!score && !finished;
         return (
           <div
-            key={courtNo}
+            key={`${courtNo}:${waveNo}`}
             className="rounded-[18px] p-4"
             style={{
               background: 'var(--night-card)',
@@ -84,7 +90,7 @@ export function CourtsTab({
                   className="mono rounded-lg px-2 py-1 text-[12px] font-bold"
                   style={{ background: 'var(--night-inset)', color: 'var(--court)' }}
                 >
-                  Court {courtNo}
+                  {gameSlotLabel(courtNo, waveNo)}
                 </span>
                 {mineHere && (
                   <span className="text-[10px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--court)' }}>

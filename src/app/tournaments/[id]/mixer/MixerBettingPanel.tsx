@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar, playerFromName } from '@/components/ui/Avatar';
+import { useToast } from '@/components/desktop';
 import { placeMixerBet } from './actions';
 
 type ConfigRow = {
@@ -45,6 +46,7 @@ export function MixerBettingPanel({
   bets: BetRow[];
   config: ConfigRow;
 }) {
+  const toast = useToast();
   const [optimisticBets, setOptimisticBets] = useState(bets);
   const markets = useMemo(
     () => Array.from({ length: Math.max(1, Math.min(config.podium_markets ?? 3, 8)) }, (_, i) => i + 1),
@@ -62,6 +64,10 @@ export function MixerBettingPanel({
     const marketPlace = Number(formData.get('market_place') ?? 1);
     const pickPlayerId = String(formData.get('pick_player_id') ?? '');
     const chips = Math.max(1, Number(formData.get('chips') ?? 1));
+    // Snapshot for rollback: placeMixerBet no longer redirects, so a rejected
+    // wager (over budget, market closed) must revert the optimistic ticket
+    // rather than leaving a bet on screen the server never accepted.
+    const prev = optimisticBets;
     setOptimisticBets((current) => {
       const next = current.filter((bet) => !(bet.market_place === marketPlace && bet.pick_player_id === pickPlayerId));
       next.push({
@@ -72,7 +78,11 @@ export function MixerBettingPanel({
       });
       return next;
     });
-    await placeMixerBet(formData);
+    const result = await placeMixerBet(formData);
+    if (!result.ok) {
+      setOptimisticBets(prev);
+      toast({ type: 'error', title: result.error ?? 'Could not place your bet.' });
+    }
   };
 
   if (!config.betting_enabled) return <EmptyPool />;
@@ -184,12 +194,12 @@ function EmptyPool() {
 }
 
 function Dink({ pose, size }: { pose: 'token-t' | 'presenting-t'; size: number }) {
-  // Paddle mascot retired — old paddle poses render the ball bust instead.
-  const file = pose === 'token-t' || pose === 'presenting-t' ? 'happy-bust' : pose;
+  // Paddle mascot retired — the round "ball" mascot (in /characters) is used now.
+  const file = pose === 'token-t' ? 'voter' : 'host';
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/design-handoff/dink/${file}.png`}
+      src={`/design-handoff/characters/${file}.png`}
       alt=""
       width={size}
       height={size}

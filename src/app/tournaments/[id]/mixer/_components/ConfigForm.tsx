@@ -1,6 +1,7 @@
 import { updateMixerConfig } from '../actions';
 import type { ConfigRow } from '../_types';
 import type { PaymentMethods } from './payment-methods';
+import { ActionForm } from './ActionForm';
 import { formatLockDuration, money, type PrizeBuckets } from './admin-helpers';
 import {
   NumberField,
@@ -8,6 +9,7 @@ import {
   RangeField,
   ToggleField,
 } from './admin-ui';
+import { ResetFormulaButton } from './ResetFormulaButton';
 
 // The Setup-tab form. Big by nature — it edits every knob in event_config,
 // including formula parameters and fairness/betting cutoffs (both hidden
@@ -33,7 +35,7 @@ export function ConfigForm({
   const lockHours = Math.floor(cfg.lock_seconds / 3600);
   const lockExtraSeconds = cfg.lock_seconds % 3600;
   return (
-    <form action={updateMixerConfig} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+    <ActionForm action={updateMixerConfig} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
       <input type="hidden" name="tournament_id" value={tournamentId} />
       <div className="grid grid-cols-2 gap-3">
         <NumberField name="rounds" label="Rounds" value={cfg.rounds} min={1} max={50} />
@@ -119,6 +121,7 @@ export function ConfigForm({
         <div className="mt-2 text-[11px] text-ink-3">
           score = α·(u+u′) + β·√(u·u′) − γ·(d+d′), floored at −C, then weight = e<sup>score/τ</sup> · decay<sup>prior pairings</sup>.
         </div>
+        <ResetFormulaButton />
       </details>
 
       <details className="mt-3 rounded-2xl bg-paper-2 p-3">
@@ -150,6 +153,6 @@ export function ConfigForm({
       <button className="mt-4 w-full rounded-2xl px-4 py-3 text-sm font-bold" style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}>
         Save event settings
       </button>
-    </form>
+    </ActionForm>
   );
 }

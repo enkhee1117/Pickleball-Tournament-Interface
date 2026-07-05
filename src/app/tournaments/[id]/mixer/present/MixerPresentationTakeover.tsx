@@ -19,6 +19,7 @@ type PairingRow = {
   player_a_id: string;
   player_b_id: string;
   court_no: number;
+  wave_no: number;
 };
 
 type SitOutRow = {
@@ -103,17 +104,24 @@ function RevealTakeover({
   pairings: PairingRow[];
   sitOuts: SitOutRow[];
 }) {
-  const courts = useMemo(() => [...new Set(pairings.map((pairing) => pairing.court_no))].sort((a, b) => a - b), [pairings]);
+  // Cycle through game slots (court + wave), since one court can host several
+  // heats when games outnumber courts.
+  const slots = useMemo(() => {
+    const seen = new Map<string, { courtNo: number; waveNo: number }>();
+    for (const p of pairings) seen.set(`${p.court_no}:${p.wave_no}`, { courtNo: p.court_no, waveNo: p.wave_no });
+    return [...seen.values()].sort((a, b) => a.courtNo - b.courtNo || a.waveNo - b.waveNo);
+  }, [pairings]);
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
-    if (courts.length <= 1) return;
-    const timer = window.setInterval(() => setActiveIndex((index) => (index + 1) % courts.length), 3200);
+    if (slots.length <= 1) return;
+    const timer = window.setInterval(() => setActiveIndex((index) => (index + 1) % slots.length), 3200);
     return () => window.clearInterval(timer);
-  }, [courts.length]);
+  }, [slots.length]);
 
-  const activeCourt = courts[activeIndex] ?? courts[0];
-  const teams = pairings.filter((pairing) => pairing.court_no === activeCourt);
+  const activeSlot = slots[activeIndex] ?? slots[0];
+  const activeCourt = activeSlot?.courtNo;
+  const teams = pairings.filter((pairing) => pairing.court_no === activeSlot?.courtNo && pairing.wave_no === activeSlot?.waveNo);
 
   return (
     <div className="grid w-full max-w-7xl gap-6 xl:grid-cols-[1fr_360px]">
@@ -121,7 +129,10 @@ function RevealTakeover({
         <div className="flex items-start justify-between gap-6">
           <div>
             <div className="text-[12px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--court)' }}>Round {round?.round_no ?? 1} reveal</div>
-            <div className="serif mt-3 text-[72px] leading-none">Court {activeCourt}</div>
+            <div className="serif mt-3 text-[72px] leading-none">
+              Court {activeCourt}
+              {activeSlot?.waveNo && activeSlot.waveNo > 1 ? <span className="text-[36px]" style={{ color: 'var(--court)' }}> · Heat {activeSlot.waveNo}</span> : null}
+            </div>
           </div>
           <Dink pose="presenting-t" size={132} />
         </div>
@@ -139,21 +150,24 @@ function RevealTakeover({
         <div className="rounded-[24px] p-5 text-left" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
           <div className="text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--court)' }}>All courts</div>
           <div className="mt-4 grid grid-cols-2 gap-2">
-            {courts.map((courtNo, index) => (
-              <button
-                key={courtNo}
-                type="button"
-                onClick={() => setActiveIndex(index)}
-                className="rounded-2xl px-4 py-3 text-left"
-                style={{
-                  background: courtNo === activeCourt ? 'var(--court)' : 'var(--night-inset)',
-                  color: courtNo === activeCourt ? 'var(--night-court-ink)' : 'var(--night-text)',
-                }}
-              >
-                <div className="mono text-lg font-bold">C{courtNo}</div>
-                <div className="mt-0.5 text-[10px] uppercase tracking-[0.08em]">Reveal</div>
-              </button>
-            ))}
+            {slots.map((slot, index) => {
+              const on = index === activeIndex;
+              return (
+                <button
+                  key={`${slot.courtNo}:${slot.waveNo}`}
+                  type="button"
+                  onClick={() => setActiveIndex(index)}
+                  className="rounded-2xl px-4 py-3 text-left"
+                  style={{
+                    background: on ? 'var(--court)' : 'var(--night-inset)',
+                    color: on ? 'var(--night-court-ink)' : 'var(--night-text)',
+                  }}
+                >
+                  <div className="mono text-lg font-bold">C{slot.courtNo}{slot.waveNo > 1 ? `·H${slot.waveNo}` : ''}</div>
+                  <div className="mt-0.5 text-[10px] uppercase tracking-[0.08em]">Reveal</div>
+                </button>
+              );
+            })}
           </div>
         </div>
         {sitOuts.length > 0 && (
@@ -273,13 +287,13 @@ function PlayerLine({ player, compact = false }: { player: PlayerRow; compact?: 
   );
 }
 
-function Dink({ size }: { pose: 'presenting-t' | 'wave' | 'winner'; size: number }) {
-  // Paddle mascot retired — every paddle pose now renders the ball bust.
-  const file = 'happy-bust';
+function Dink({ pose, size }: { pose: 'presenting-t' | 'wave' | 'winner'; size: number }) {
+  // Paddle mascot retired — the round "ball" mascot (in /characters) is used now.
+  const file = pose === 'winner' ? 'winner' : 'host';
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/design-handoff/dink/${file}.png`}
+      src={`/design-handoff/characters/${file}.png`}
       alt=""
       width={size}
       height={size}

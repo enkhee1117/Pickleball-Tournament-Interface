@@ -8,20 +8,22 @@ import type { PlayerRow } from '../_types';
 
 export type DinkPose = 'token-t' | 'presenting-t' | 'wave' | 'coach' | 'idle';
 
-// The old paddle-character mascot is retired — the ball is our mascot now. Any
-// remaining paddle poses resolve to the ball bust so the paddle never renders.
-const RETIRED_PADDLE_POSE: Partial<Record<DinkPose, string>> = {
-  wave: 'happy-bust',
-  'token-t': 'happy-bust',
-  'presenting-t': 'happy-bust',
+// The paddle-character mascot is retired — the round "ball" mascot in
+// /design-handoff/characters is the only mascot now. Each mixer pose maps to a
+// clean, transparent ball cutout by role, so the old paddle art never renders.
+const BALL_POSE: Record<DinkPose, string> = {
+  wave: 'host', // greeting at the vote header
+  'token-t': 'voter', // token budget — the ball holding a token
+  'presenting-t': 'host', // empty / sealed states
+  coach: 'idle',
+  idle: 'idle',
 };
 
 export function Dink({ pose, size }: { pose: DinkPose; size: number }) {
-  const file = RETIRED_PADDLE_POSE[pose] ?? pose;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/design-handoff/dink/${file}.png`}
+      src={`/design-handoff/characters/${BALL_POSE[pose]}.png`}
       alt=""
       width={size}
       height={size}

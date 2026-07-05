@@ -4,19 +4,11 @@ import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
-import type { PairingRow, PlayerRow, RoundRow, TournamentRow } from '../_types';
-import type { CourtResult } from '@/lib/mixer-standings';
+import type { PlayerRow, RoundRow, TournamentRow } from '../_types';
+import { buildCourtResults } from '@/lib/mixer-standings';
 import { ScoreFlow } from './ScoreFlow';
 
 type PageProps = { params: Promise<{ id: string }> };
-
-type ScoreRowWithRound = {
-  round_id: string;
-  court_no: number;
-  team_a_score: number;
-  team_b_score: number;
-  completed_at: string | null;
-};
 
 export default async function MixerScorePage({ params }: PageProps) {
   const { id } = await params;
@@ -48,52 +40,20 @@ export default async function MixerScorePage({ params }: PageProps) {
 
   const [{ data: pairings }, { data: scores }] = await Promise.all([
     roundIds.length
-      ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no').in('round_id', roundIds)
+      ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', roundIds)
       : Promise.resolve({ data: [] }),
     roundIds.length
-      ? supabase.from('mixer_scores').select('round_id,court_no,team_a_score,team_b_score,completed_at').in('round_id', roundIds)
+      ? supabase.from('mixer_scores').select('round_id,court_no,wave_no,team_a_score,team_b_score,completed_at').in('round_id', roundIds)
       : Promise.resolve({ data: [] }),
   ]);
 
-  const pairingRows = (pairings ?? []) as (PairingRow & { round_id: string })[];
-  const scoreRows = (scores ?? []) as ScoreRowWithRound[];
+  const pairingRows = (pairings ?? []) as { round_id: string; player_a_id: string; player_b_id: string; court_no: number; wave_no: number }[];
+  const scoreRows = (scores ?? []) as { round_id: string; court_no: number; wave_no: number; team_a_score: number; team_b_score: number; completed_at: string | null }[];
   const roundNoById = new Map(roundRows.map((r) => [r.id, r.round_no] as const));
   const nameOf = (pid: string) => roster.find((p) => p.id === pid)?.display_name ?? 'TBD';
 
-  // Group pairings by (round, court); a court is a matchup once it has 2 teams.
-  const byCourt = new Map<string, (PairingRow & { round_id: string })[]>();
-  for (const p of pairingRows) {
-    const key = `${p.round_id}:${p.court_no}`;
-    byCourt.set(key, [...(byCourt.get(key) ?? []), p]);
-  }
-
-  const results: CourtResult[] = [];
-  for (const [key, teams] of byCourt) {
-    if (teams.length < 2) continue;
-    const [teamA, teamB] = teams;
-    const roundId = teamA.round_id;
-    const courtNo = teamA.court_no;
-    const score = scoreRows.find((s) => s.round_id === roundId && s.court_no === courtNo);
-    results.push({
-      key,
-      roundId,
-      roundNo: roundNoById.get(roundId) ?? 0,
-      courtNo,
-      teamA: [
-        { id: teamA.player_a_id, name: nameOf(teamA.player_a_id) },
-        { id: teamA.player_b_id, name: nameOf(teamA.player_b_id) },
-      ],
-      teamB: [
-        { id: teamB.player_a_id, name: nameOf(teamB.player_a_id) },
-        { id: teamB.player_b_id, name: nameOf(teamB.player_b_id) },
-      ],
-      scoreA: score?.team_a_score ?? 0,
-      scoreB: score?.team_b_score ?? 0,
-      completed: !!score?.completed_at,
-      editable: !!currentRound && roundId === currentRound.id,
-    });
-  }
-  results.sort((a, b) => a.roundNo - b.roundNo || a.courtNo - b.courtNo);
+  // Wave-aware: a game is one (round, court, wave) slot with two teams.
+  const results = buildCourtResults(pairingRows, scoreRows, roundNoById, currentRound?.id ?? null, nameOf);
 
   const playerCount = roster.length;
 

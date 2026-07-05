@@ -7,10 +7,13 @@ import { formatInviteCode } from '@/lib/invite-codes';
 import { Chip } from '@/components/ui/Chip';
 import { DesktopSurface, BallMark } from '@/components/desktop';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
+import { gameSlotLabel } from '@/lib/mixer-standings';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import { ShareCodeCard } from '../../invite/ShareCodeCard';
 import { MixerRealtimeSync } from '../MixerRealtimeSync';
+import { ActionForm } from '../_components/ActionForm';
 import { ConfirmForm } from '@/components/ui/ConfirmForm';
+import { simulateRoundVotesAction, playRoundAction, autoNightAction, seedTestTournamentAction } from '../sim-actions';
 import {
   drawMixerRound,
   finalizeMixerEvent,
@@ -105,10 +108,10 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
 
   const [{ data: pairings }, { data: scores }, { data: payments }, { data: states }, { data: betsSummary }, { data: snapshot }, { data: voteRows }] = await Promise.all([
     currentRound
-      ? supabase.from('mixer_pairings').select('id,player_a_id,player_b_id,court_no').eq('round_id', currentRound.id).order('court_no', { ascending: true })
+      ? supabase.from('mixer_pairings').select('id,player_a_id,player_b_id,court_no,wave_no').eq('round_id', currentRound.id).order('court_no', { ascending: true }).order('wave_no', { ascending: true })
       : Promise.resolve({ data: [] }),
     currentRound
-      ? supabase.from('mixer_scores').select('court_no,team_a_score,team_b_score,completed_at').eq('round_id', currentRound.id)
+      ? supabase.from('mixer_scores').select('court_no,wave_no,team_a_score,team_b_score,completed_at').eq('round_id', currentRound.id)
       : Promise.resolve({ data: [] }),
     supabase.from('payments').select('id,player_id,type,amount,method,status').eq('tournament_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('player_event_state').select('player_id,pairing_pool,tokens_base_remaining,tokens_bought_remaining,chips_remaining,sit_out_count').eq('tournament_id', id),
@@ -141,11 +144,20 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const drawStarted = roundRows.some((round) => ['drawing', 'revealed', 'playing', 'done'].includes(round.state));
   const hasOpenBallots = roundRows.some((round) => round.state === 'open');
   const hasLockedBallots = roundRows.some((round) => round.state === 'locked');
-  const currentCourtCount = new Set(pairingRows.map((pairing) => pairing.court_no)).size;
+  // A "game slot" is one matchup = (court, wave). When games outnumber courts a
+  // court hosts several waves (heats), so the round's game count is the number
+  // of distinct (court, wave) pairs, not distinct courts.
+  const slotKey = (courtNo: number, waveNo: number) => `${courtNo}:${waveNo}`;
+  const gameSlots = [...new Map(pairingRows.map((p) => [slotKey(p.court_no, p.wave_no), { courtNo: p.court_no, waveNo: p.wave_no }])).values()]
+    .sort((a, b) => a.courtNo - b.courtNo || a.waveNo - b.waveNo);
+  const currentCourtCount = gameSlots.length;
   const scoredCourtCount = scoreRows.filter((score) => score.completed_at).length;
   const canOpenBallot = !!currentRound && !drawStarted && hasLockedBallots;
   const canLockBallot = !!currentRound && hasOpenBallots && !drawStarted;
   const canDraw = currentRound?.state === 'locked';
+  // Vote simulation writes ballots, which the DB only accepts while the round
+  // is open (same rule real voters hit).
+  const canSimulate = currentRound?.state === 'open';
   const canStartPlay = currentRound?.state === 'revealed';
   const canMarkDone = (currentRound?.state === 'playing' || currentRound?.state === 'revealed') && (currentCourtCount === 0 || scoredCourtCount >= currentCourtCount);
 
@@ -206,14 +218,14 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
         {sp.ok && <Notice tone="ok">{sp.ok}</Notice>}
 
         {!cfg || !currentRound ? (
-          <form action={initializeMixerEvent} className="rounded-2xl bg-white p-5 text-center" style={{ border: '1px dashed var(--line)' }}>
+          <ActionForm action={initializeMixerEvent} className="rounded-2xl bg-white p-5 text-center" style={{ border: '1px dashed var(--line)' }}>
             <input type="hidden" name="tournament_id" value={id} />
             <div className="text-[15px] font-semibold text-ink">Mixer config is not initialized</div>
             <div className="mt-1 text-xs text-ink-3">Create default tokens, chips, Round 1, and player event state.</div>
             <button className="mt-4 rounded-2xl px-5 py-3 text-sm font-semibold" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
               Initialize Mixer
             </button>
-          </form>
+          </ActionForm>
         ) : (
           <>
             {activeTab === 'run' && (
@@ -258,7 +270,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                       </div>
                       {/* Voting window in HOURS — sets config.lock_seconds and
                           re-arms this round's timer in one tap. */}
-                      <form action={setMixerVotingWindow} className="mt-2.5 flex items-center gap-2">
+                      <ActionForm action={setMixerVotingWindow} className="mt-2.5 flex items-center gap-2">
                         <input type="hidden" name="tournament_id" value={id} />
                         <input type="hidden" name="round_id" value={currentRound.id} />
                         <label className="flex flex-1 items-center gap-2 rounded-xl px-3 py-2" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)' }}>
@@ -277,7 +289,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         <button className="rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
                           Start timer
                         </button>
-                      </form>
+                      </ActionForm>
                     </div>
 
                     {/* The draw */}
@@ -294,7 +306,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         <WeightTile v={`${wPct(cfg.beta)}%`} l="Skill balance" />
                         <WeightTile v={`${wPct(cfg.gamma)}%`} l="Novelty" />
                       </div>
-                      <form action={drawMixerRound}>
+                      <ActionForm action={drawMixerRound}>
                         <input type="hidden" name="tournament_id" value={id} />
                         <input type="hidden" name="round_id" value={currentRound.id} />
                         <button
@@ -304,7 +316,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         >
                           🎲 Run the draw
                         </button>
-                      </form>
+                      </ActionForm>
                     </div>
 
                     {/* Round controls */}
@@ -319,11 +331,11 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                           tournamentId={id}
                           roundId={currentRound.id}
                           state="done"
-                          label={currentCourtCount > 0 && scoredCourtCount < currentCourtCount ? `Score ${currentCourtCount - scoredCourtCount} court${currentCourtCount - scoredCourtCount === 1 ? '' : 's'}` : 'Mark done'}
+                          label={currentCourtCount > 0 && scoredCourtCount < currentCourtCount ? `Score ${currentCourtCount - scoredCourtCount} game${currentCourtCount - scoredCourtCount === 1 ? '' : 's'}` : 'Mark done'}
                           disabled={!canMarkDone}
                         />
                       </div>
-                      <form action={finalizeMixerEvent} className="mt-2.5">
+                      <ActionForm action={finalizeMixerEvent} className="mt-2.5">
                         <input type="hidden" name="tournament_id" value={id} />
                         <button
                           className="w-full rounded-2xl px-4 py-3 text-sm font-semibold"
@@ -331,7 +343,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         >
                           Finalize standings, raffle &amp; pools
                         </button>
-                      </form>
+                      </ActionForm>
                       <div className="mt-3">
                         <RoundRail rounds={roundRows} activeRoundId={currentRound.id} />
                       </div>
@@ -340,6 +352,16 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
 
                   {/* RIGHT — live read-outs */}
                   <div className="flex flex-col gap-[18px]">
+                    <TestHarnessPanel
+                      tournamentId={id}
+                      roundId={currentRound.id}
+                      roundNo={currentRound.round_no}
+                      canSimulate={canSimulate}
+                      canPlay={currentRound.state !== 'done' && finalStandings.length === 0}
+                      eventFinalized={finalStandings.length > 0}
+                      votedCount={votedCount}
+                      rosterCount={roster.length}
+                    />
                     {/* Recovery controls — mistakes happen on live nights. */}
                     <div className="rounded-[18px] p-5" style={{ border: '1px solid color-mix(in oklch, var(--berry, oklch(0.55 0.2 12)) 35%, var(--line))', background: 'var(--surface-card)' }}>
                       <h3 className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>Rerun &amp; reset</h3>
@@ -347,32 +369,32 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         Fix a draw that fired early or start the night over. Roster and payments always survive.
                       </div>
                       <div className="grid gap-2">
-                        <ConfirmForm action={repoolMixerRoster} confirm="Re-pool every player from their gender and the event's gender mode? Wallets and votes are kept. Follow with Reopen + Run the draw to redraw the teams.">
+                        <ActionForm action={repoolMixerRoster} confirm="Re-pool every player from their gender and the event's gender mode? Wallets and votes are kept. Follow with Reopen + Run the draw to redraw the teams.">
                           <input type="hidden" name="tournament_id" value={id} />
                           <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
                             Re-pool teams from genders (roster/config changed)
                           </button>
-                        </ConfirmForm>
-                        <ConfirmForm action={reopenMixerRound} confirm={`Reopen round ${currentRound.round_no}? Its pairings AND any scores already entered are cleared, and voting goes live again.`}>
+                        </ActionForm>
+                        <ActionForm action={reopenMixerRound} confirm={`Reopen round ${currentRound.round_no}? Its pairings and scores already entered are cleared, and voting goes live again.`}>
                           <input type="hidden" name="tournament_id" value={id} />
                           <input type="hidden" name="round_id" value={currentRound.id} />
                           <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
                             Reopen round {currentRound.round_no} (clear draw + scores)
                           </button>
-                        </ConfirmForm>
-                        <ConfirmForm action={resetMixerRoundVotes} confirm={`Wipe every ballot for round ${currentRound.round_no} and refund the tokens?`}>
+                        </ActionForm>
+                        <ActionForm action={resetMixerRoundVotes} confirm={`Wipe every ballot for round ${currentRound.round_no} and refund the tokens?`}>
                           <input type="hidden" name="tournament_id" value={id} />
                           <input type="hidden" name="round_id" value={currentRound.id} />
                           <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
                             Reset round {currentRound.round_no} votes (refund tokens)
                           </button>
-                        </ConfirmForm>
-                        <ConfirmForm action={resetMixerEvent} confirm="Reset the ENTIRE event? All pairings, scores, ballots, and bets are wiped; tokens and chips are restored; every round reopens. Roster and payments are kept.">
+                        </ActionForm>
+                        <ActionForm action={resetMixerEvent} confirm="Reset the ENTIRE event? All pairings, scores, ballots, and bets are wiped; tokens and chips are restored; every round reopens. Roster and payments are kept.">
                           <input type="hidden" name="tournament_id" value={id} />
                           <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-bold" style={{ background: 'color-mix(in oklch, oklch(0.55 0.2 12) 14%, var(--surface-card))', color: 'oklch(0.55 0.2 12)', border: '1px solid color-mix(in oklch, oklch(0.55 0.2 12) 45%, var(--line))' }}>
                             Reset whole event &amp; rerun
                           </button>
-                        </ConfirmForm>
+                        </ActionForm>
                       </div>
                     </div>
                     <div className="rounded-[18px] p-5" style={PANEL}>
@@ -384,14 +406,15 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                         <div className="mt-2 text-[13px]" style={{ color: 'var(--text3)' }}>No courts revealed yet — run the draw to seat this round.</div>
                       ) : (
                         <div className="mt-3 flex flex-col gap-2">
-                          {[...new Set(pairingRows.map((p) => p.court_no))].map((courtNo) => {
-                            const teams = pairingRows.filter((p) => p.court_no === courtNo);
-                            const score = scoreRows.find((s) => s.court_no === courtNo);
+                          {gameSlots.map(({ courtNo, waveNo }) => {
+                            const teams = pairingRows.filter((p) => p.court_no === courtNo && p.wave_no === waveNo);
+                            const score = scoreRows.find((s) => s.court_no === courtNo && s.wave_no === waveNo);
                             const live = !!score && !score.completed_at;
                             return (
                               <CourtMini
-                                key={courtNo}
+                                key={slotKey(courtNo, waveNo)}
                                 courtNo={courtNo}
+                                waveNo={waveNo}
                                 teamA={teams[0] ? `${name(teams[0].player_a_id)} & ${name(teams[0].player_b_id)}` : '—'}
                                 teamB={teams[1] ? `${name(teams[1].player_a_id)} & ${name(teams[1].player_b_id)}` : '—'}
                                 scoreA={score?.team_a_score ?? 0}
@@ -472,7 +495,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                             </div>
                             <Chip tone={pool === 'a' ? 'court' : 'ghost'}>Pool {pool.toUpperCase()}</Chip>
                           </div>
-                          <form action={updateMixerPlayerGender} className="mt-3 flex items-center gap-2">
+                          <ActionForm action={updateMixerPlayerGender} className="mt-3 flex items-center gap-2">
                             <input type="hidden" name="tournament_id" value={id} />
                             <input type="hidden" name="player_id" value={p.id} />
                             <select name="gender" defaultValue={p.gender ?? ''} className="h-10 flex-1 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink" aria-label={`Gender for ${p.display_name}`}>
@@ -482,8 +505,8 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                               <option value="x">Nonbinary</option>
                             </select>
                             <button className="h-10 rounded-xl px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Save</button>
-                          </form>
-                          <form action={updateMixerPlayerPool} className="mt-2 flex items-center gap-2">
+                          </ActionForm>
+                          <ActionForm action={updateMixerPlayerPool} className="mt-2 flex items-center gap-2">
                             <input type="hidden" name="tournament_id" value={id} />
                             <input type="hidden" name="player_id" value={p.id} />
                             <select name="pairing_pool" defaultValue={pool} className="h-10 flex-1 rounded-xl bg-paper-2 px-3 text-sm font-semibold text-ink">
@@ -491,7 +514,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                               <option value="b">Pool B</option>
                             </select>
                             <button className="h-10 rounded-xl px-3 text-xs font-bold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Save</button>
-                          </form>
+                          </ActionForm>
                         </div>
                       );
                     })}
@@ -532,26 +555,30 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                   </div>
                 ) : (
                   <div className="grid gap-3">
-                    {[...new Set(pairingRows.map((p) => p.court_no))].map((courtNo) => {
-                      const teams = pairingRows.filter((p) => p.court_no === courtNo);
-                      const score = scoreRows.find((s) => s.court_no === courtNo);
+                    {gameSlots.map(({ courtNo, waveNo }) => {
+                      const teams = pairingRows.filter((p) => p.court_no === courtNo && p.wave_no === waveNo);
+                      const score = scoreRows.find((s) => s.court_no === courtNo && s.wave_no === waveNo);
                       return (
-                        <div key={courtNo} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
-                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-3">Court {courtNo}</div>
+                        <div key={slotKey(courtNo, waveNo)} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
+                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-3">
+                            {gameSlotLabel(courtNo, waveNo)}
+                            {waveNo > 1 && <span className="ml-2 font-medium normal-case text-ink-3">waits for Heat {waveNo - 1}</span>}
+                          </div>
                           <div className="grid gap-1 text-sm font-semibold text-ink">
                             {teams.map((team, idx) => (
                               <div key={team.id}>{idx === 0 ? 'A' : 'B'} · {name(team.player_a_id)} & {name(team.player_b_id)}</div>
                             ))}
                           </div>
-                          <form action={scoreMixerCourt} className="mt-3 flex items-center gap-2">
+                          <ActionForm action={scoreMixerCourt} className="mt-3 flex items-center gap-2">
                             <input type="hidden" name="tournament_id" value={id} />
                             <input type="hidden" name="round_id" value={currentRound.id} />
                             <input type="hidden" name="court_no" value={courtNo} />
+                            <input type="hidden" name="wave_no" value={waveNo} />
                             <input name="team_a_score" type="number" min={0} defaultValue={score?.team_a_score ?? 0} className="mono h-10 w-16 rounded-xl bg-paper-2 text-center text-ink" />
                             <span className="text-xs text-ink-3">to</span>
                             <input name="team_b_score" type="number" min={0} defaultValue={score?.team_b_score ?? 0} className="mono h-10 w-16 rounded-xl bg-paper-2 text-center text-ink" />
                             <button className="ml-auto rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Post</button>
-                          </form>
+                          </ActionForm>
                         </div>
                       );
                     })}
@@ -870,13 +897,123 @@ function WeightTile({ v, l }: { v: string; l: string }) {
   );
 }
 
-function CourtMini({ courtNo, teamA, teamB, scoreA, scoreB, live }: { courtNo: number; teamA: string; teamB: string; scoreA: number; scoreB: number; live: boolean }) {
+// Organizer test harness — simulate absent players' voting so the whole flow
+// (vote → draw → score → standings) can be exercised without many logins. Every
+// button routes through a manager-gated RPC; a non-manager is refused server-side.
+function TestHarnessPanel({
+  tournamentId,
+  roundId,
+  roundNo,
+  canSimulate,
+  canPlay,
+  eventFinalized,
+  votedCount,
+  rosterCount,
+}: {
+  tournamentId: string;
+  roundId: string;
+  roundNo: number;
+  canSimulate: boolean;
+  canPlay: boolean;
+  eventFinalized: boolean;
+  votedCount: number;
+  rosterCount: number;
+}) {
+  const unvoted = Math.max(0, rosterCount - votedCount);
+  return (
+    <div
+      className="rounded-[18px] p-5"
+      style={{ border: '1px dashed color-mix(in oklch, var(--accent) 45%, var(--line))', background: 'color-mix(in oklch, var(--accent) 6%, var(--surface-card))' }}
+    >
+      <h3 className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: 'var(--text)' }}>
+        🧪 Test harness
+        <span className="chip">Round {roundNo}</span>
+      </h3>
+      <div className="mb-3 text-[12.5px]" style={{ color: 'var(--text3)' }}>
+        Drive the whole flow without 16 logins. Simulated votes obey the same budget, pools and lock as real ones; auto-play
+        also draws and posts random finals.
+      </div>
+
+      <div className="mono mb-1.5 text-[10px] uppercase tracking-[0.1em]" style={{ color: 'var(--text3)' }}>Votes</div>
+      {!canSimulate ? (
+        <div className="rounded-xl px-3 py-2.5 text-[12.5px]" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)', color: 'var(--text3)' }}>
+          Open the ballot to simulate votes for this round.
+        </div>
+      ) : (
+        <div className="grid gap-2">
+          <form action={simulateRoundVotesAction}>
+            <input type="hidden" name="tournament_id" value={tournamentId} />
+            <input type="hidden" name="round_id" value={roundId} />
+            <input type="hidden" name="mode" value="missing" />
+            <button className="w-full rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: 'var(--accent)', color: 'var(--accent-ink)' }}>
+              Fill ballots for {unvoted} unvoted player{unvoted === 1 ? '' : 's'}
+            </button>
+          </form>
+          <ConfirmForm action={simulateRoundVotesAction} confirm={`Wipe every ballot for round ${roundNo} (refunding tokens) and re-roll fresh votes for everyone?`}>
+            <input type="hidden" name="tournament_id" value={tournamentId} />
+            <input type="hidden" name="round_id" value={roundId} />
+            <input type="hidden" name="mode" value="all" />
+            <button className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
+              Re-roll all ballots
+            </button>
+          </ConfirmForm>
+        </div>
+      )}
+
+      <div className="mono mb-1.5 mt-4 text-[10px] uppercase tracking-[0.1em]" style={{ color: 'var(--text3)' }}>Auto-play</div>
+      {eventFinalized ? (
+        <div className="rounded-xl px-3 py-2.5 text-[12.5px]" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)', color: 'var(--text3)' }}>
+          Event is finalized. Reset it above to run again.
+        </div>
+      ) : (
+        <div className="grid gap-2">
+          <ConfirmForm action={playRoundAction} confirm={`Play round ${roundNo} end to end (simulate any missing votes, lock, draw, and post random finals)?`}>
+            <input type="hidden" name="tournament_id" value={tournamentId} />
+            <button disabled={!canPlay} className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-45" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
+              ▶ Play round {roundNo} to the end
+            </button>
+          </ConfirmForm>
+          <ConfirmForm action={autoNightAction} confirm="Auto-play every remaining round (votes, draws, random scores) and finalize standings, raffle & pools?">
+            <input type="hidden" name="tournament_id" value={tournamentId} />
+            <button disabled={!canPlay} className="w-full rounded-2xl px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45" style={{ background: 'var(--accent)', color: 'var(--accent-ink)' }}>
+              ⏭ Auto-play to finals
+            </button>
+          </ConfirmForm>
+        </div>
+      )}
+
+      <div className="mono mb-1.5 mt-4 text-[10px] uppercase tracking-[0.1em]" style={{ color: 'var(--text3)' }}>Fresh test event</div>
+      <ConfirmForm action={seedTestTournamentAction} confirm="Create a brand-new mixer with a full placeholder roster and auto-play the entire night? You'll land on the new event.">
+        <div className="grid grid-cols-[1fr_auto] gap-2">
+          <input name="name" defaultValue="Test Mixer" aria-label="Test event name" className="h-10 rounded-xl px-3 text-[13px]" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)', color: 'var(--text)' }} />
+          <select name="player_count" defaultValue="16" aria-label="Player count" className="h-10 rounded-xl px-2 text-[13px]" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+            <option value="8">8</option>
+            <option value="12">12</option>
+            <option value="16">16</option>
+            <option value="20">20</option>
+            <option value="24">24</option>
+          </select>
+        </div>
+        <select name="gender_mode" defaultValue="mixed" aria-label="Gender mode" className="mt-2 h-10 w-full rounded-xl px-2 text-[13px]" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)', color: 'var(--text)' }}>
+          <option value="mixed">Mixed doubles</option>
+          <option value="open">Open (gender-blind)</option>
+          <option value="same">Same-gender teams</option>
+        </select>
+        <button className="mt-2 w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}>
+          🌱 Seed &amp; auto-play a new mixer
+        </button>
+      </ConfirmForm>
+    </div>
+  );
+}
+
+function CourtMini({ courtNo, waveNo, teamA, teamB, scoreA, scoreB, live }: { courtNo: number; waveNo: number; teamA: string; teamB: string; scoreA: number; scoreB: number; live: boolean }) {
   return (
     <div
       className="flex items-center gap-3 rounded-xl p-3"
       style={{ border: '1px solid var(--line)', borderLeft: live ? '3px solid var(--serve)' : '1px solid var(--line)' }}
     >
-      <span className="mono w-12 text-[11px]" style={{ color: 'var(--text3)' }}>CT {courtNo}</span>
+      <span className="mono w-12 text-[11px]" style={{ color: 'var(--text3)' }}>CT {courtNo}{waveNo > 1 ? `·H${waveNo}` : ''}</span>
       <div className="min-w-0 flex-1 text-[13px]" style={{ color: 'var(--text)' }}>
         <div className="flex justify-between gap-2"><span className="truncate">{teamA}</span><span className="mono font-bold">{scoreA}</span></div>
         <div className="flex justify-between gap-2"><span className="truncate">{teamB}</span><span className="mono font-bold">{scoreB}</span></div>
