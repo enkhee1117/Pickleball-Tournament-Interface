@@ -29,11 +29,11 @@ export function SignupForm({ next }: { next: string }) {
       />
       <input
         name="phone"
-        type="text"
+        type="email"
         inputMode="email"
         autoComplete="username"
         required
-        placeholder="Phone or email"
+        placeholder="Email"
         className="rounded-2xl px-5 py-[16px] text-base outline-none"
         style={inputStyle}
       />

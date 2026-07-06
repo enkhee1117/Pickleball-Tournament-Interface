@@ -28,11 +28,11 @@ export function LoginForm({ next }: { next: string }) {
       <input type="hidden" name="next" value={next} />
 
       <div>
-        <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">Email or phone</label>
+        <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">Email</label>
         <div className={INPUT_WRAP} style={{ border: '1.5px solid var(--line)' }}>
           <input
             name="phone"
-            type="text"
+            type="email"
             inputMode="email"
             autoComplete="username"
             required

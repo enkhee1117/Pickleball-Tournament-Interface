@@ -118,14 +118,15 @@ export function QuickJoinForm({
       </div>
 
       <label className="block">
-        <span className={LABEL_CLS}>Email or phone</span>
+        <span className={LABEL_CLS}>Email</span>
         <input
           name="identifier"
+          type="email"
           value={identifier}
           onChange={(event) => setIdentifier(event.target.value)}
           autoComplete="email"
           inputMode="email"
-          placeholder="sam@example.com or +1 555 010 1234"
+          placeholder="sam@example.com"
           className="w-full rounded-xl bg-paper-2 px-4 py-3 text-[15px] text-ink outline-none"
           style={{ borderWidth: 1.5, borderStyle: 'solid', borderColor: 'var(--line)' }}
           required

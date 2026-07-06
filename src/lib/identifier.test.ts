@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isEmailShaped, resolveIdentifier } from './identifier';
+import { isEmailShaped, resolveEmailIdentifier, resolveIdentifier } from './identifier';
 
 describe('isEmailShaped', () => {
   it('accepts a normal email', () => {
@@ -37,5 +37,19 @@ describe('resolveIdentifier', () => {
   });
   it('returns null for gibberish', () => {
     expect(resolveIdentifier('not an email or phone')).toBe(null);
+  });
+});
+
+describe('resolveEmailIdentifier (auth is email-only)', () => {
+  it('accepts a real email', () => {
+    expect(resolveEmailIdentifier('ALICE@Example.com')).toEqual({ kind: 'email', email: 'alice@example.com', phone: null });
+  });
+  it('rejects a phone number', () => {
+    expect(resolveEmailIdentifier('+1 (555) 123-4567')).toBe(null);
+    expect(resolveEmailIdentifier('5551234567')).toBe(null);
+  });
+  it('rejects gibberish and empty', () => {
+    expect(resolveEmailIdentifier('nope')).toBe(null);
+    expect(resolveEmailIdentifier('   ')).toBe(null);
   });
 });
