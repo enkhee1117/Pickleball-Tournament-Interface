@@ -39,6 +39,7 @@ import { CountdownTimer } from '../_components/CountdownTimer';
 import { OrganizerRevealTakeover } from '../_components/OrganizerRevealTakeover';
 import { DrawArmedModal } from '../_components/DrawArmedModal';
 import { CockpitScoreBoard } from '../_components/CockpitScoreBoard';
+import { StandingsBoard } from '../_components/StandingsBoard';
 import {
   formatLockDuration,
   getOrganizerTab,
@@ -148,12 +149,15 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
       : Promise.resolve({ data: [] }),
   ]);
   const scoreResults = buildCourtResults(
-    (allPairings ?? []) as { round_id: string; player_a_id: string; player_b_id: string; court_no: number; wave_no: number }[],
+    (allPairings ?? []) as { id?: string; created_at?: string | null; round_id: string; player_a_id: string; player_b_id: string; court_no: number; wave_no: number }[],
     (allScores ?? []) as { round_id: string; court_no: number; wave_no: number; team_a_score: number; team_b_score: number; completed_at: string | null }[],
     new Map(roundRows.map((r) => [r.id, r.round_no] as const)),
     currentRound?.id ?? null,
     name,
   );
+  // Gender per player (by-gender podium) + finalized flag for the Standings tab.
+  const genders: Record<string, PlayerRow['gender']> = {};
+  for (const p of roster) genders[p.id] = p.gender;
   const paidCount = paymentRows.filter((p) => p.type === 'entry' && p.status === 'confirmed').length;
   const pendingPayments = paymentRows.filter((p) => p.status === 'pending').length;
   const betChips = betSummaryRows.reduce((sum, b) => sum + b.total_chips, 0);
@@ -623,6 +627,17 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
               </Section>
             )}
 
+            {activeTab === 'standings' && (
+              <Section title="Standings">
+                <StandingsBoard
+                  tournamentId={id}
+                  results={scoreResults}
+                  genders={genders}
+                  finalized={finalStandings.length > 0}
+                />
+              </Section>
+            )}
+
             {activeTab === 'prizes' && (
               <Section title="Money and prizes">
                 <div className="grid grid-cols-2 gap-2">
@@ -673,6 +688,7 @@ const COCKPIT_TITLES: Record<string, string> = {
   run: 'Run event',
   roster: 'Roster',
   scores: 'Scores',
+  standings: 'Standings',
   prizes: 'Prizes',
   setup: 'Setup',
 };
@@ -692,6 +708,8 @@ function cockpitSub(
       return `${players} players · ${paid} paid · ${pending} pending`;
     case 'scores':
       return 'Post scores court by court · game to 11, win by 2';
+    case 'standings':
+      return 'Live board · re-sorts as scores post';
     case 'prizes':
       return 'Entry pot, raffle & pooled betting';
     case 'setup':
@@ -705,6 +723,7 @@ const NAV_ITEMS: { tab: string; label: string; icon: React.ReactNode }[] = [
   { tab: 'run', label: 'Run event', icon: <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /> },
   { tab: 'roster', label: 'Roster', icon: <path d="M9 8a3 3 0 106 0 3 3 0 00-6 0zM4 19c.8-3 2.8-4.4 5-4.4s4.2 1.4 5 4.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /> },
   { tab: 'scores', label: 'Scores', icon: <><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" /><path d="M8 9h8M8 13h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></> },
+  { tab: 'standings', label: 'Standings', icon: <path d="M5 20V10M12 20V4M19 20v-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /> },
   { tab: 'prizes', label: 'Prizes', icon: <path d="M7 4h10v3a5 5 0 01-10 0V4zM9 15h6M8 20h8M12 15v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /> },
   { tab: 'setup', label: 'Setup', icon: <><circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.5" /><path d="M12 3.5v2M12 18.5v2M4.5 7l1.7 1M17.8 16l1.7 1M4.5 17l1.7-1M17.8 8l1.7-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></> },
 ];

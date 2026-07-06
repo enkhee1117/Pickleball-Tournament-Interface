@@ -10,12 +10,13 @@ export type PrizeBuckets = {
   reserve: number;
 };
 
-export type OrganizerTab = 'run' | 'roster' | 'scores' | 'prizes' | 'setup';
+export type OrganizerTab = 'run' | 'roster' | 'scores' | 'standings' | 'prizes' | 'setup';
 
 export const ORGANIZER_TABS: Array<{ id: OrganizerTab; label: string; description: string }> = [
   { id: 'run', label: 'Run', description: 'Ballot and draw' },
   { id: 'roster', label: 'Roster', description: 'Players and payments' },
   { id: 'scores', label: 'Scores', description: 'Courts and results' },
+  { id: 'standings', label: 'Standings', description: 'Live board and podium' },
   { id: 'prizes', label: 'Prizes', description: 'Pots and raffle' },
   { id: 'setup', label: 'Setup', description: 'Rules and money' },
 ];
