@@ -36,6 +36,7 @@ import { MatchTab } from './_components/MatchTab';
 import { CourtsTab } from './_components/CourtsTab';
 import { MeTab } from './_components/MeTab';
 import { Notice, mixerAvatarFor } from './_components/mixer-night';
+import { MixerPlayerShell, type PlayerTab } from './_components/MixerPlayerShell';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -268,8 +269,8 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     }))
     .sort((a, b) => (a.down ? 1 : 0) - (b.down ? 1 : 0) || b.tokens - a.tokens);
 
-  return (
-    <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={myPlayer} isManager={isManager}>
+  const overlays = (
+    <>
       <PushRegistration />
       {reveal && (
         <RevealTakeover
@@ -295,35 +296,55 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
       {showPresenceCheckIn && <MixerPresenceCheckIn tournamentId={id} />}
       {sp.error && <Notice tone="error">{sp.error}</Notice>}
       {sp.ok && <Notice tone="ok">{sp.ok}</Notice>}
-      {tab === 'vote' && (
-        <MixerVotePanel
-          tournamentId={id}
-          round={voteRound ?? currentRound}
-          rounds={roundRows}
-          eventRoundCount={cfg.rounds}
-          config={cfg}
-          roster={roster}
-          states={stateRows}
-          myPlayer={myPlayer}
-          myState={myState}
-          votes={voteRows}
-          confirmedRoundIds={confirmedRoundIds}
-          genderMode={t.gender_mode ?? 'mixed'}
-        />
-      )}
-      {tab === 'match' && (
-        <MatchTab tournamentId={id} round={currentRound} roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} gameTo={cfg.game_to ?? 11} ballotsIn={ballotsIn} rosterCount={activeRosterCount} tokensSpent={tokensSpent} myBallot={myBallot} />
-      )}
-      {tab === 'courts' && (
-        <CourtsTab roster={roster} pairings={pairingRows} scores={scoreRows} sitOuts={sitOutIds} myPlayer={myPlayer} round={currentRound} />
-      )}
-      {tab === 'betting' && (
-        <MixerBettingPanel tournamentId={id} roster={roster} myPlayer={myPlayer} myState={myState} bets={betRows} config={cfg} />
-      )}
-      {tab === 'me' && (
-        <MeTab tournament={t} config={cfg} player={myPlayer} state={myState} inviteCode={t.invite_code} payments={paymentRows} raffleTickets={raffleTickets} raffleWinner={raffleWinner} standings={standings} />
-      )}
-    </MixerShell>
+    </>
+  );
+
+  // Every pane is rendered once here on the server; MixerPlayerShell toggles
+  // which is visible client-side (no navigation, no refetch on a tab click).
+  const panes: Record<PlayerTab, ReactNode> = {
+    vote: (
+      <MixerVotePanel
+        tournamentId={id}
+        round={voteRound ?? currentRound}
+        rounds={roundRows}
+        eventRoundCount={cfg.rounds}
+        config={cfg}
+        roster={roster}
+        states={stateRows}
+        myPlayer={myPlayer}
+        myState={myState}
+        votes={voteRows}
+        confirmedRoundIds={confirmedRoundIds}
+        genderMode={t.gender_mode ?? 'mixed'}
+      />
+    ),
+    match: (
+      <MatchTab tournamentId={id} round={currentRound} roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} gameTo={cfg.game_to ?? 11} ballotsIn={ballotsIn} rosterCount={activeRosterCount} tokensSpent={tokensSpent} myBallot={myBallot} />
+    ),
+    courts: (
+      <CourtsTab roster={roster} pairings={pairingRows} scores={scoreRows} sitOuts={sitOutIds} myPlayer={myPlayer} round={currentRound} />
+    ),
+    betting: (
+      <MixerBettingPanel tournamentId={id} roster={roster} myPlayer={myPlayer} myState={myState} bets={betRows} config={cfg} />
+    ),
+    me: (
+      <MeTab tournament={t} config={cfg} player={myPlayer} state={myState} inviteCode={t.invite_code} payments={paymentRows} raffleTickets={raffleTickets} raffleWinner={raffleWinner} standings={standings} />
+    ),
+  };
+
+  return (
+    <MixerPlayerShell
+      tournamentId={id}
+      tournamentName={t.name}
+      inviteCode={t.invite_code}
+      roundNo={currentRound.round_no}
+      roundState={currentRound.state}
+      playerName={myPlayer.display_name}
+      isManager={isManager}
+      initialTab={tab}
+      overlays={overlays}
+      panes={panes}
+    />
   );
 }
 
