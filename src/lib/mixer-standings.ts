@@ -132,7 +132,7 @@ export function sortStandings(rows: StandingRow[]): StandingRow[] {
 // keyed by (round, court, wave): when games outnumber courts a court runs
 // several games in waves, so grouping by court alone would fuse distinct games.
 export function buildCourtResults(
-  pairings: { round_id: string; player_a_id: string; player_b_id: string; court_no: number; wave_no?: number }[],
+  pairings: { id?: string; created_at?: string | null; round_id: string; player_a_id: string; player_b_id: string; court_no: number; wave_no?: number }[],
   scores: { round_id: string; court_no: number; wave_no?: number; team_a_score: number; team_b_score: number; completed_at: string | null }[],
   roundNoById: Map<string, number>,
   currentRoundId: string | null,
@@ -146,7 +146,15 @@ export function buildCourtResults(
   const results: CourtResult[] = [];
   for (const [key, teams] of byGame) {
     if (teams.length < 2) continue;
-    const [teamA, teamB] = teams;
+    // Which pairing row is "team A" (owns team_a_score) must NOT depend on the
+    // query's row order — the finalize RPC settles it by (created_at, id), and
+    // if the client disagrees, the same game's scores get attributed to the
+    // opposite teams, so the live board and the finalized snapshot rank players
+    // differently. Sort by the SAME key the RPC uses so every surface agrees.
+    const ordered = [...teams].sort(
+      (a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? '') || (a.id ?? '').localeCompare(b.id ?? ''),
+    );
+    const [teamA, teamB] = ordered;
     const roundId = teamA.round_id;
     const courtNo = teamA.court_no;
     const waveNo = teamA.wave_no ?? 1;

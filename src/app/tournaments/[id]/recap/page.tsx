@@ -56,7 +56,7 @@ export default async function RecapPage({ params }: PageProps) {
   const roundIds = roundRows.map((r) => r.id);
 
   const [{ data: pairings }, { data: scores }] = await Promise.all([
-    roundIds.length ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', roundIds) : Promise.resolve({ data: [] }),
+    roundIds.length ? supabase.from('mixer_pairings').select('id,created_at,round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', roundIds) : Promise.resolve({ data: [] }),
     roundIds.length ? supabase.from('mixer_scores').select('round_id,court_no,wave_no,team_a_score,team_b_score,completed_at').in('round_id', roundIds) : Promise.resolve({ data: [] }),
   ]);
 

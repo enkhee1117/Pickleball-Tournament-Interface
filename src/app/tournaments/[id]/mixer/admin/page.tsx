@@ -141,7 +141,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const allRoundIds = roundRows.map((r) => r.id);
   const [{ data: allPairings }, { data: allScores }] = await Promise.all([
     allRoundIds.length
-      ? supabase.from('mixer_pairings').select('round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', allRoundIds)
+      ? supabase.from('mixer_pairings').select('id,created_at,round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', allRoundIds)
       : Promise.resolve({ data: [] }),
     allRoundIds.length
       ? supabase.from('mixer_scores').select('round_id,court_no,wave_no,team_a_score,team_b_score,completed_at').in('round_id', allRoundIds)
