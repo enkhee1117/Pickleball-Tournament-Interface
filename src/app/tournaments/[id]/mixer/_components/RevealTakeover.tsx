@@ -72,9 +72,39 @@ export function RevealTakeover({
         @keyframes ttdRevealPop{0%{opacity:0;transform:translateY(12px) scale(.94)}100%{opacity:1;transform:none}}
         @keyframes ttdRevealFade{0%{opacity:0}100%{opacity:1}}
         @keyframes ttdRevealPulse{0%,100%{opacity:.55}50%{opacity:1}}
+        @keyframes ttdRevealConfetti{0%{transform:translateY(-10vh) rotate(0);opacity:1}100%{transform:translateY(105vh) rotate(720deg);opacity:.9}}
       `}</style>
 
-      <div className="mono text-[11px] font-bold uppercase tracking-[0.28em]" style={{ color: 'var(--court)', animation: 'ttdRevealFade .4s ease-out' }}>
+      {/* X close — dismisses like the primary action. */}
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label="Close reveal"
+        className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full"
+        style={{ background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.16)', color: 'rgba(255,255,255,.8)' }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+      </button>
+
+      {phase === 'reveal' && !sittingOut ? (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+          {Array.from({ length: 40 }, (_, i) => {
+            const left = (i * 37) % 100;
+            const delay = (i % 8) * 0.12;
+            const dur = 2.3 + ((i % 5) * 0.35);
+            const colors = ['var(--court)', 'oklch(0.7 0.19 48)', 'oklch(0.82 0.14 90)', '#fff', 'oklch(0.72 0.12 230)'];
+            return (
+              <span
+                key={i}
+                className="absolute top-0"
+                style={{ left: `${left}%`, width: 8, height: 13, borderRadius: 2, background: colors[i % colors.length], animation: `ttdRevealConfetti ${dur}s linear ${delay}s forwards` }}
+              />
+            );
+          })}
+        </div>
+      ) : null}
+
+      <div className="relative mono text-[11px] font-bold uppercase tracking-[0.28em]" style={{ color: 'var(--court)', animation: 'ttdRevealFade .4s ease-out' }}>
         Round {roundNo} · the tokens have spoken
       </div>
 

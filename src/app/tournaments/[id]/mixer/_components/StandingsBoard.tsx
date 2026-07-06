@@ -11,26 +11,20 @@ import {
 } from '@/lib/mixer-standings';
 import { GamesProgressStrip } from '@/components/ui/GamesProgressStrip';
 import { MedalPodium, type PodiumEntry } from '@/components/ui/MedalPodium';
+import { Avatar } from '@/components/ui/Avatar';
 import { finalizeMixerEvent } from '../actions';
 import { ActionForm } from './ActionForm';
+import { mixerAvatarFor } from './mixer-night';
+import { PlayerDetailDrawer, type PlayerDetail } from './PlayerDetailDrawer';
 import type { PlayerRow } from '../_types';
 
 // The cockpit's Standings tab (handoff admin.html "pane-standings"): the games
-// progress strip, the live board (rank · player · W–L · games dots · diff ·
-// pts), and — when the event is finalized — a locked board with the medal
-// podium (Overall ⇄ By-gender). Finalizing is a two-step confirm; if games
-// remain it warns before locking, settling the raffle and pools.
+// progress strip, the live board (rank · player · avatar · W–L · games dots ·
+// diff · pts), and — when the event is finalized — a locked board with the
+// medal podium (Overall ⇄ By-gender). Clicking a row opens a player-detail
+// drawer. Finalizing is a two-step confirm; if games remain it warns before
+// locking, settling the raffle and pools.
 const firstName = (n: string) => n.split(' ')[0];
-const initials = (n: string) =>
-  n.split(' ').map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
-
-function Face({ name }: { name: string }) {
-  return (
-    <span className="av" style={{ width: 32, height: 32, fontSize: 11, color: 'var(--court-deep)' }} aria-hidden>
-      {initials(name)}
-    </span>
-  );
-}
 
 function GamesDots({ games }: { games: PlayerGames | undefined }) {
   const scheduled = games?.scheduled ?? 0;
@@ -56,11 +50,13 @@ export function StandingsBoard({
   results,
   genders,
   finalized,
+  selfPlayerId,
 }: {
   tournamentId: string;
   results: CourtResult[];
   genders: Record<string, PlayerRow['gender']>;
   finalized: boolean;
+  selfPlayerId?: string | null;
 }) {
   const namesMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -70,12 +66,35 @@ export function StandingsBoard({
   const standings = useMemo(() => computeStandings(results, namesMap), [results, namesMap]);
   const gamesMap = useMemo(() => playerGamesMap(results), [results]);
   const gamesLeft = tallyGames(results).left;
+  const avatarFor = (id: string, name: string) => mixerAvatarFor({ id, display_name: name }, selfPlayerId ?? undefined);
 
   const toEntry = (row: StandingRow): PodiumEntry => ({ playerId: row.playerId, name: row.name, points: row.points });
   const women = standings.filter((r) => genders[r.playerId] === 'f');
   const men = standings.filter((r) => genders[r.playerId] === 'm');
   const canSplit = women.length >= 1 && men.length >= 1;
   const [podMode, setPodMode] = useState<'overall' | 'gender'>('overall');
+
+  // Row → detail drawer.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedDetail: PlayerDetail | null = useMemo(() => {
+    if (!selectedId) return null;
+    const idx = standings.findIndex((r) => r.playerId === selectedId);
+    if (idx < 0) return null;
+    const row = standings[idx];
+    return {
+      playerId: row.playerId,
+      name: row.name,
+      avatar: avatarFor(row.playerId, row.name),
+      rank: idx + 1,
+      wins: row.wins,
+      losses: row.losses,
+      points: row.points,
+      pointDiff: row.pointDiff,
+      games: gamesMap.get(row.playerId) ?? { played: 0, scheduled: 0, onCourt: false },
+      isSelf: row.playerId === selfPlayerId,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, standings, gamesMap, selfPlayerId]);
 
   if (standings.length === 0) {
     return (
@@ -135,20 +154,26 @@ export function StandingsBoard({
         </div>
         {standings.map((row, i) => {
           const medal = i < 3 && finalized ? ['var(--amber)', 'oklch(0.82 0.02 250)', 'oklch(0.66 0.09 55)'][i] : null;
+          const isSelf = row.playerId === selfPlayerId;
           return (
-            <div
+            <button
               key={row.playerId}
-              className="grid grid-cols-[34px_1fr_120px_60px_56px] items-center gap-2 rounded-xl px-4 py-2.5"
-              style={{ background: i % 2 ? 'var(--surface-inset)' : undefined }}
+              type="button"
+              onClick={() => setSelectedId(row.playerId)}
+              aria-label={`${row.name} details`}
+              className="grid w-full grid-cols-[34px_1fr_120px_60px_56px] items-center gap-2 rounded-xl px-4 py-2.5 text-left transition-colors hover:brightness-[.98]"
+              style={{ background: isSelf ? 'color-mix(in oklch, var(--court) 12%, transparent)' : i % 2 ? 'var(--surface-inset)' : undefined }}
             >
               <span className="mono flex items-center gap-1.5 text-[15px] font-bold" style={{ color: 'var(--ink-3)' }}>
                 {medal ? <span className="h-2.5 w-2.5 rounded-full" style={{ background: medal }} /> : null}
                 {i + 1}
               </span>
               <span className="flex min-w-0 items-center gap-2.5">
-                <Face name={row.name} />
+                <Avatar player={avatarFor(row.playerId, row.name)} size={32} ring={isSelf} />
                 <span className="min-w-0">
-                  <span className="block truncate text-[15px] font-semibold leading-tight" style={{ color: 'var(--ink)' }}>{firstName(row.name)}</span>
+                  <span className="block truncate text-[15px] font-semibold leading-tight" style={{ color: 'var(--ink)' }}>
+                    {isSelf ? 'You' : firstName(row.name)}
+                  </span>
                   <span className="mono text-[11px]" style={{ color: 'var(--ink-3)' }}>{row.wins}–{row.losses}</span>
                 </span>
               </span>
@@ -157,10 +182,12 @@ export function StandingsBoard({
                 {row.pointDiff > 0 ? '+' : ''}{row.pointDiff}
               </span>
               <span className="mono text-right text-[15px] font-bold" style={{ color: 'var(--court-deep)' }}>{row.points}</span>
-            </div>
+            </button>
           );
         })}
       </div>
+
+      <PlayerDetailDrawer detail={selectedDetail} onClose={() => setSelectedId(null)} />
 
       {!finalized ? (
         <ActionForm

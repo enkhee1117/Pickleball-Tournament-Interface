@@ -21,6 +21,7 @@ export function DrawArmedModal({
   games,
   sittingPerRound,
   poolLabel,
+  triggerLabel = '🎲 Run the draw',
 }: {
   tournamentId: string;
   roundId: string;
@@ -31,6 +32,7 @@ export function DrawArmedModal({
   games: number;
   sittingPerRound: number;
   poolLabel: string;
+  triggerLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -51,7 +53,7 @@ export function DrawArmedModal({
         className="w-full rounded-2xl px-4 py-4 text-[16px] font-semibold disabled:cursor-not-allowed disabled:opacity-45"
         style={{ background: 'var(--accent)', color: 'var(--accent-ink)' }}
       >
-        🎲 Run the draw
+        {triggerLabel}
       </button>
 
       {open ? (
