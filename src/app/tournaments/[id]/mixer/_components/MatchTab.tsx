@@ -1,12 +1,17 @@
+import Link from 'next/link';
 import type { PairingRow, PlayerRow, RoundRow, ScoreRow, StandingItem } from '../_types';
 import { gameSlotLabel } from '@/lib/mixer-standings';
 import { EmptyNight } from './mixer-night';
 import { MatchScoreEntry } from './MatchScoreEntry';
 import { MixerFinalStandings } from './MixerFinalStandings';
+import { PlayerNightShell, type NightPhase } from './PlayerNightShell';
+import { BallotLockedPane, type BallotPick } from './BallotLockedPane';
 
-// The player's "Match" tab — shows their current pairing/court, courtside score
-// entry for their own game, plus a mini live standings block. When the event is
-// finalized, defers to the final-standings view instead.
+// The player's "night" tab (handoff player.html) — a Voting | Ballot locked |
+// Teams revealed segmented experience. The Teams-revealed pane is the live match
+// (pairing/court, courtside score entry, mini standings); the Ballot-locked pane
+// is the "your picks are in" hero + steps + final ballot. When the event is
+// finalized, defers to the final-standings view.
 
 export function MatchTab({
   tournamentId,
@@ -17,6 +22,10 @@ export function MatchTab({
   myPlayer,
   standings,
   gameTo = 11,
+  ballotsIn = 0,
+  rosterCount = 0,
+  tokensSpent = 0,
+  myBallot = [],
 }: {
   tournamentId: string;
   round: RoundRow;
@@ -26,12 +35,53 @@ export function MatchTab({
   myPlayer: PlayerRow;
   standings: StandingItem[];
   gameTo?: number;
+  ballotsIn?: number;
+  rosterCount?: number;
+  tokensSpent?: number;
+  myBallot?: BallotPick[];
 }) {
   if (standings.length > 0) {
     return <MixerFinalStandings standings={standings} roster={roster} myPlayerId={myPlayer.id} />;
   }
-  const myPairing = pairings.find((p) => p.player_a_id === myPlayer.id || p.player_b_id === myPlayer.id);
+
+  const livePhase: NightPhase =
+    round.state === 'open' ? 'voting' : ['locked', 'drawing'].includes(round.state) ? 'locked' : 'revealed';
+
   const name = (id: string) => roster.find((p) => p.id === id)?.display_name ?? 'TBD';
+
+  const votingPane = (
+    <div className="rounded-[18px] p-5" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)' }}>
+      <div className="text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--court)' }}>
+        {round.state === 'open' ? 'Voting open' : 'Voting closed'}
+      </div>
+      <div className="serif mt-1.5 text-[28px] leading-none">Who do you want to play with?</div>
+      <p className="mt-2 text-[13.5px] leading-[1.5]" style={{ color: 'var(--night-text2)' }}>
+        {round.state === 'open'
+          ? 'Spend your tokens on the partners you want to draw — set a ballot for each round; they all lock together.'
+          : 'Ballots are locked for this round. Head to “Ballot locked” to see your sealed picks.'}
+      </p>
+      {round.state === 'open' && (
+        <Link
+          href={`/tournaments/${tournamentId}/mixer?tab=vote`}
+          className="mt-4 inline-flex rounded-2xl px-5 py-3 text-[14px] font-semibold"
+          style={{ background: 'var(--court)', color: 'var(--night-court-ink)' }}
+        >
+          Go to your ballot →
+        </Link>
+      )}
+    </div>
+  );
+
+  const lockedPane = (
+    <BallotLockedPane ballotsIn={ballotsIn} rosterCount={rosterCount} tokensSpent={tokensSpent} picks={myBallot} />
+  );
+
+  const revealedPane = buildRevealedPane();
+
+  return <PlayerNightShell livePhase={livePhase} voting={votingPane} locked={lockedPane} revealed={revealedPane} />;
+
+  function buildRevealedPane() {
+  const myPairing = pairings.find((p) => p.player_a_id === myPlayer.id || p.player_b_id === myPlayer.id);
   if (!myPairing) {
     return <EmptyNight title="No pairing yet" body="When the organizer draws this round, your court and partner land here." />;
   }
@@ -55,7 +105,7 @@ export function MatchTab({
   const yourTeam = `${name(myPairing.player_a_id)} & ${name(myPairing.player_b_id)}`;
   const oppTeam = opponent ? `${name(opponent.player_a_id)} & ${name(opponent.player_b_id)}` : null;
   return (
-    <div className="px-[18px]">
+    <div className="flex flex-col gap-3">
       {waitingForHeats ? (
         // My game is a later heat on a shared court — I'm seated, but I wait for
         // the earlier heat(s) to clear the court before first serve.
@@ -144,6 +194,7 @@ export function MatchTab({
       <StandingsMini roster={roster} pairings={pairings} scores={scores} />
     </div>
   );
+  }
 }
 
 function StandingsMini({ roster, pairings, scores }: { roster: PlayerRow[]; pairings: PairingRow[]; scores: ScoreRow[] }) {
