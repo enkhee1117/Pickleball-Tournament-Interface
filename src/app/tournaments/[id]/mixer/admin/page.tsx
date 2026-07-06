@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
 import { DesktopSurface, BallMark } from '@/components/desktop';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
-import { gameSlotLabel } from '@/lib/mixer-standings';
+import { buildCourtResults, gameSlotLabel } from '@/lib/mixer-standings';
 import { mixerTeamPlan } from '@/lib/mixer';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import { MixerRealtimeSync } from '../MixerRealtimeSync';
@@ -20,7 +20,6 @@ import {
   swapMixerPlayer,
   resetMixerEvent,
   resetMixerRoundVotes,
-  scoreMixerCourt,
   setMixerVotingWindow,
 } from '../actions';
 import type {
@@ -39,6 +38,7 @@ import { mixerAvatarFor } from '../_components/mixer-night';
 import { CountdownTimer } from '../_components/CountdownTimer';
 import { OrganizerRevealTakeover } from '../_components/OrganizerRevealTakeover';
 import { DrawArmedModal } from '../_components/DrawArmedModal';
+import { CockpitScoreBoard } from '../_components/CockpitScoreBoard';
 import {
   formatLockDuration,
   getOrganizerTab,
@@ -135,6 +135,25 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const betSummaryRows = (betsSummary ?? []) as BetSummaryRow[];
   const final = snapshot as SnapshotRow | null;
   const name = (playerId: string) => roster.find((p) => p.id === playerId)?.display_name ?? 'TBD';
+
+  // All-round game results for the Scores tab board (round tabs + progress
+  // strip span the whole night, not just the current round's courts).
+  const allRoundIds = roundRows.map((r) => r.id);
+  const [{ data: allPairings }, { data: allScores }] = await Promise.all([
+    allRoundIds.length
+      ? supabase.from('mixer_pairings').select('round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', allRoundIds)
+      : Promise.resolve({ data: [] }),
+    allRoundIds.length
+      ? supabase.from('mixer_scores').select('round_id,court_no,wave_no,team_a_score,team_b_score,completed_at').in('round_id', allRoundIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const scoreResults = buildCourtResults(
+    (allPairings ?? []) as { round_id: string; player_a_id: string; player_b_id: string; court_no: number; wave_no: number }[],
+    (allScores ?? []) as { round_id: string; court_no: number; wave_no: number; team_a_score: number; team_b_score: number; completed_at: string | null }[],
+    new Map(roundRows.map((r) => [r.id, r.round_no] as const)),
+    currentRound?.id ?? null,
+    name,
+  );
   const paidCount = paymentRows.filter((p) => p.type === 'entry' && p.status === 'confirmed').length;
   const pendingPayments = paymentRows.filter((p) => p.status === 'pending').length;
   const betChips = betSummaryRows.reduce((sum, b) => sum + b.total_chips, 0);
@@ -589,40 +608,17 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
 
             {activeTab === 'scores' && (
               <Section title="Courts and scores">
-                {pairingRows.length === 0 ? (
+                {scoreResults.length === 0 ? (
                   <div className="rounded-2xl bg-white p-4 text-center text-sm text-ink-3" style={{ border: '1px dashed var(--line)' }}>
-                    No pairings revealed yet.
+                    No pairings revealed yet — run the draw on the Run tab.
                   </div>
                 ) : (
-                  <div className="grid gap-3">
-                    {gameSlots.map(({ courtNo, waveNo }) => {
-                      const teams = pairingRows.filter((p) => p.court_no === courtNo && p.wave_no === waveNo);
-                      const score = scoreRows.find((s) => s.court_no === courtNo && s.wave_no === waveNo);
-                      return (
-                        <div key={slotKey(courtNo, waveNo)} className="rounded-2xl bg-white p-4" style={{ border: '1px solid var(--line)' }}>
-                          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-ink-3">
-                            {gameSlotLabel(courtNo, waveNo)}
-                            {waveNo > 1 && <span className="ml-2 font-medium normal-case text-ink-3">waits for Heat {waveNo - 1}</span>}
-                          </div>
-                          <div className="grid gap-1 text-sm font-semibold text-ink">
-                            {teams.map((team, idx) => (
-                              <div key={team.id}>{idx === 0 ? 'A' : 'B'} · {name(team.player_a_id)} & {name(team.player_b_id)}</div>
-                            ))}
-                          </div>
-                          <ActionForm action={scoreMixerCourt} className="mt-3 flex items-center gap-2">
-                            <input type="hidden" name="tournament_id" value={id} />
-                            <input type="hidden" name="round_id" value={currentRound.id} />
-                            <input type="hidden" name="court_no" value={courtNo} />
-                            <input type="hidden" name="wave_no" value={waveNo} />
-                            <input name="team_a_score" type="number" min={0} defaultValue={score?.team_a_score ?? 0} className="mono h-10 w-16 rounded-xl bg-paper-2 text-center text-ink" />
-                            <span className="text-xs text-ink-3">to</span>
-                            <input name="team_b_score" type="number" min={0} defaultValue={score?.team_b_score ?? 0} className="mono h-10 w-16 rounded-xl bg-paper-2 text-center text-ink" />
-                            <button className="ml-auto rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>Post</button>
-                          </ActionForm>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <CockpitScoreBoard
+                    tournamentId={id}
+                    roundNo={currentRound.round_no}
+                    roundsTotal={cfg.rounds ?? roundRows.length}
+                    results={scoreResults}
+                  />
                 )}
               </Section>
             )}
