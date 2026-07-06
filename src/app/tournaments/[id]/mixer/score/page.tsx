@@ -38,13 +38,16 @@ export default async function MixerScorePage({ params }: PageProps) {
   const roster = (players ?? []) as PlayerRow[];
   const roundIds = roundRows.map((r) => r.id);
 
-  const [{ data: pairings }, { data: scores }] = await Promise.all([
+  const [{ data: pairings }, { data: scores }, { data: snapshot }] = await Promise.all([
     roundIds.length
-      ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', roundIds)
+      ? supabase.from('mixer_pairings').select('id,created_at,round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', roundIds)
       : Promise.resolve({ data: [] }),
     roundIds.length
       ? supabase.from('mixer_scores').select('round_id,court_no,wave_no,team_a_score,team_b_score,completed_at').in('round_id', roundIds)
       : Promise.resolve({ data: [] }),
+    // The event's final snapshot, if any — its existence is the "standings are
+    // final" signal that locks the board and reveals the podium.
+    supabase.from('mixer_final_snapshots').select('tournament_id').eq('tournament_id', id).maybeSingle(),
   ]);
 
   const pairingRows = (pairings ?? []) as { round_id: string; player_a_id: string; player_b_id: string; court_no: number; wave_no: number }[];
@@ -56,6 +59,11 @@ export default async function MixerScorePage({ params }: PageProps) {
   const results = buildCourtResults(pairingRows, scoreRows, roundNoById, currentRound?.id ?? null, nameOf);
 
   const playerCount = roster.length;
+  const finalized = !!snapshot;
+  // Gender per player for the by-gender podium (open-mode events simply won't
+  // split). Keyed by player id.
+  const genders: Record<string, PlayerRow['gender']> = {};
+  for (const p of roster) genders[p.id] = p.gender;
 
   return (
     <ScoreFlow
@@ -67,6 +75,8 @@ export default async function MixerScorePage({ params }: PageProps) {
       roundState={currentRound?.state ?? 'setup'}
       playerCount={playerCount}
       results={results}
+      finalized={finalized}
+      genders={genders}
     />
   );
 }

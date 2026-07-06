@@ -7,35 +7,14 @@ import { DesktopSurface } from '@/components/desktop/DesktopSurface';
 import { CommandBar, type Command } from '@/components/desktop/CommandBar';
 import { useToast } from '@/components/desktop/ToastProvider';
 import { useRouter } from 'next/navigation';
-import { computeStandings, gameSlotLabel, ordinal, playerGamesMap, type CourtResult, type PlayerGames, type StandingRow } from '@/lib/mixer-standings';
+import { computeStandings, gameSlotLabel, ordinal, playerGamesMap, tallyGames, type CourtResult, type PlayerGames, type StandingRow } from '@/lib/mixer-standings';
 import { GamesProgressStrip } from '@/components/ui/GamesProgressStrip';
+import { MedalPodium, type PodiumEntry } from '@/components/ui/MedalPodium';
+import { Face, ScoreCard, firstName, isValid, winValue } from '../_components/score-cards';
+import type { PlayerRow } from '../_types';
+import { finalizeMixerEvent } from '../actions';
+import { ActionForm } from '../_components/ActionForm';
 import { postCourtScore } from './actions';
-
-const firstName = (n: string) => n.split(' ')[0];
-const initials = (n: string) =>
-  n
-    .split(' ')
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-
-const WIN_BY = 2;
-const GAME_TO = 11;
-const isValid = (a: number, b: number) => (a >= GAME_TO || b >= GAME_TO) && Math.abs(a - b) >= WIN_BY;
-
-function Face({ name, size = 32, border }: { name: string; size?: number; border?: string }) {
-  return (
-    <span
-      className="av"
-      style={{ width: size, height: size, fontSize: size * 0.36, border, color: 'var(--court-deep)' }}
-      aria-hidden
-    >
-      {initials(name)}
-    </span>
-  );
-}
 
 function sig(results: CourtResult[]): string {
   return results.map((r) => `${r.key}:${r.completed ? 1 : 0}:${r.scoreA}:${r.scoreB}`).join('|');
@@ -52,6 +31,8 @@ export function ScoreFlow({
   roundState,
   playerCount,
   results: initialResults,
+  finalized,
+  genders,
 }: {
   theme: Theme;
   tournamentId: string;
@@ -61,6 +42,8 @@ export function ScoreFlow({
   roundState: string;
   playerCount: number;
   results: CourtResult[];
+  finalized: boolean;
+  genders: Record<string, PlayerRow['gender']>;
 }) {
   const toast = useToast();
   const router = useRouter();
@@ -91,6 +74,15 @@ export function ScoreFlow({
 
   const standings = useMemo(() => computeStandings(results, namesMap), [results, namesMap]);
   const gamesMap = useMemo(() => playerGamesMap(results), [results]);
+  const gamesLeft = useMemo(() => tallyGames(results).left, [results]);
+
+  // Podium (finalized board): top-3 overall and, when the field has both, split
+  // by gender. Entries carry no "you" on the organizer board.
+  const toEntry = (row: StandingRow): PodiumEntry => ({ playerId: row.playerId, name: row.name, points: row.points });
+  const women = standings.filter((r) => genders[r.playerId] === 'f');
+  const men = standings.filter((r) => genders[r.playerId] === 'm');
+  const canSplit = women.length >= 1 && men.length >= 1;
+  const [podMode, setPodMode] = useState<'overall' | 'gender'>('overall');
 
   const [deltas, setDeltas] = useState<Record<string, number>>({});
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -148,8 +140,7 @@ export function ScoreFlow({
   function quick11(court: CourtResult, side: 'a' | 'b') {
     const cur = drafts[court.key] ?? { a: 0, b: 0 };
     const other = side === 'a' ? cur.b : cur.a;
-    const val = other >= GAME_TO - 1 ? other + WIN_BY : GAME_TO; // deuce → win by 2
-    setDraft(court.key, side, val);
+    setDraft(court.key, side, winValue(other));
   }
 
   function post(court: CourtResult) {
@@ -335,13 +326,76 @@ export function ScoreFlow({
 
           {/* STANDINGS */}
           <aside className="rounded-[22px] p-[20px_22px_24px]" style={{ background: 'var(--card)', border: '1px solid var(--line)' }} aria-label="Live standings">
-            <div className="mb-1.5 flex items-center justify-between">
+            <div className="mb-1.5 flex items-center justify-between gap-3">
               <h2 className="text-[19px] font-semibold">Standings</h2>
-              <span className="mono text-[11px] uppercase tracking-[.08em]" style={{ color: 'var(--ink-3)' }}>
-                {roundNo > 0 ? `Round ${roundNo} of ${roundsTotal} · live` : 'live'}
-              </span>
+              {finalized ? (
+                <span className="chip" style={{ background: 'color-mix(in oklch, var(--court) 20%, transparent)', color: 'var(--court-deep)' }}>
+                  Final
+                </span>
+              ) : (
+                <span className="mono text-[11px] uppercase tracking-[.08em]" style={{ color: 'var(--ink-3)' }}>
+                  {roundNo > 0 ? `Round ${roundNo} of ${roundsTotal} · live` : 'live'}
+                </span>
+              )}
             </div>
-            <StandingsList standings={standings} deltas={deltas} flashId={flashId} gamesMap={gamesMap} />
+
+            {finalized && standings.length > 0 ? (
+              <div className="mb-4 rounded-[16px] p-4" style={{ background: 'var(--surface-inset)', border: '1px solid var(--line)' }}>
+                {canSplit ? (
+                  <div className="mb-3 flex justify-center">
+                    <div className="flex rounded-full p-0.5" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
+                      {(['overall', 'gender'] as const).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setPodMode(m)}
+                          className="rounded-full px-3 py-1 text-[12px] font-semibold"
+                          style={podMode === m ? { background: 'var(--court)', color: 'var(--accent-ink)' } : { color: 'var(--ink-2)' }}
+                        >
+                          {m === 'overall' ? 'Overall' : 'By gender'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {canSplit && podMode === 'gender' ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <MedalPodium title="Women" small top3={women.slice(0, 3).map(toEntry)} />
+                    <MedalPodium title="Men" small top3={men.slice(0, 3).map(toEntry)} />
+                  </div>
+                ) : (
+                  <MedalPodium top3={standings.slice(0, 3).map(toEntry)} />
+                )}
+              </div>
+            ) : null}
+
+            <StandingsList standings={standings} deltas={finalized ? {} : deltas} flashId={finalized ? null : flashId} gamesMap={gamesMap} />
+
+            {!finalized && standings.length > 0 ? (
+              <ActionForm
+                action={finalizeMixerEvent}
+                className="mt-3"
+                confirm={
+                  gamesLeft > 0
+                    ? `${gamesLeft} game${gamesLeft === 1 ? '' : 's'} still unplayed. Finalize standings anyway? This locks the board, reveals the podium, and settles the raffle & pools.`
+                    : 'Finalize standings? This locks the board, reveals the podium, and settles the raffle & pools.'
+                }
+                successToast="Standings finalized"
+              >
+                <input type="hidden" name="tournament_id" value={tournamentId} />
+                <button
+                  type="submit"
+                  className="w-full rounded-[14px] py-3 text-[14px] font-bold"
+                  style={
+                    gamesLeft > 0
+                      ? { background: 'color-mix(in oklch, var(--berry) 12%, var(--card))', color: 'var(--berry)', border: '1px solid color-mix(in oklch, var(--berry) 40%, var(--line))' }
+                      : { background: 'var(--court)', color: 'var(--accent-ink)' }
+                  }
+                >
+                  {gamesLeft > 0 ? `Finalize anyway (${gamesLeft} left)` : 'Finalize standings'}
+                </button>
+              </ActionForm>
+            ) : null}
 
             <div className="mt-4 flex flex-col gap-[9px] border-t pt-3.5" style={{ borderColor: 'var(--line)' }}>
               <div className="mono text-[10px] uppercase tracking-[.1em]" style={{ color: 'var(--ink-3)' }}>
@@ -389,148 +443,6 @@ function seedDrafts(results: CourtResult[]): Record<string, { a: number; b: numb
   return d;
 }
 
-function ScoreCard({
-  court,
-  draft,
-  editing,
-  onStep,
-  onQuick11,
-  onPost,
-  onReopen,
-}: {
-  court: CourtResult;
-  draft: { a: number; b: number };
-  editing: boolean;
-  onStep: (side: 'a' | 'b', delta: number) => void;
-  onQuick11: (side: 'a' | 'b') => void;
-  onPost: () => void;
-  onReopen: () => void;
-}) {
-  const valid = isValid(draft.a, draft.b);
-  const live = court.editable && !court.completed;
-  const spine = court.completed ? 'var(--court)' : live ? 'var(--serve)' : 'var(--line-2)';
-
-  return (
-    <div
-      className="overflow-hidden rounded-[18px]"
-      style={{ background: 'var(--card)', border: '1px solid var(--line)', borderLeft: `4px solid ${spine}` }}
-    >
-      <div className="flex items-center justify-between border-b p-[13px_18px]" style={{ borderColor: 'var(--line)' }}>
-        <span className="mono text-[12px] uppercase tracking-[.12em]" style={{ color: 'var(--ink-3)' }}>
-          {gameSlotLabel(court.courtNo, court.waveNo)}
-        </span>
-        {court.completed ? (
-          <span className="chip" style={{ background: 'color-mix(in oklch, var(--court) 20%, transparent)', color: 'var(--court-deep)' }}>
-            Final
-          </span>
-        ) : live ? (
-          <span className="chip chip-live"><span className="dot" />On court</span>
-        ) : (
-          <span className="chip">Upcoming</span>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2">
-        {(['a', 'b'] as const).map((side) => {
-          const players = side === 'a' ? court.teamA : court.teamB;
-          const score = side === 'a' ? draft.a : draft.b;
-          const isWinner = court.completed && (side === 'a' ? draft.a > draft.b : draft.b > draft.a);
-          const isLoser = court.completed && !isWinner && draft.a !== draft.b;
-          return (
-            <div
-              key={side}
-              className="relative px-5 pb-5 pt-[18px] text-center"
-              style={{
-                borderRight: side === 'a' ? '1px solid var(--line)' : undefined,
-                background: isWinner ? 'color-mix(in oklch, var(--court) 12%, transparent)' : undefined,
-                opacity: isLoser ? 0.55 : 1,
-              }}
-            >
-              <div className="mb-2.5 flex justify-center">
-                <Face name={players[0].name} size={44} border="3px solid var(--card)" />
-                <span className="-ml-3.5">
-                  <Face name={players[1].name} size={44} border="3px solid var(--card)" />
-                </span>
-              </div>
-              <div className="text-[15px] font-bold">{players.map((p) => firstName(p.name)).join(' & ')}</div>
-              <div
-                className="mono mt-2 text-[64px] font-bold leading-none tracking-[-.04em]"
-                style={{ color: isLoser ? 'var(--ink-3)' : side === 'a' ? 'var(--court-deep)' : 'var(--sky)' }}
-              >
-                {score}
-              </div>
-
-              {editing ? (
-                <div className="mt-3 flex items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    aria-label={`Remove a point from team ${side.toUpperCase()}`}
-                    onClick={() => onStep(side, -1)}
-                    disabled={score <= 0}
-                    className="flex h-10 w-10 items-center justify-center rounded-[12px] text-[20px] font-bold disabled:opacity-35"
-                    style={{ border: '1px solid var(--line)', color: 'var(--ink)' }}
-                  >
-                    −
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Add a point to team ${side.toUpperCase()}`}
-                    onClick={() => onStep(side, 1)}
-                    className="flex h-10 w-10 items-center justify-center rounded-[12px] text-[20px] font-bold"
-                    style={{ background: side === 'a' ? 'var(--court)' : 'var(--sky)', color: 'var(--accent-ink)' }}
-                  >
-                    +
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onQuick11(side)}
-                    className="mono ml-1 rounded-[9px] px-2.5 py-2 text-[13px] font-bold"
-                    style={{ background: 'color-mix(in oklch, var(--court) 18%, transparent)', color: 'var(--court-deep)' }}
-                  >
-                    11
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="border-t p-[14px_18px]" style={{ borderColor: 'var(--line)' }}>
-        {editing ? (
-          <button
-            type="button"
-            onClick={onPost}
-            disabled={!valid}
-            className="w-full rounded-[14px] text-[15px] font-bold disabled:cursor-not-allowed disabled:opacity-40"
-            style={{ background: 'var(--court)', color: 'var(--accent-ink)', height: 52 }}
-          >
-            Record final
-          </button>
-        ) : court.completed && court.editable ? (
-          <button
-            type="button"
-            onClick={onReopen}
-            className="w-full rounded-[14px] text-[14px] font-semibold"
-            style={{ border: '1px solid var(--line)', color: 'var(--ink-2)', height: 48 }}
-          >
-            Reopen to edit
-          </button>
-        ) : (
-          <div className="text-center text-[12.5px]" style={{ color: 'var(--ink-3)' }}>
-            {court.completed ? 'Final — locked for this round' : 'Waiting to start'}
-          </div>
-        )}
-        {editing && !valid ? (
-          <div className="mt-2 text-center text-[11.5px]" style={{ color: 'var(--ink-3)' }}>
-            A team needs {GAME_TO}+ and a {WIN_BY}-point lead to record.
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 function GamesDots({ games }: { games: PlayerGames | undefined }) {
   const scheduled = games?.scheduled ?? 0;
   const played = games?.played ?? 0;
@@ -571,10 +483,11 @@ function StandingsList({
   }
   return (
     <div className="relative mt-3">
-      <div className="mono mb-1 grid grid-cols-[30px_1fr_52px_44px] items-center gap-2 px-3 text-[10px] uppercase tracking-[.08em]" style={{ color: 'var(--ink-3)' }}>
+      <div className="mono mb-1 grid grid-cols-[30px_1fr_52px_40px_40px] items-center gap-2 px-3 text-[10px] uppercase tracking-[.08em]" style={{ color: 'var(--ink-3)' }}>
         <span>#</span>
         <span>Player</span>
         <span className="text-right">Games</span>
+        <span className="text-right">Diff</span>
         <span className="text-right">Pts</span>
       </div>
       {standings.map((row, i) => {
@@ -583,7 +496,7 @@ function StandingsList({
         return (
           <div
             key={row.playerId}
-            className="grid grid-cols-[30px_1fr_52px_44px] items-center gap-2 rounded-[13px] p-[10px_12px]"
+            className="grid grid-cols-[30px_1fr_52px_40px_40px] items-center gap-2 rounded-[13px] p-[10px_12px]"
             style={{
               background: flash ? 'color-mix(in oklch, var(--court) 22%, transparent)' : undefined,
               transition: 'background .3s',
@@ -607,6 +520,9 @@ function StandingsList({
               </span>
             </span>
             <GamesDots games={gamesMap.get(row.playerId)} />
+            <span className="mono text-right text-[13px]" style={{ color: 'var(--ink-2)' }}>
+              {row.pointDiff > 0 ? '+' : ''}{row.pointDiff}
+            </span>
             <span className="mono text-right text-[15px] font-bold" style={{ color: 'var(--court-deep)' }}>
               {row.points}
             </span>

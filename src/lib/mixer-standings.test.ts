@@ -147,6 +147,31 @@ describe('playerGamesMap', () => {
   });
 });
 
+describe('buildCourtResults team ordering', () => {
+  // Team A (owns team_a_score) must be settled by (created_at, id) — the same
+  // key the finalize RPC uses — NOT by the query's row order. Otherwise the
+  // live board and the finalized snapshot attribute a game's scores to opposite
+  // teams and rank players differently. Rows here arrive newest-first to prove
+  // the function re-sorts them.
+  const pairings = [
+    { id: 'z', created_at: '2026-01-01T00:00:02Z', round_id: 'r1', player_a_id: 'late1', player_b_id: 'late2', court_no: 1, wave_no: 1 },
+    { id: 'a', created_at: '2026-01-01T00:00:01Z', round_id: 'r1', player_a_id: 'early1', player_b_id: 'early2', court_no: 1, wave_no: 1 },
+  ];
+  const scores = [{ round_id: 'r1', court_no: 1, wave_no: 1, team_a_score: 11, team_b_score: 4, completed_at: 't' }];
+
+  it('makes the earliest-created pairing team A regardless of row order', () => {
+    const [game] = buildCourtResults(pairings, scores, new Map([['r1', 1]]), 'r1', (id) => id);
+    expect(game.teamA.map((p) => p.id)).toEqual(['early1', 'early2']);
+    expect(game.scoreA).toBe(11);
+  });
+
+  it('attributes team_a_score to the early team in standings', () => {
+    const rows = computeStandings(buildCourtResults(pairings, scores, new Map([['r1', 1]]), 'r1', (id) => id), new Map());
+    expect(rows.find((r) => r.playerId === 'early1')!.points).toBe(11);
+    expect(rows.find((r) => r.playerId === 'late1')!.points).toBe(4);
+  });
+});
+
 describe('gameSlotLabel', () => {
   it('omits the heat qualifier for wave 1 and shows it beyond', () => {
     expect(gameSlotLabel(2, 1)).toBe('Court 2');

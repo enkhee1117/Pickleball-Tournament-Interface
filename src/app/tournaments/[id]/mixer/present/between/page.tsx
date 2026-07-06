@@ -39,14 +39,15 @@ export default async function MixerPresentBetweenPage({ params }: PageProps) {
   const roster = (players ?? []) as PlayerRow[];
   const roundIds = roundRows.map((r) => r.id);
 
-  const [{ data: pairings }, { data: scores }, { data: checkIns }] = await Promise.all([
+  const [{ data: pairings }, { data: scores }, { data: checkIns }, { data: snapshot }] = await Promise.all([
     roundIds.length
-      ? supabase.from('mixer_pairings').select('id,round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', roundIds)
+      ? supabase.from('mixer_pairings').select('id,created_at,round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', roundIds)
       : Promise.resolve({ data: [] }),
     roundIds.length
       ? supabase.from('mixer_scores').select('round_id,court_no,wave_no,team_a_score,team_b_score,completed_at').in('round_id', roundIds)
       : Promise.resolve({ data: [] }),
     supabase.from('mixer_check_ins').select('player_id').eq('tournament_id', id),
+    supabase.from('mixer_final_snapshots').select('tournament_id').eq('tournament_id', id).maybeSingle(),
   ]);
 
   const pairingRows = (pairings ?? []) as (PairingRow & { round_id: string })[];
@@ -89,6 +90,7 @@ export default async function MixerPresentBetweenPage({ params }: PageProps) {
       standings={standings}
       deltas={deltas}
       facewall={facewall}
+      finalized={!!snapshot}
     />
   );
 }

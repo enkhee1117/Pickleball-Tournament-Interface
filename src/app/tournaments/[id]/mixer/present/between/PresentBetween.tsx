@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { GALAXY_BG } from '@/lib/demo-roster';
 import { BallMark } from '@/components/desktop/BallMark';
+import { MedalPodium, type PodiumEntry } from '@/components/ui/MedalPodium';
 import { MixerRealtimeSync } from '../../MixerRealtimeSync';
 
 interface StandingItem {
@@ -42,6 +43,7 @@ export function PresentBetween({
   standings,
   deltas,
   facewall,
+  finalized = false,
 }: {
   tournamentId: string;
   tournamentName: string;
@@ -52,6 +54,7 @@ export function PresentBetween({
   standings: StandingItem[];
   deltas: Record<string, number>;
   facewall: { id: string; name: string; checked: boolean }[];
+  finalized?: boolean;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<'standings' | 'holding'>('standings');
@@ -97,6 +100,7 @@ export function PresentBetween({
 
   const leader = standings[0] ?? null;
   const board = standings.slice(1);
+  const podiumEntries: PodiumEntry[] = standings.slice(0, 3).map((r) => ({ playerId: r.playerId, name: r.name, points: r.points }));
   const checkedCount = facewall.filter((f) => f.checked).length;
   const total = facewall.length;
   const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
@@ -177,7 +181,26 @@ export function PresentBetween({
               className="absolute inset-0 flex flex-col items-center justify-center px-[90px] transition-opacity duration-500"
               style={{ opacity: phase === 'standings' ? 1 : 0, pointerEvents: phase === 'standings' ? 'auto' : 'none' }}
             >
-              {leader ? (
+              {leader && finalized ? (
+                <>
+                  <div className="mb-6 text-center">
+                    <div className="mono text-[14px] uppercase tracking-[.16em]" style={{ color: 'var(--accent)' }}>
+                      Final standings · {roundsTotal} rounds
+                    </div>
+                    <div className="serif mt-2 text-[72px] leading-[.98]">
+                      The <em className="serif-i" style={{ color: 'var(--accent)' }}>champions.</em>
+                    </div>
+                  </div>
+                  <div className="mb-8 w-[560px]" style={{ transform: 'scale(2.2)', transformOrigin: 'top center' }}>
+                    <MedalPodium top3={podiumEntries} />
+                  </div>
+                  <div className="grid w-[1500px] grid-cols-2 gap-x-11 gap-y-3 pt-[220px]">
+                    {board.slice(2).map((row, i) => (
+                      <BoardRow key={row.playerId} row={row} delta={0} index={i + 2} />
+                    ))}
+                  </div>
+                </>
+              ) : leader ? (
                 <>
                   <div className="mb-7 text-center">
                     <div className="mono text-[14px] uppercase tracking-[.16em]" style={{ color: 'var(--accent)' }}>
