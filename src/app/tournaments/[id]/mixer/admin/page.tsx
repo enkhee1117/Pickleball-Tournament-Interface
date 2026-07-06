@@ -40,6 +40,7 @@ import { OrganizerRevealTakeover } from '../_components/OrganizerRevealTakeover'
 import { DrawArmedModal } from '../_components/DrawArmedModal';
 import { CockpitScoreBoard } from '../_components/CockpitScoreBoard';
 import { StandingsBoard } from '../_components/StandingsBoard';
+import { CockpitTabsProvider, CockpitPanel, CockpitNavList, CockpitTopbarTitle, type CockpitTab } from '../_components/cockpit-tabs';
 import {
   formatLockDuration,
   getOrganizerTab,
@@ -291,6 +292,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
       {showOrganizerReveal && currentRound && (
         <OrganizerRevealTakeover roundId={currentRound.id} roundNo={currentRound.round_no} courts={revealCourts} sittingOut={revealSitting} />
       )}
+      <CockpitTabsProvider tournamentId={id} initialTab={activeTab as CockpitTab}>
       <div className="mx-auto grid w-full max-w-[1440px] grid-cols-1 lg:grid-cols-[248px_minmax(0,1fr)]">
         <CockpitSidebar
           tournamentId={id}
@@ -299,13 +301,15 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
           roundNo={currentRound?.round_no ?? null}
           roundsTotal={cfg?.rounds ?? null}
           playerCount={roster.length}
-          active={activeTab}
           pendingPayments={pendingPayments}
         />
         <div className="min-w-0">
           <CockpitTopbar
-            title={COCKPIT_TITLES[activeTab] ?? 'Cockpit'}
-            sub={cockpitSub(activeTab, currentRound?.round_no ?? null, currentRound?.state ?? null, roster.length, paidCount, pendingPayments)}
+            roundNo={currentRound?.round_no ?? null}
+            state={currentRound?.state ?? null}
+            players={roster.length}
+            paid={paidCount}
+            pending={pendingPayments}
             recapHref={`/tournaments/${id}/recap`}
           />
           <div id="main" className="px-5 pb-24 pt-6 lg:px-7">
@@ -323,7 +327,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
           </ActionForm>
         ) : (
           <>
-            {activeTab === 'run' && (
+            <CockpitPanel id="run">
               <>
                 {unpaidPlayers.length > 0 && entryFee > 0 && (
                   <div className="mb-5">
@@ -636,17 +640,17 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                   </div>
                 </div>
               </>
-            )}
+            </CockpitPanel>
 
-            {activeTab === 'roster' && (
+            <CockpitPanel id="roster">
               <RosterTable
                 tournamentId={id}
                 inviteHref={`/tournaments/${id}/invite`}
                 rows={rosterTableRows}
               />
-            )}
+            </CockpitPanel>
 
-            {activeTab === 'scores' && (
+            <CockpitPanel id="scores">
               <Section title="Courts and scores">
                 <CockpitScoreBoard
                   tournamentId={id}
@@ -675,9 +679,9 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                   }
                 />
               </Section>
-            )}
+            </CockpitPanel>
 
-            {activeTab === 'standings' && (
+            <CockpitPanel id="standings">
               <Section title="Standings">
                 <StandingsBoard
                   tournamentId={id}
@@ -687,9 +691,9 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                   selfPlayerId={selfPlayerId}
                 />
               </Section>
-            )}
+            </CockpitPanel>
 
-            {activeTab === 'prizes' && (
+            <CockpitPanel id="prizes">
               <Section title="Money and prizes">
                 <div className="grid grid-cols-2 gap-2">
                   <Stat label="Paid entries" value={`${paidCount}/${roster.length}`} />
@@ -711,18 +715,19 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                   </div>
                 )}
               </Section>
-            )}
+            </CockpitPanel>
 
-            {activeTab === 'setup' && (
+            <CockpitPanel id="setup">
               <Section title="Event setup">
                 <ConfigForm tournamentId={id} cfg={cfg} prizeBuckets={prizeBuckets} paymentMethods={paymentMethods} playerCount={roster.length} betChips={betChips} />
               </Section>
-            )}
+            </CockpitPanel>
           </>
         )}
           </div>
         </div>
       </div>
+      </CockpitTabsProvider>
     </DesktopSurface>
   );
 }
@@ -735,50 +740,6 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
 
 const PANEL: React.CSSProperties = { background: 'var(--card)', border: '1px solid var(--line)' };
 
-const COCKPIT_TITLES: Record<string, string> = {
-  run: 'Run event',
-  roster: 'Roster',
-  scores: 'Scores',
-  standings: 'Standings',
-  prizes: 'Prizes',
-  setup: 'Setup',
-};
-
-function cockpitSub(
-  tab: string,
-  roundNo: number | null,
-  state: string | null,
-  players: number,
-  paid: number,
-  pending: number,
-): string {
-  switch (tab) {
-    case 'run':
-      return roundNo ? `Round ${roundNo} · ${state ?? 'setup'}` : 'Set up the event to begin';
-    case 'roster':
-      return `${players} players · ${paid} paid · ${pending} pending`;
-    case 'scores':
-      return 'Post scores court by court · game to 11, win by 2';
-    case 'standings':
-      return 'Live board · re-sorts as scores post';
-    case 'prizes':
-      return 'Entry pot, raffle & pooled betting';
-    case 'setup':
-      return 'Tokens, lock mode, draw weighting & payments';
-    default:
-      return '';
-  }
-}
-
-const NAV_ITEMS: { tab: string; label: string; icon: React.ReactNode }[] = [
-  { tab: 'run', label: 'Run event', icon: <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /> },
-  { tab: 'roster', label: 'Roster', icon: <path d="M9 8a3 3 0 106 0 3 3 0 00-6 0zM4 19c.8-3 2.8-4.4 5-4.4s4.2 1.4 5 4.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /> },
-  { tab: 'scores', label: 'Scores', icon: <><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" /><path d="M8 9h8M8 13h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></> },
-  { tab: 'standings', label: 'Standings', icon: <path d="M5 20V10M12 20V4M19 20v-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /> },
-  { tab: 'prizes', label: 'Prizes', icon: <path d="M7 4h10v3a5 5 0 01-10 0V4zM9 15h6M8 20h8M12 15v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /> },
-  { tab: 'setup', label: 'Setup', icon: <><circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.5" /><path d="M12 3.5v2M12 18.5v2M4.5 7l1.7 1M17.8 16l1.7 1M4.5 17l1.7-1M17.8 8l1.7-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></> },
-];
-
 function CockpitSidebar({
   tournamentId,
   eventName,
@@ -786,7 +747,6 @@ function CockpitSidebar({
   roundNo,
   roundsTotal,
   playerCount,
-  active,
   pendingPayments,
 }: {
   tournamentId: string;
@@ -795,7 +755,6 @@ function CockpitSidebar({
   roundNo: number | null;
   roundsTotal: number | null;
   playerCount: number;
-  active: string;
   pendingPayments: number;
 }) {
   const live = state === 'open' || state === 'playing';
@@ -824,33 +783,7 @@ function CockpitSidebar({
         </div>
       </div>
       <div className="mono px-2.5 pb-1.5 pt-2 text-[10px] uppercase tracking-[.14em]" style={{ color: 'var(--text3)' }}>Cockpit</div>
-      {NAV_ITEMS.map((item) => {
-        const on = active === item.tab;
-        return (
-          <Link
-            key={item.tab}
-            href={`/tournaments/${tournamentId}/mixer/admin?tab=${item.tab}`}
-            className="flex items-center gap-3 rounded-[11px] border px-3 py-2.5 text-[14px] font-medium"
-            style={
-              on
-                ? { background: 'color-mix(in oklch, var(--accent) 16%, transparent)', color: 'var(--text)', borderColor: 'color-mix(in oklch, var(--accent) 34%, transparent)' }
-                : { color: 'var(--text2)', borderColor: 'transparent' }
-            }
-          >
-            <span className="grid w-5 place-items-center">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                {item.icon}
-              </svg>
-            </span>
-            {item.label}
-            {item.tab === 'prizes' && pendingPayments > 0 ? (
-              <span className="mono ml-auto rounded-full px-[7px] py-px text-[10px] font-bold text-white" style={{ background: 'var(--serve)' }}>
-                {pendingPayments}
-              </span>
-            ) : null}
-          </Link>
-        );
-      })}
+      <CockpitNavList pendingPayments={pendingPayments} />
       <div className="hidden flex-1 lg:block" />
       <div className="mono px-2.5 pb-1.5 pt-2 text-[10px] uppercase tracking-[.14em]" style={{ color: 'var(--text3)' }}>Viewing as</div>
       <div className="flex gap-1 rounded-[11px] p-[3px]" style={{ background: 'var(--surface-raise)', border: '1px solid var(--line)' }}>
@@ -876,7 +809,7 @@ function CockpitSidebar({
   );
 }
 
-function CockpitTopbar({ title, sub, recapHref }: { title: string; sub: string; recapHref: string }) {
+function CockpitTopbar({ roundNo, state, players, paid, pending, recapHref }: { roundNo: number | null; state: string | null; players: number; paid: number; pending: number; recapHref: string }) {
   return (
     <div
       className="sticky top-0 z-20 flex h-[66px] items-center gap-4 border-b px-5 lg:px-7"
@@ -886,10 +819,7 @@ function CockpitTopbar({ title, sub, recapHref }: { title: string; sub: string; 
         className="absolute inset-x-0 top-0 h-[3px]"
         style={{ background: 'linear-gradient(90deg, oklch(0.55 0.2 25) 0 40%, #fff 40% 60%, oklch(0.42 0.14 258) 60%)' }}
       />
-      <div>
-        <h1 className="text-[19px] font-semibold" style={{ color: 'var(--text)' }}>{title}</h1>
-        <div className="mono text-[11px] tracking-[.06em]" style={{ color: 'var(--text3)' }}>{sub}</div>
-      </div>
+      <CockpitTopbarTitle roundNo={roundNo} state={state} players={players} paid={paid} pending={pending} />
       {/* Recap / history — the topbar clock (handoff admin.html). */}
       <Link
         href={recapHref}
