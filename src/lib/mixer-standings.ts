@@ -66,6 +66,57 @@ export function computeStandings(results: CourtResult[], names: Map<string, stri
   return sortStandings([...acc.values()]);
 }
 
+// A game is "live" (on a court right now) when it belongs to the current
+// round (editable) and has no final score yet. "Final" games are completed.
+export interface GameTally {
+  total: number;
+  fin: number;
+  live: number;
+  left: number; // total - fin
+}
+
+export function tallyGames(results: CourtResult[]): GameTally {
+  let fin = 0;
+  let live = 0;
+  for (const r of results) {
+    if (r.completed) fin++;
+    else if (r.editable) live++;
+  }
+  const total = results.length;
+  return { total, fin, live, left: total - fin };
+}
+
+// Per-player game counts for the standings "Games" dots. `scheduled` is every
+// game the player is drawn into (played or not); `played` is the completed
+// ones; `onCourt` is true while they're in a live (current-round) game.
+export interface PlayerGames {
+  played: number;
+  scheduled: number;
+  onCourt: boolean;
+}
+
+export function playerGamesMap(results: CourtResult[]): Map<string, PlayerGames> {
+  const map = new Map<string, PlayerGames>();
+  const ensure = (id: string): PlayerGames => {
+    let g = map.get(id);
+    if (!g) {
+      g = { played: 0, scheduled: 0, onCourt: false };
+      map.set(id, g);
+    }
+    return g;
+  };
+  for (const r of results) {
+    const live = r.editable && !r.completed;
+    for (const p of [...r.teamA, ...r.teamB]) {
+      const g = ensure(p.id);
+      g.scheduled++;
+      if (r.completed) g.played++;
+      if (live) g.onCourt = true;
+    }
+  }
+  return map;
+}
+
 export function sortStandings(rows: StandingRow[]): StandingRow[] {
   return [...rows].sort(
     (a, b) =>
