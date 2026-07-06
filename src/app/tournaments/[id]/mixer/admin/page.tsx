@@ -648,6 +648,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
                   results={scoreResults}
                   genders={genders}
                   finalized={finalStandings.length > 0}
+                  selfPlayerId={selfPlayerId}
                 />
               </Section>
             )}
