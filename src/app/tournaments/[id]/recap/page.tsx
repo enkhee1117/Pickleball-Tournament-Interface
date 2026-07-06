@@ -19,7 +19,12 @@ type ScoreRowWithRound = {
   completed_at: string | null;
 };
 
-type SnapshotRow = { raffle_winner: unknown };
+type SnapshotRow = { raffle_winner: unknown; created_at?: string | null };
+
+const csvCell = (v: string | number) => {
+  const s = String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
 
 export default async function RecapPage({ params }: PageProps) {
   const { id } = await params;
@@ -37,7 +42,7 @@ export default async function RecapPage({ params }: PageProps) {
       supabase.from('tournament_players').select('id,display_name,gender,profile_id,withdrawn_at').eq('tournament_id', id).order('created_at', { ascending: true }),
       supabase.from('player_event_state').select('player_id,pairing_pool,tokens_base_remaining,tokens_bought_remaining,chips_remaining,sit_out_count,boosts_used').eq('tournament_id', id),
       supabase.from('payments').select('id,player_id,type,amount,method,status').eq('tournament_id', id),
-      supabase.from('mixer_final_snapshots').select('raffle_winner').eq('tournament_id', id).maybeSingle(),
+      supabase.from('mixer_final_snapshots').select('raffle_winner,created_at').eq('tournament_id', id).maybeSingle(),
     ]);
 
   if (!tournament) notFound();
@@ -93,6 +98,40 @@ export default async function RecapPage({ params }: PageProps) {
   const raffleWinner = final?.raffle_winner && !Array.isArray(final.raffle_winner) ? (final.raffle_winner as { displayName?: string }) : null;
   const attendance = roster.map((p) => ({ name: p.display_name, guest: !p.profile_id }));
 
+  // Completion time + play duration (span of scored games) for the hero.
+  const completedTimes = scoreRows.filter((s) => s.completed_at).map((s) => new Date(s.completed_at as string).getTime());
+  const completedAt = final?.created_at ?? (completedTimes.length ? new Date(Math.max(...completedTimes)).toISOString() : null);
+  const completedLabel = completedAt
+    ? new Date(completedAt).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+    : null;
+  const durationLabel =
+    completedTimes.length > 1
+      ? (() => {
+          const mins = Math.round((Math.max(...completedTimes) - Math.min(...completedTimes)) / 60000);
+          return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+        })()
+      : null;
+
+  // DUPR-style match export: one row per completed doubles game.
+  const duprCsv = [
+    'Match,Team A Player 1,Team A Player 2,Team B Player 1,Team B Player 2,Score A,Score B',
+    ...results
+      .filter((r) => r.completed)
+      .map((r) =>
+        [
+          `R${r.roundNo} Court ${r.courtNo}${r.waveNo > 1 ? ` Heat ${r.waveNo}` : ''}`,
+          r.teamA[0]?.name ?? '',
+          r.teamA[1]?.name ?? '',
+          r.teamB[0]?.name ?? '',
+          r.teamB[1]?.name ?? '',
+          r.scoreA,
+          r.scoreB,
+        ]
+          .map(csvCell)
+          .join(','),
+      ),
+  ].join('\n');
+
   return (
     <Recap
       theme={theme}
@@ -115,6 +154,9 @@ export default async function RecapPage({ params }: PageProps) {
       pot={pot}
       raffleWinner={raffleWinner?.displayName ?? null}
       csv={resultsToCsv(results, names)}
+      duprCsv={duprCsv}
+      completedLabel={completedLabel}
+      durationLabel={durationLabel}
     />
   );
 }

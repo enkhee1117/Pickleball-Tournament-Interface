@@ -302,6 +302,7 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
           <CockpitTopbar
             title={COCKPIT_TITLES[activeTab] ?? 'Cockpit'}
             sub={cockpitSub(activeTab, currentRound?.round_no ?? null, currentRound?.state ?? null, roster.length, paidCount, pendingPayments)}
+            recapHref={`/tournaments/${id}/recap`}
           />
           <div id="main" className="px-5 pb-24 pt-6 lg:px-7">
         {sp.error && <Notice tone="error">{sp.error}</Notice>}
@@ -840,7 +841,7 @@ function CockpitSidebar({
   );
 }
 
-function CockpitTopbar({ title, sub }: { title: string; sub: string }) {
+function CockpitTopbar({ title, sub, recapHref }: { title: string; sub: string; recapHref: string }) {
   return (
     <div
       className="sticky top-0 z-20 flex h-[66px] items-center gap-4 border-b px-5 lg:px-7"
@@ -854,6 +855,19 @@ function CockpitTopbar({ title, sub }: { title: string; sub: string }) {
         <h1 className="text-[19px] font-semibold" style={{ color: 'var(--text)' }}>{title}</h1>
         <div className="mono text-[11px] tracking-[.06em]" style={{ color: 'var(--text3)' }}>{sub}</div>
       </div>
+      {/* Recap / history — the topbar clock (handoff admin.html). */}
+      <Link
+        href={recapHref}
+        aria-label="Recap & history"
+        title="Recap & history"
+        className="ml-auto grid h-9 w-9 shrink-0 place-items-center rounded-full"
+        style={{ background: 'var(--surface-card)', color: 'var(--text2)', border: '1px solid var(--line-2)' }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+          <path d="M12 8v4l3 2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+      </Link>
     </div>
   );
 }

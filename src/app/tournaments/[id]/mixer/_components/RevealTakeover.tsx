@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 
 const seenKey = (roundId: string) => `ttd-mixer-reveal-${roundId}`;
 
-type Phase = 'hidden' | 'spin' | 'reveal';
+type Phase = 'hidden' | 'lock' | 'spin' | 'reveal';
 
 export function RevealTakeover({
   roundId,
@@ -44,9 +44,15 @@ export function RevealTakeover({
       setPhase('reveal');
       return;
     }
-    setPhase('spin');
-    const t = window.setTimeout(() => setPhase('reveal'), 1700);
-    return () => window.clearTimeout(t);
+    // Three-beat ceremony (tp-mixer): voting-closed lock → token shuffle →
+    // partner/court reveal.
+    setPhase('lock');
+    const t1 = window.setTimeout(() => setPhase('spin'), 1100);
+    const t2 = window.setTimeout(() => setPhase('reveal'), 2800);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
   }, [roundId]);
 
   function dismiss() {
@@ -108,7 +114,18 @@ export function RevealTakeover({
         Round {roundNo} · the tokens have spoken
       </div>
 
-      {phase === 'spin' ? (
+      {phase === 'lock' ? (
+        <div className="mt-8 flex flex-col items-center" style={{ animation: 'ttdRevealPop .45s cubic-bezier(.2,.9,.3,1.2) both' }}>
+          <div className="grid h-20 w-20 place-items-center rounded-full" style={{ background: 'color-mix(in oklch, var(--court) 18%, transparent)', border: '1px solid color-mix(in oklch, var(--court) 45%, transparent)' }} aria-hidden>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+              <rect x="5" y="10.5" width="14" height="9" rx="2" stroke="var(--court)" strokeWidth="1.7" />
+              <path d="M8 10.5V8a4 4 0 018 0v2.5" stroke="var(--court)" strokeWidth="1.7" />
+            </svg>
+          </div>
+          <div className="serif mt-5 text-[40px] leading-tight text-white">Voting closed.</div>
+          <div className="mt-2 text-[14px]" style={{ color: 'rgba(255,255,255,.7)' }}>Tokens locked in — the draw is running.</div>
+        </div>
+      ) : phase === 'spin' ? (
         <div className="mt-8 flex flex-col items-center">
           <div className="serif text-[40px] leading-tight text-white" style={{ animation: 'ttdRevealPulse 1s ease-in-out infinite' }}>
             Who did the tokens pick?

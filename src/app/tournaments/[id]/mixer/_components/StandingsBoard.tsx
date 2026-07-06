@@ -145,11 +145,12 @@ export function StandingsBoard({
       ) : null}
 
       <div className="rounded-[18px] p-2" style={{ background: 'var(--card)', border: '1px solid var(--line)' }}>
-        <div className="mono grid grid-cols-[34px_1fr_120px_60px_56px] items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-[.08em]" style={{ color: 'var(--ink-3)' }}>
+        <div className="mono grid grid-cols-[34px_1fr_48px_52px_112px_48px] items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-[.08em]" style={{ color: 'var(--ink-3)' }}>
           <span>#</span>
           <span>Player</span>
-          <span className="text-right">Games</span>
+          <span className="text-right">W–L</span>
           <span className="text-right">Diff</span>
+          <span className="text-right">Games</span>
           <span className="text-right">Pts</span>
         </div>
         {standings.map((row, i) => {
@@ -161,7 +162,7 @@ export function StandingsBoard({
               type="button"
               onClick={() => setSelectedId(row.playerId)}
               aria-label={`${row.name} details`}
-              className="grid w-full grid-cols-[34px_1fr_120px_60px_56px] items-center gap-2 rounded-xl px-4 py-2.5 text-left transition-colors hover:brightness-[.98]"
+              className="grid w-full grid-cols-[34px_1fr_48px_52px_112px_48px] items-center gap-2 rounded-xl px-4 py-2.5 text-left transition-colors hover:brightness-[.98]"
               style={{ background: isSelf ? 'color-mix(in oklch, var(--court) 12%, transparent)' : i % 2 ? 'var(--surface-inset)' : undefined }}
             >
               <span className="mono flex items-center gap-1.5 text-[15px] font-bold" style={{ color: 'var(--ink-3)' }}>
@@ -170,17 +171,15 @@ export function StandingsBoard({
               </span>
               <span className="flex min-w-0 items-center gap-2.5">
                 <Avatar player={avatarFor(row.playerId, row.name)} size={32} ring={isSelf} />
-                <span className="min-w-0">
-                  <span className="block truncate text-[15px] font-semibold leading-tight" style={{ color: 'var(--ink)' }}>
-                    {isSelf ? 'You' : firstName(row.name)}
-                  </span>
-                  <span className="mono text-[11px]" style={{ color: 'var(--ink-3)' }}>{row.wins}–{row.losses}</span>
+                <span className="truncate text-[15px] font-semibold" style={{ color: 'var(--ink)' }}>
+                  {isSelf ? 'You' : firstName(row.name)}
                 </span>
               </span>
-              <GamesDots games={gamesMap.get(row.playerId)} />
+              <span className="mono text-right text-[13px]" style={{ color: 'var(--ink-2)' }}>{row.wins}–{row.losses}</span>
               <span className="mono text-right text-[13px]" style={{ color: 'var(--ink-2)' }}>
                 {row.pointDiff > 0 ? '+' : ''}{row.pointDiff}
               </span>
+              <GamesDots games={gamesMap.get(row.playerId)} />
               <span className="mono text-right text-[15px] font-bold" style={{ color: 'var(--court-deep)' }}>{row.points}</span>
             </button>
           );
