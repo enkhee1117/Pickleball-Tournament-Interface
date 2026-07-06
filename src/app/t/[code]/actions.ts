@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { isValidInviteCode, normalizeInviteCode } from '@/lib/invite-codes';
 import { fieldString, formatPgError } from '@/lib/forms';
-import { resolveIdentifier } from '@/lib/identifier';
+import { resolveEmailIdentifier } from '@/lib/identifier';
 import { validatePassword } from '@/lib/validation';
 import { duprForSkill, normalizeGender } from '@/lib/quick-join';
 import { createConfirmedAccount } from '@/lib/create-account';
@@ -32,10 +32,10 @@ export async function joinPublicTournament(formData: FormData): Promise<void> {
 }
 
 // Cold-join quick account (cold-join.html steps 3-4, revised). Instead of an
-// anonymous session, the 15-second profile now asks for a real email (or
-// phone) + password up front — so the player has a durable login from tap
-// one, their history follows them, and there's no risky anonymous→permanent
-// upgrade path later. The account is auto-confirmed at creation (same policy
+// anonymous session, the 15-second profile now asks for a real email +
+// password up front — so the player has a durable login from tap one, their
+// history follows them, and there's no risky anonymous→permanent upgrade path
+// later. The account is auto-confirmed at creation (same policy
 // as /signup) so nothing blocks them from playing right now; email
 // verification only matters later when they want to organize their own event.
 //
@@ -62,8 +62,8 @@ export async function joinMixerWithQuickAccount(formData: FormData): Promise<voi
     redirect(`${back}?error=${encodeURIComponent(message)}`);
 
   if (!displayName) fail('Pick a display name to join');
-  const resolved = resolveIdentifier(identifier);
-  if (!resolved) fail('Enter a valid email or phone number.');
+  const resolved = resolveEmailIdentifier(identifier);
+  if (!resolved) fail('Enter a valid email address.');
   const passCheck = validatePassword(password);
   if (!passCheck.ok) fail(passCheck.error);
 

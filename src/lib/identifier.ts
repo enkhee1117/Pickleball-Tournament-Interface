@@ -30,3 +30,12 @@ export function resolveIdentifier(input: string): ResolvedIdentifier | null {
   if (!phone) return null;
   return { kind: 'phone', email: phoneToSynthEmail(phone), phone };
 }
+
+// Auth is email-only. This resolves a login/signup identifier and rejects
+// anything that isn't a real email (phone numbers included) so every auth entry
+// point — login, signup, quick-join — stays consistent. Returns an email-kind
+// ResolvedIdentifier so downstream account helpers keep working unchanged.
+export function resolveEmailIdentifier(input: string): ResolvedIdentifier | null {
+  const resolved = resolveIdentifier(input);
+  return resolved && resolved.kind === 'email' ? resolved : null;
+}
