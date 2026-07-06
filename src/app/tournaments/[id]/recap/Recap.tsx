@@ -35,6 +35,9 @@ export function Recap({
   pot,
   raffleWinner,
   csv,
+  duprCsv,
+  completedLabel,
+  durationLabel,
 }: {
   theme: Theme;
   tournamentId: string;
@@ -51,21 +54,58 @@ export function Recap({
   pot: number;
   raffleWinner: string | null;
   csv: string;
+  duprCsv: string;
+  completedLabel: string | null;
+  durationLabel: string | null;
 }) {
   const router = useRouter();
   const toast = useToast();
 
-  function downloadCsv() {
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const slug = tournamentName.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  function download(content: string, mime: string, filename: string) {
+    const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${tournamentName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-results.csv`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  }
+
+  function downloadCsv() {
+    download(csv, 'text/csv;charset=utf-8', `${slug}-results.csv`);
     toast({ type: 'success', title: 'Results CSV ready', desc: 'Every match, score & standing downloaded.' });
+  }
+
+  function downloadDupr() {
+    download(duprCsv, 'text/csv;charset=utf-8', `${slug}-dupr.csv`);
+    toast({ type: 'success', title: 'DUPR export ready', desc: 'Match sheet downloaded — upload it to DUPR.' });
+  }
+
+  // Offline recap card: a self-contained SVG the organizer can drop in a group
+  // chat (no external image service, so it works anywhere).
+  function downloadRecapImage() {
+    const esc = (s: string) => s.replace(/[<&>]/g, (c) => ({ '<': '&lt;', '&': '&amp;', '>': '&gt;' })[c] as string);
+    const [p2, p1, p3] = [podium[1], podium[0], podium[2]];
+    const podLine = (p: { rank: number; name: string; record: string } | undefined, medal: string) =>
+      p ? `${medal} ${esc(firstName(p.name))} · ${esc(p.record)}` : '';
+    const sups = superlatives.slice(0, 3).map((s) => `${esc(s.label)}: ${esc(firstName(s.sup.name))}`);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#16182a"/>
+  <rect width="1200" height="6" fill="#9cd96b"/>
+  <text x="64" y="120" fill="#9cd96b" font-family="monospace" font-size="26" letter-spacing="4">EVENT COMPLETE${completedLabel ? ' · ' + esc(completedLabel).toUpperCase() : ''}</text>
+  <text x="64" y="210" fill="#fff" font-family="Georgia, serif" font-size="76" font-style="italic">${esc(tournamentName)}</text>
+  <text x="64" y="262" fill="#c8c8d4" font-family="sans-serif" font-size="26">Partner Mixer · ${playersCount} players · ${roundsTotal} rounds · ${nightNumbers.matches} matches${durationLabel ? ' · ' + durationLabel : ''}</text>
+  <text x="64" y="360" fill="#f0d060" font-family="sans-serif" font-size="40" font-weight="700">${podLine(p1, '🥇')}</text>
+  <text x="64" y="420" fill="#cfd3e0" font-family="sans-serif" font-size="34">${podLine(p2, '🥈')}</text>
+  <text x="64" y="472" fill="#d6a15a" font-family="sans-serif" font-size="34">${podLine(p3, '🥉')}</text>
+  ${sups.map((s, i) => `<text x="64" y="${548 + i * 34}" fill="#8a8fa3" font-family="monospace" font-size="22">${s}</text>`).join('\n  ')}
+  <text x="1136" y="596" fill="#5b6070" font-family="monospace" font-size="20" text-anchor="end">Try to Dink</text>
+</svg>`;
+    download(svg, 'image/svg+xml;charset=utf-8', `${slug}-recap.svg`);
+    toast({ type: 'success', title: 'Recap card ready', desc: 'Saved an SVG you can share anywhere.' });
   }
 
   async function copyPublicLink() {
@@ -81,8 +121,8 @@ export function Recap({
   const exportRows = [
     { key: 'csv', title: 'Full results — CSV', desc: 'Every match, score & standing for your records', onClick: downloadCsv },
     { key: 'link', title: 'Public results link', desc: 'Anyone with the link sees the final board', onClick: copyPublicLink },
-    { key: 'image', title: 'Recap image for the group chat', desc: 'Podium + superlatives — coming soon', onClick: () => toast({ type: 'info', title: 'Recap image', desc: 'Image export is on the roadmap.' }) },
-    { key: 'dupr', title: 'Submit to DUPR', desc: 'Rated matches export — coming soon', onClick: () => toast({ type: 'info', title: 'DUPR submit', desc: 'DUPR export is on the roadmap.' }) },
+    { key: 'image', title: 'Recap image for the group chat', desc: 'Podium + superlatives — download an SVG card', onClick: downloadRecapImage },
+    { key: 'dupr', title: 'Submit to DUPR', desc: 'Rated-match sheet (CSV) for DUPR upload', onClick: downloadDupr },
   ];
 
   const medalBg = ['var(--court)', 'var(--ink-3)', 'var(--amber)'];
@@ -101,7 +141,9 @@ export function Recap({
           }}
         >
           <div className="flex items-center justify-between">
-            <div className="mono text-[12px] uppercase tracking-[.14em]" style={{ color: 'rgba(255,255,255,.66)' }}>Event complete</div>
+            <div className="mono text-[12px] uppercase tracking-[.14em]" style={{ color: 'rgba(255,255,255,.66)' }}>
+              Event complete{completedLabel ? ` · ${completedLabel}` : ''}
+            </div>
             <div className="flex gap-2.5">
               <button type="button" onClick={copyPublicLink} className="btn btn-glass btn-sm">Share recap</button>
               <button type="button" onClick={() => { toast({ type: 'success', title: 'New event drafted', desc: 'Same format — edit & publish.' }); router.push('/tournaments/new'); }} className="btn btn-accent btn-sm">
@@ -113,7 +155,7 @@ export function Recap({
             <div>
               <h1 className="serif text-[52px] leading-[.98]">{tournamentName}</h1>
               <div className="mono mt-2.5 text-[14px] tracking-[.02em]" style={{ color: 'rgba(255,255,255,.72)' }}>
-                Partner Mixer · {playersCount} players · {roundsTotal} rounds · {nightNumbers.matches} matches
+                Partner Mixer · {playersCount} players · {roundsTotal} rounds · {nightNumbers.matches} matches{durationLabel ? ` · ${durationLabel}` : ''}
               </div>
             </div>
             <div className="flex gap-3">

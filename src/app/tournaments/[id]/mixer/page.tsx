@@ -35,7 +35,7 @@ import type {
 import { MatchTab } from './_components/MatchTab';
 import { CourtsTab } from './_components/CourtsTab';
 import { MeTab } from './_components/MeTab';
-import { Notice } from './_components/mixer-night';
+import { Notice, mixerAvatarFor } from './_components/mixer-night';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -245,6 +245,29 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     );
   }
 
+  // Player's-night data for the Match tab: how many ballots are in this round
+  // (blind-safe count only — never picks), my own tokens spent, and my sealed
+  // ballot (only I ever see my picks).
+  const activeRosterCount = roster.filter((p) => !p.withdrawn_at).length;
+  const { count: ballotsInRaw } = await supabase
+    .from('mixer_round_ballots')
+    .select('*', { count: 'exact', head: true })
+    .eq('round_id', currentRound.id)
+    .not('confirmed_at', 'is', null);
+  const ballotsIn = ballotsInRaw ?? 0;
+  const myRoundVotes = voteRows.filter((v) => v.round_id === currentRound.id);
+  const tokensSpent = myRoundVotes.reduce((sum, v) => sum + (v.up_tokens ?? 0) + (v.down_tokens ?? 0), 0);
+  const nameFor = (pid: string) => roster.find((p) => p.id === pid)?.display_name ?? 'Player';
+  const myBallot = myRoundVotes
+    .map((v) => ({
+      playerId: v.target_player_id,
+      name: nameFor(v.target_player_id),
+      tokens: v.up_tokens ?? 0,
+      down: (v.down_tokens ?? 0) > 0,
+      avatar: mixerAvatarFor({ id: v.target_player_id, display_name: nameFor(v.target_player_id) }, myPlayer.id),
+    }))
+    .sort((a, b) => (a.down ? 1 : 0) - (b.down ? 1 : 0) || b.tokens - a.tokens);
+
   return (
     <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={myPlayer} isManager={isManager}>
       <PushRegistration />
@@ -289,7 +312,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
         />
       )}
       {tab === 'match' && (
-        <MatchTab tournamentId={id} round={currentRound} roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} gameTo={cfg.game_to ?? 11} />
+        <MatchTab tournamentId={id} round={currentRound} roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} gameTo={cfg.game_to ?? 11} ballotsIn={ballotsIn} rosterCount={activeRosterCount} tokensSpent={tokensSpent} myBallot={myBallot} />
       )}
       {tab === 'courts' && (
         <CourtsTab roster={roster} pairings={pairingRows} scores={scoreRows} sitOuts={sitOutIds} myPlayer={myPlayer} round={currentRound} />

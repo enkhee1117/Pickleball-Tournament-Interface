@@ -174,6 +174,7 @@ function Controls({
 
       {/* replay + exit — bottom-right */}
       <div className="fixed bottom-5 right-5 z-30 flex items-center gap-2.5">
+        <ShareLiveView tournamentId={tournamentId} />
         <Link
           href={`/tournaments/${tournamentId}/mixer/present/between`}
           className="mono rounded-full px-[15px] py-[9px] text-[12px] uppercase tracking-[.1em]"
@@ -198,6 +199,46 @@ function Controls({
         ← Exit
       </Link>
     </>
+  );
+}
+
+// Share the public spectator board (present pages are viewable without an
+// account) — native share where available, clipboard copy otherwise.
+function ShareLiveView({ tournamentId }: { tournamentId: string }) {
+  const [copied, setCopied] = useState(false);
+  async function share() {
+    const url = `${window.location.origin}/tournaments/${tournamentId}/mixer/present/between`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Try to Dink — live board', url });
+        return;
+      } catch {
+        /* fall through to copy */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* ignore */
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={share}
+      className="mono flex items-center gap-1.5 rounded-full px-[15px] py-[9px] text-[12px] uppercase tracking-[.1em]"
+      style={{ background: 'color-mix(in oklch, var(--bg2) 70%, transparent)', border: '1px solid var(--line-2)', color: 'var(--text2)' }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M8.5 13.5l7-4M8.5 10.5l7 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <circle cx="6" cy="12" r="2.4" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="17.5" cy="7" r="2.4" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="17.5" cy="17" r="2.4" stroke="currentColor" strokeWidth="1.6" />
+      </svg>
+      {copied ? 'Link copied' : 'Share live view'}
+    </button>
   );
 }
 
