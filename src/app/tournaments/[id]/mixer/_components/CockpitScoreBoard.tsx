@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
 import { gameSlotLabel, type CourtResult } from '@/lib/mixer-standings';
 import { GamesProgressStrip } from '@/components/ui/GamesProgressStrip';
 import { useToast } from '@/components/desktop';
@@ -29,14 +29,32 @@ export function CockpitScoreBoard({
   roundNo,
   roundsTotal,
   results: initialResults,
+  currentRoundNo,
+  canDraw = false,
+  drawButton = null,
 }: {
   tournamentId: string;
   roundNo: number;
   roundsTotal: number;
   results: CourtResult[];
+  // The current round's number + whether its ballots are locked (drawable), and
+  // the ready-to-fire draw control. Together they let the organizer run the
+  // draw straight from an undrawn round's empty state (handoff admin.html).
+  currentRoundNo?: number;
+  canDraw?: boolean;
+  drawButton?: ReactNode;
 }) {
   const toast = useToast();
   const [, startTransition] = useTransition();
+  const [courtSide, setCourtSide] = useState(false);
+
+  // Full-screen court-side mode locks the scroll behind it.
+  useEffect(() => {
+    if (!courtSide) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setCourtSide(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [courtSide]);
 
   const [results, setResults] = useState<CourtResult[]>(initialResults);
   const propSig = sig(initialResults);
@@ -123,8 +141,12 @@ export function CockpitScoreBoard({
   }
 
   const anyGames = results.length > 0;
+  // Drawing is only possible for the current round once its ballots lock; when
+  // the organizer is viewing that round and it has no games yet, the empty
+  // state offers the real draw instead of pointing at the Run tab.
+  const canDrawHere = canDraw && !!drawButton && viewRound === currentRoundNo;
 
-  return (
+  const board = (
     <div className="flex flex-col gap-4">
       {anyGames ? <GamesProgressStrip results={results} /> : null}
 
@@ -163,11 +185,23 @@ export function CockpitScoreBoard({
       ) : null}
 
       {viewCourts.length === 0 ? (
-        <div className="rounded-2xl bg-white p-6 text-center text-sm" style={{ border: '1px dashed var(--line)', color: 'var(--ink-3)' }}>
-          Round {viewRound} hasn&apos;t been drawn yet — run the draw on the Run tab to seat it.
+        <div className="rounded-2xl bg-white p-8 text-center" style={{ border: '1px dashed var(--line)' }}>
+          <div className="serif text-[22px]" style={{ color: 'var(--ink)' }}>Round {viewRound} hasn&apos;t been drawn yet</div>
+          <p className="mx-auto mt-2 max-w-[42ch] text-[13.5px]" style={{ color: 'var(--ink-3)' }}>
+            Run the draw to pair players for this round — the matchups appear here, ready to score.
+          </p>
+          {canDrawHere ? (
+            <div className="mx-auto mt-5 max-w-[320px]">{drawButton}</div>
+          ) : (
+            <p className="mt-4 text-[12.5px]" style={{ color: 'var(--ink-3)' }}>
+              {viewRound === currentRoundNo
+                ? 'Lock the ballots on the Run tab first, then the draw arms here.'
+                : 'This round arms once the current round wraps up.'}
+            </p>
+          )}
         </div>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className={`grid gap-4 ${courtSide ? 'lg:grid-cols-2' : 'xl:grid-cols-2'}`}>
           {viewCourts.map((court) => (
             <ScoreCard
               key={court.key}
@@ -183,5 +217,53 @@ export function CockpitScoreBoard({
         </div>
       )}
     </div>
+  );
+
+  return (
+    <>
+      {/* Toolbar: court-side toggle (design's header "Court-side" action). */}
+      <div className="mb-3 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => setCourtSide(true)}
+          className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[13px] font-semibold"
+          style={{ background: 'var(--surface-card)', color: 'var(--text)', border: '1px solid var(--line-2)' }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M4 9V5a1 1 0 011-1h4M20 9V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4M20 15v4a1 1 0 01-1 1h-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+          </svg>
+          Court-side
+        </button>
+      </div>
+
+      {board}
+
+      {courtSide ? (
+        <div className="fixed inset-0 z-50 flex flex-col overflow-auto" style={{ background: 'var(--paper)' }}>
+          <div className="sticky top-0 z-10 flex items-center justify-between gap-4 px-6 py-3.5" style={{ background: 'var(--court)', color: 'var(--accent-ink)' }}>
+            <div className="flex items-center gap-3">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M4 9V5a1 1 0 011-1h4M20 9V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4M20 15v4a1 1 0 01-1 1h-4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+              </svg>
+              <span className="text-[15px] font-bold">Court-side mode</span>
+              <span className="mono hidden text-[11px] uppercase tracking-[.08em] sm:inline" style={{ opacity: 0.75 }}>
+                Big controls · tap − / + or 11 · Record when done
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCourtSide(false)}
+              className="rounded-xl px-4 py-2 text-[13px] font-bold"
+              style={{ background: 'var(--ink)', color: 'var(--paper)' }}
+            >
+              Exit court-side
+            </button>
+          </div>
+          <div className="mx-auto w-full max-w-[1200px] p-6" style={{ color: 'var(--text)' }}>
+            {board}
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

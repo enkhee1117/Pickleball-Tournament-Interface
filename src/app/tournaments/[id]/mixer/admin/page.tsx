@@ -612,18 +612,32 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
 
             {activeTab === 'scores' && (
               <Section title="Courts and scores">
-                {scoreResults.length === 0 ? (
-                  <div className="rounded-2xl bg-white p-4 text-center text-sm text-ink-3" style={{ border: '1px dashed var(--line)' }}>
-                    No pairings revealed yet — run the draw on the Run tab.
-                  </div>
-                ) : (
-                  <CockpitScoreBoard
-                    tournamentId={id}
-                    roundNo={currentRound.round_no}
-                    roundsTotal={cfg.rounds ?? roundRows.length}
-                    results={scoreResults}
-                  />
-                )}
+                <CockpitScoreBoard
+                  tournamentId={id}
+                  roundNo={currentRound.round_no}
+                  roundsTotal={cfg.rounds ?? roundRows.length}
+                  results={scoreResults}
+                  currentRoundNo={currentRound.round_no}
+                  canDraw={canDraw}
+                  drawButton={
+                    <DrawArmedModal
+                      tournamentId={id}
+                      roundId={currentRound.id}
+                      roundNo={currentRound.round_no}
+                      canDraw={canDraw}
+                      weights={{ votes: wPct(cfg.alpha), skill: wPct(cfg.beta), novelty: wPct(cfg.gamma) }}
+                      teams={teamPlan.teams}
+                      games={teamPlan.teams / 2}
+                      sittingPerRound={sittingPerRound}
+                      poolLabel={
+                        genderMode === 'mixed'
+                          ? `${poolA} in pool A, ${poolB} in pool B.`
+                          : 'Byes rotate fairly so no one sits twice before everyone has sat once.'
+                      }
+                      triggerLabel={`Run the draw for Round ${currentRound.round_no} →`}
+                    />
+                  }
+                />
               </Section>
             )}
 
