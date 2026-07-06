@@ -343,12 +343,12 @@ function MixerShell({
   children: ReactNode;
 }) {
   const base = `/tournaments/${tournament.id}/mixer`;
-  const tabs: [string, string][] = [
-    ['vote', 'Vote'],
-    ['match', 'Match'],
-    ['courts', 'Courts'],
-    ['betting', 'Pool'],
-    ['me', 'Me'],
+  const tabs: [string, string, ReactNode][] = [
+    ['vote', 'Vote', <><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.7" /><path d="M8 11.5l2.5 2.5 5-5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></>],
+    ['match', 'Match', <><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.7" /><path d="M12 4v16" stroke="currentColor" strokeWidth="1.7" strokeDasharray="1.6 1.8" /></>],
+    ['courts', 'Courts', <><rect x="3.5" y="6" width="7.5" height="12" rx="1.4" stroke="currentColor" strokeWidth="1.6" /><rect x="13" y="6" width="7.5" height="12" rx="1.4" stroke="currentColor" strokeWidth="1.6" /></>],
+    ['betting', 'Pool', <><circle cx="9.5" cy="10" r="5" stroke="currentColor" strokeWidth="1.6" /><path d="M14.2 6.5A5 5 0 1115.5 16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></>],
+    ['me', 'Me', <><circle cx="12" cy="8.5" r="3.3" stroke="currentColor" strokeWidth="1.7" /><path d="M5.5 19.5c.8-3.4 3.4-5.2 6.5-5.2s5.7 1.8 6.5 5.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></>],
   ];
   const href = (id: string) => (id === 'vote' ? base : `${base}?tab=${id}`);
   // Player mode is mobile-primary and widens on desktop (handoff player.html):
@@ -379,16 +379,27 @@ function MixerShell({
               ROUND {currentRound.round_no}{player ? ` · ${player.display_name.toUpperCase()}` : ''}
             </div>
           </div>
-          {tabs.map(([id, label]) => (
-            <Link
-              key={id}
-              href={href(id)}
-              className="rounded-[11px] px-3 py-2.5 text-[14px] font-medium"
-              style={tab === id ? { background: 'var(--court)', color: 'var(--night-court-ink)', fontWeight: 600 } : { color: 'var(--night-nav-link)' }}
-            >
-              {label}
-            </Link>
-          ))}
+          {tabs.map(([id, label, icon]) => {
+            const on = tab === id;
+            return (
+              <Link
+                key={id}
+                href={href(id)}
+                prefetch
+                className="flex items-center gap-3 rounded-[11px] border px-3 py-2.5 text-[14px] font-medium"
+                style={
+                  on
+                    ? { background: 'color-mix(in oklch, var(--court) 16%, transparent)', color: 'var(--night-text)', borderColor: 'color-mix(in oklch, var(--court) 34%, transparent)', fontWeight: 600 }
+                    : { color: 'var(--night-nav-link)', borderColor: 'transparent' }
+                }
+              >
+                <span className="grid w-5 place-items-center" style={{ color: on ? 'var(--court-deep)' : 'var(--night-text3)' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>{icon}</svg>
+                </span>
+                {label}
+              </Link>
+            );
+          })}
           <div className="flex-1" />
           {isManager && (
             <Link href={`${base}/admin`} className="rounded-[11px] px-3 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)', color: 'var(--night-nav-link-strong)' }}>
@@ -400,8 +411,9 @@ function MixerShell({
           </Link>
         </aside>
 
-        {/* Main column — constrained on tablet, full on desktop */}
-        <div className="mx-auto w-full max-w-[560px] lg:max-w-[1080px] lg:px-6">
+        {/* Main column — centered on mobile, left-aligned against the sidebar on
+            desktop (no dead gap between nav and content). */}
+        <div className="mx-auto w-full max-w-[560px] lg:mx-0 lg:max-w-[1120px] lg:px-8">
           <div className="lg:hidden">
             <TopBar
               dark

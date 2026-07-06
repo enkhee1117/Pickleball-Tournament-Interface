@@ -227,6 +227,12 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const wPct = (w: number | undefined) => (wSum > 0 ? Math.round((Number(w ?? 0) / wSum) * 100) : 0);
   const anonCount = roster.filter((p) => !p.profile_id).length;
   const entryFee = Number(cfg?.entry_fee ?? 0);
+  // "Needs your attention" — players who haven't paid their entry (handoff
+  // admin.html attention banner).
+  const unpaidPlayers = roster.filter(
+    (p) => !p.withdrawn_at && !paymentRows.some((pay) => pay.player_id === p.id && pay.type === 'entry' && pay.status === 'confirmed'),
+  );
+  const outstanding = Math.round(unpaidPlayers.length * entryFee);
 
   // Roster tab data table (mirrors the desktop handoff). One row per player,
   // folding in each player's entry payment + token balance so the table is a
@@ -321,6 +327,37 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
           <>
             {activeTab === 'run' && (
               <>
+                {unpaidPlayers.length > 0 && entryFee > 0 && (
+                  <div className="mb-5">
+                    <div className="mono mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[.14em]" style={{ color: 'var(--text3)' }}>
+                      Needs your attention
+                      <span className="grid h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold text-white" style={{ background: 'var(--serve)' }}>1</span>
+                    </div>
+                    <div
+                      className="flex items-center gap-3.5 rounded-2xl p-4"
+                      style={{ background: 'color-mix(in oklch, var(--serve) 8%, var(--surface-card))', border: '1px solid color-mix(in oklch, var(--serve) 34%, var(--line))', borderLeft: '4px solid var(--serve)' }}
+                    >
+                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[18px]" style={{ background: 'var(--serve)', color: '#fff' }}>$</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>
+                          {unpaidPlayers.length} player{unpaidPlayers.length === 1 ? " hasn't" : "s haven't"} paid
+                        </div>
+                        <div className="truncate text-[12.5px]" style={{ color: 'var(--text3)' }}>
+                          ${outstanding} outstanding · {unpaidPlayers.slice(0, 3).map((p) => p.display_name.split(' ')[0]).join(', ')}
+                          {unpaidPlayers.length > 3 ? ` +${unpaidPlayers.length - 3}` : ''}
+                        </div>
+                      </div>
+                      <Link
+                        href={`/tournaments/${id}/mixer/admin?tab=roster`}
+                        className="shrink-0 rounded-xl px-4 py-2 text-[13px] font-semibold"
+                        style={{ background: 'var(--surface-raise)', color: 'var(--text)', border: '1px solid var(--line-2)' }}
+                      >
+                        Nudge
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
                 <CockpitStateBar stepIndex={stepIndex} roundNo={currentRound.round_no} roundsTotal={cfg.rounds} />
 
                 <div className="grid gap-[18px] xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
