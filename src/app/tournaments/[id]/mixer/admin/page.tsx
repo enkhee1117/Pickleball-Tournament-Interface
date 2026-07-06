@@ -107,7 +107,11 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const currentRound = currentMixerRound(roundRows);
   const roster = (players ?? []) as PlayerRow[];
 
-  const [{ data: pairings }, { data: scores }, { data: payments }, { data: states }, { data: betsSummary }, { data: snapshot }, { data: ballotRows }] = await Promise.all([
+  // All game slots for the whole night — the Scores tab board (round tabs +
+  // progress strip) spans every round, not just the current one. Computed up
+  // front so it batches with everything else instead of a second serial round.
+  const allRoundIds = roundRows.map((r) => r.id);
+  const [{ data: pairings }, { data: scores }, { data: payments }, { data: states }, { data: betsSummary }, { data: snapshot }, { data: ballotRows }, { data: allPairings }, { data: allScores }] = await Promise.all([
     currentRound
       ? supabase.from('mixer_pairings').select('id,player_a_id,player_b_id,court_no,wave_no').eq('round_id', currentRound.id).order('court_no', { ascending: true }).order('wave_no', { ascending: true })
       : Promise.resolve({ data: [] }),
@@ -127,6 +131,12 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
     currentRound
       ? supabase.from('mixer_round_ballots').select('player_id,confirmed_at').eq('round_id', currentRound.id)
       : Promise.resolve({ data: [] }),
+    allRoundIds.length
+      ? supabase.from('mixer_pairings').select('id,created_at,round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', allRoundIds)
+      : Promise.resolve({ data: [] }),
+    allRoundIds.length
+      ? supabase.from('mixer_scores').select('round_id,court_no,wave_no,team_a_score,team_b_score,completed_at').in('round_id', allRoundIds)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const pairingRows = (pairings ?? []) as PairingRow[];
@@ -136,18 +146,6 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   const betSummaryRows = (betsSummary ?? []) as BetSummaryRow[];
   const final = snapshot as SnapshotRow | null;
   const name = (playerId: string) => roster.find((p) => p.id === playerId)?.display_name ?? 'TBD';
-
-  // All-round game results for the Scores tab board (round tabs + progress
-  // strip span the whole night, not just the current round's courts).
-  const allRoundIds = roundRows.map((r) => r.id);
-  const [{ data: allPairings }, { data: allScores }] = await Promise.all([
-    allRoundIds.length
-      ? supabase.from('mixer_pairings').select('id,created_at,round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', allRoundIds)
-      : Promise.resolve({ data: [] }),
-    allRoundIds.length
-      ? supabase.from('mixer_scores').select('round_id,court_no,wave_no,team_a_score,team_b_score,completed_at').in('round_id', allRoundIds)
-      : Promise.resolve({ data: [] }),
-  ]);
   const scoreResults = buildCourtResults(
     (allPairings ?? []) as { id?: string; created_at?: string | null; round_id: string; player_a_id: string; player_b_id: string; court_no: number; wave_no: number }[],
     (allScores ?? []) as { round_id: string; court_no: number; wave_no: number; team_a_score: number; team_b_score: number; completed_at: string | null }[],

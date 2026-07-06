@@ -99,7 +99,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const myPlayer = user ? roster.find((p) => p.profile_id === user.id) ?? null : null;
   const myState = myPlayer ? stateRows.find((s) => s.player_id === myPlayer.id) ?? null : null;
 
-  const [{ data: votes }, { data: pairings }, { data: scores }, { data: sitOuts }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }] = await Promise.all([
+  const [{ data: votes }, { data: pairings }, { data: scores }, { data: sitOuts }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }, { count: ballotsInRaw }] = await Promise.all([
     roundIds.length > 0 && myPlayer
       ? supabase.from('mixer_votes').select('round_id,target_player_id,up_tokens,down_tokens').in('round_id', roundIds).eq('voter_player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
@@ -127,6 +127,11 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     roundIds.length > 0 && myPlayer
       ? supabase.from('mixer_round_ballots').select('round_id,confirmed_at').in('round_id', roundIds).eq('player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
+    // Blind-safe total of confirmed ballots for the live round (count only, never
+    // picks). Batched here instead of a sequential await after this block.
+    currentRound && myPlayer
+      ? supabase.from('mixer_round_ballots').select('*', { count: 'exact', head: true }).eq('round_id', currentRound.id).not('confirmed_at', 'is', null)
+      : Promise.resolve({ count: 0 }),
   ]);
 
   const voteRows = (votes ?? []) as VoteRow[];
@@ -250,11 +255,6 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   // (blind-safe count only — never picks), my own tokens spent, and my sealed
   // ballot (only I ever see my picks).
   const activeRosterCount = roster.filter((p) => !p.withdrawn_at).length;
-  const { count: ballotsInRaw } = await supabase
-    .from('mixer_round_ballots')
-    .select('*', { count: 'exact', head: true })
-    .eq('round_id', currentRound.id)
-    .not('confirmed_at', 'is', null);
   const ballotsIn = ballotsInRaw ?? 0;
   const myRoundVotes = voteRows.filter((v) => v.round_id === currentRound.id);
   const tokensSpent = myRoundVotes.reduce((sum, v) => sum + (v.up_tokens ?? 0) + (v.down_tokens ?? 0), 0);
