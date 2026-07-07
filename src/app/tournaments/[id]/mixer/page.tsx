@@ -9,6 +9,7 @@ import { Icons } from '@/components/ui/icons';
 import { BallMark } from '@/components/desktop';
 import { formatInviteCode } from '@/lib/invite-codes';
 import { currentMixerRound, sortMixerRounds } from '@/lib/mixer-rounds';
+import { buildCourtResults } from '@/lib/mixer-standings';
 import { QuickJoinForm } from './QuickJoinForm';
 import { PushRegistration } from './PushRegistration';
 import { MixerCourtCall, MixerPresenceCheckIn } from './MixerCourtCall';
@@ -34,13 +35,14 @@ import type {
 } from './_types';
 import { MatchTab } from './_components/MatchTab';
 import { CourtsTab } from './_components/CourtsTab';
+import { StandingsTab } from './_components/StandingsTab';
 import { MeTab } from './_components/MeTab';
 import { mixerAvatarFor } from './_components/mixer-night';
 import { MixerPlayerShell, type PlayerTab } from './_components/MixerPlayerShell';
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: 'vote' | 'match' | 'courts' | 'betting' | 'me'; round?: string; ok?: string; error?: string }>;
+  searchParams: Promise<{ tab?: 'vote' | 'match' | 'courts' | 'betting' | 'standings' | 'me'; round?: string; ok?: string; error?: string }>;
 };
 
 type VoteRow = {
@@ -99,7 +101,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const myPlayer = user ? roster.find((p) => p.profile_id === user.id) ?? null : null;
   const myState = myPlayer ? stateRows.find((s) => s.player_id === myPlayer.id) ?? null : null;
 
-  const [{ data: votes }, { data: pairings }, { data: scores }, { data: sitOuts }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }, { count: ballotsInRaw }] = await Promise.all([
+  const [{ data: votes }, { data: pairings }, { data: scores }, { data: sitOuts }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }, { count: ballotsInRaw }, { data: allPairings }, { data: allScores }] = await Promise.all([
     roundIds.length > 0 && myPlayer
       ? supabase.from('mixer_votes').select('round_id,target_player_id,up_tokens,down_tokens').in('round_id', roundIds).eq('voter_player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
@@ -132,6 +134,15 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     currentRound && myPlayer
       ? supabase.from('mixer_round_ballots').select('*', { count: 'exact', head: true }).eq('round_id', currentRound.id).not('confirmed_at', 'is', null)
       : Promise.resolve({ count: 0 }),
+    // Cumulative pairings + scores across every round — the player Standings tab
+    // ranks the whole night, not just the current round. Scores are public
+    // (present-standings is public), so this leaks nothing the blind vote hides.
+    roundIds.length > 0 && myPlayer
+      ? supabase.from('mixer_pairings').select('id,created_at,round_id,player_a_id,player_b_id,court_no,wave_no').in('round_id', roundIds)
+      : Promise.resolve({ data: [] }),
+    roundIds.length > 0 && myPlayer
+      ? supabase.from('mixer_scores').select('round_id,court_no,wave_no,team_a_score,team_b_score,completed_at').in('round_id', roundIds)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const voteRows = (votes ?? []) as VoteRow[];
@@ -273,6 +284,15 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     }))
     .sort((a, b) => (a.down ? 1 : 0) - (b.down ? 1 : 0) || b.tokens - a.tokens);
 
+  // Whole-night court results for the Standings tab (cumulative ranking).
+  const scoreResults = buildCourtResults(
+    (allPairings ?? []) as { id?: string; created_at?: string | null; round_id: string; player_a_id: string; player_b_id: string; court_no: number; wave_no: number }[],
+    (allScores ?? []) as { round_id: string; court_no: number; wave_no: number; team_a_score: number; team_b_score: number; completed_at: string | null }[],
+    new Map(roundRows.map((r) => [r.id, r.round_no] as const)),
+    currentRound.id,
+    nameFor,
+  );
+
   const overlays = (
     <>
       <PushRegistration />
@@ -328,6 +348,18 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     ),
     betting: (
       <MixerBettingPanel tournamentId={id} roster={roster} myPlayer={myPlayer} myState={myState} bets={betRows} config={cfg} />
+    ),
+    standings: (
+      <StandingsTab
+        tournamentId={id}
+        results={scoreResults}
+        currentPairings={pairingRows}
+        currentScores={scoreRows}
+        roster={roster}
+        currentRound={currentRound}
+        roundCount={cfg.rounds}
+        selfPlayerId={myPlayer.id}
+      />
     ),
     me: (
       <MeTab tournament={t} config={cfg} player={myPlayer} state={myState} inviteCode={t.invite_code} payments={paymentRows} raffleTickets={raffleTickets} raffleWinner={raffleWinner} standings={standings} />
