@@ -14,6 +14,7 @@ import { QuickJoinForm } from './QuickJoinForm';
 import { PushRegistration } from './PushRegistration';
 import { MixerCourtCall, MixerPresenceCheckIn } from './MixerCourtCall';
 import { RevealTakeover } from './_components/RevealTakeover';
+import { GoTimeTakeover } from './_components/GoTimeTakeover';
 import { bindMixerRosterEntry } from './actions';
 import { ActionForm } from './_components/ActionForm';
 import { MixerBettingPanel } from './MixerBettingPanel';
@@ -101,7 +102,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const myPlayer = user ? roster.find((p) => p.profile_id === user.id) ?? null : null;
   const myState = myPlayer ? stateRows.find((s) => s.player_id === myPlayer.id) ?? null : null;
 
-  const [{ data: votes }, { data: pairings }, { data: scores }, { data: sitOuts }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }, { count: ballotsInRaw }, { data: allPairings }, { data: allScores }] = await Promise.all([
+  const [{ data: votes }, { data: pairings }, { data: scores }, { data: sitOuts }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }, { count: ballotsInRaw }, { data: allPairings }, { data: allScores }, { data: allCheckIns }] = await Promise.all([
     roundIds.length > 0 && myPlayer
       ? supabase.from('mixer_votes').select('round_id,target_player_id,up_tokens,down_tokens').in('round_id', roundIds).eq('voter_player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
@@ -142,6 +143,12 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
       : Promise.resolve({ data: [] }),
     roundIds.length > 0 && myPlayer
       ? supabase.from('mixer_scores').select('round_id,court_no,wave_no,team_a_score,team_b_score,completed_at').in('round_id', roundIds)
+      : Promise.resolve({ data: [] }),
+    // Roster presence for the go-time takeover: who has checked in for the
+    // live round. Readable by any member (never leaks picks), so we can tell
+    // when every team on a court is present.
+    currentRound && myPlayer
+      ? supabase.from('mixer_check_ins').select('player_id,acked_round_id').eq('tournament_id', id)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -215,6 +222,44 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
       return { roundId: currentRound.id, roundNo: currentRound.round_no, courtNo: null, waveNo: 1, partnerName: null, opponentTeam: null, sittingOut: true };
     }
     return null;
+  }
+
+  // notify.html touchpoint 3 — the go-time takeover. Fires only once EVERY
+  // player on my game's court (both teams) has checked in for this round: the
+  // whole court is present, so first serve is imminent. Distinct from the
+  // court call (touchpoint 2, which nags ME to check in) — this is the "all
+  // clear, go now" beat. Skipped once the game is scored. Presence is member-
+  // readable, so it never leaks who voted for whom.
+  const goTime = computeGoTime();
+  function computeGoTime() {
+    if (!myPlayer || !currentRound) return null;
+    if (!['revealed', 'playing'].includes(currentRound.state)) return null;
+    const mine = pairingRows.find((p) => p.player_a_id === myPlayer.id || p.player_b_id === myPlayer.id);
+    if (!mine) return null;
+    if (scoreRows.find((s) => s.court_no === mine.court_no && s.wave_no === mine.wave_no)?.completed_at) return null;
+    const courtTeams = pairingRows.filter((p) => p.court_no === mine.court_no && p.wave_no === mine.wave_no);
+    const opponent = courtTeams.find((p) => p.id !== mine.id) ?? null;
+    if (!opponent) return null; // needs a real two-team game
+    const courtPlayerIds = courtTeams.flatMap((p) => [p.player_a_id, p.player_b_id]);
+    const ackedIds = new Set(
+      ((allCheckIns ?? []) as { player_id: string; acked_round_id: string | null }[])
+        .filter((c) => c.acked_round_id === currentRound.id)
+        .map((c) => c.player_id),
+    );
+    if (!courtPlayerIds.every((pid) => ackedIds.has(pid))) return null;
+    const nameOf = (pid: string) => roster.find((p) => p.id === pid)?.display_name ?? 'TBD';
+    const firstNameOf = (pid: string) => nameOf(pid).split(' ')[0];
+    const partnerId = mine.player_a_id === myPlayer.id ? mine.player_b_id : mine.player_a_id;
+    const avatarOf = (pid: string) => mixerAvatarFor({ id: pid, display_name: nameOf(pid) }, myPlayer.id);
+    return {
+      roundId: currentRound.id,
+      courtNo: mine.court_no,
+      waveNo: mine.wave_no,
+      yourAvatars: [avatarOf(myPlayer.id), avatarOf(partnerId)],
+      yourLabel: `You & ${firstNameOf(partnerId)}`,
+      oppAvatars: [avatarOf(opponent.player_a_id), avatarOf(opponent.player_b_id)],
+      oppLabel: `${firstNameOf(opponent.player_a_id)} & ${firstNameOf(opponent.player_b_id)}`,
+    };
   }
 
   // Show the quiet presence check-in when the player is at a live event, not
@@ -318,6 +363,17 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
         />
       )}
       {showPresenceCheckIn && <MixerPresenceCheckIn tournamentId={id} />}
+      {goTime && (
+        <GoTimeTakeover
+          roundId={goTime.roundId}
+          courtNo={goTime.courtNo}
+          waveNo={goTime.waveNo}
+          yourAvatars={goTime.yourAvatars}
+          yourLabel={goTime.yourLabel}
+          oppAvatars={goTime.oppAvatars}
+          oppLabel={goTime.oppLabel}
+        />
+      )}
     </>
   );
 
