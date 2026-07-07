@@ -295,7 +295,21 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
   })();
 
   return (
-    <DesktopSurface withCommandBar>
+    <DesktopSurface
+      withCommandBar
+      commands={[
+        { group: 'This event', label: 'Event hub', href: `/tournaments/${id}`, icon: '▦' },
+        ...(isMixer ? [{ group: 'This event', label: 'Player view', href: `/tournaments/${id}/mixer`, icon: '◎' }] : []),
+        ...(isManager ? [{ group: 'This event', label: 'Invite players', href: `/tournaments/${id}/invite`, icon: '＋' }] : []),
+        ...(isMixer && isManager
+          ? [
+              { group: 'This event', label: 'Organizer cockpit', href: `/tournaments/${id}/mixer/admin`, icon: '⚙' },
+              { group: 'This event', label: 'Present screen', href: `/tournaments/${id}/mixer/present`, icon: '▶' },
+            ]
+          : []),
+        { group: 'This event', label: 'Recap & export', href: `/tournaments/${id}/recap`, icon: '★' },
+      ]}
+    >
       <DesktopNav
         theme={theme}
         event={t.name}

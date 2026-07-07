@@ -286,7 +286,19 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
   return (
     // Surface tint follows the chosen theme so the cockpit reads as ONE app
     // edge to edge (previously a hardcoded night body framed light content).
-    <DesktopSurface variant={theme === 'night' ? 'night' : 'default'} withCommandBar>
+    <DesktopSurface
+      variant={theme === 'night' ? 'night' : 'default'}
+      withCommandBar
+      commands={[
+        { group: 'This event', label: 'Run event', href: `/tournaments/${id}/mixer/admin`, icon: '⚡' },
+        { group: 'This event', label: 'Enter a score', href: `/tournaments/${id}/mixer/admin?tab=scores`, icon: '▦' },
+        { group: 'This event', label: 'Standings', href: `/tournaments/${id}/mixer/admin?tab=standings`, icon: '↑' },
+        { group: 'This event', label: 'Present screen', href: `/tournaments/${id}/mixer/present`, icon: '▶' },
+        { group: 'This event', label: 'Player view', href: `/tournaments/${id}/mixer`, icon: '◎' },
+        { group: 'This event', label: 'Recap & export', href: `/tournaments/${id}/recap`, icon: '★' },
+        { group: 'This event', label: 'Event hub', href: `/tournaments/${id}`, icon: '⌂' },
+      ]}
+    >
       <MixerRealtimeSync tournamentId={id} />
       {showOrganizerReveal && currentRound && (
         <OrganizerRevealTakeover roundId={currentRound.id} roundNo={currentRound.round_no} courts={revealCourts} sittingOut={revealSitting} />

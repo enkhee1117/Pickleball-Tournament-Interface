@@ -17,7 +17,17 @@ export interface Command {
   run: () => void;
 }
 
-export function CommandBar({ commands }: { commands?: Command[] }) {
+/* Serializable command (href instead of a run closure) so server components can
+   contribute context-aware commands through DesktopSurface. */
+export interface NavCommand {
+  group: string;
+  label: string;
+  href: string;
+  hint?: string;
+  icon?: string;
+}
+
+export function CommandBar({ commands, navCommands }: { commands?: Command[]; navCommands?: NavCommand[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -25,15 +35,26 @@ export function CommandBar({ commands }: { commands?: Command[] }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const allCommands = useMemo<Command[]>(() => {
+    // A client caller can pass a fully-custom set that overrides everything.
     if (commands && commands.length) return commands;
-    return [
+    // Context (nav) commands from the current surface come first, then the
+    // always-available globals.
+    const ctx: Command[] = (navCommands ?? []).map((n) => ({
+      group: n.group,
+      label: n.label,
+      hint: n.hint,
+      icon: n.icon,
+      run: () => router.push(n.href),
+    }));
+    const globals: Command[] = [
       { group: 'Create', label: 'New event', hint: 'C', icon: '＋', run: () => router.push('/tournaments/new') },
-      { group: 'Go to', label: 'Tournaments', hint: 'G H', icon: '▦', run: () => router.push('/tournaments') },
-      { group: 'Go to', label: 'History', hint: '', icon: '★', run: () => router.push('/history') },
-      { group: 'Go to', label: 'Profile', hint: '', icon: '◎', run: () => router.push('/profile') },
-      { group: 'Settings', label: 'Home', hint: '', icon: '⌂', run: () => router.push('/') },
+      { group: 'Go to', label: 'My tournaments', hint: 'G T', icon: '▦', run: () => router.push('/tournaments') },
+      { group: 'Go to', label: 'Today', hint: 'G H', icon: '⌂', run: () => router.push('/') },
+      { group: 'Go to', label: 'History', hint: 'G Y', icon: '★', run: () => router.push('/history') },
+      { group: 'Go to', label: 'Profile', hint: 'G P', icon: '◎', run: () => router.push('/profile') },
     ];
-  }, [commands, router]);
+    return [...ctx, ...globals];
+  }, [commands, navCommands, router]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
