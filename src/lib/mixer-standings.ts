@@ -224,3 +224,16 @@ export function ordinal(n: number): string {
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
+
+// Places each id moved between two orderings (score-flow.html row `mv`):
+// positive = climbed toward the top, negative = dropped. Only ids present in
+// both orderings at a different index are returned. Used by the live board to
+// show ▲/▼ deltas when a posted score re-sorts the standings.
+export function orderMovements(prevOrder: string[], curOrder: string[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  curOrder.forEach((id, i) => {
+    const was = prevOrder.indexOf(id);
+    if (was >= 0 && was !== i) out[id] = was - i;
+  });
+  return out;
+}
