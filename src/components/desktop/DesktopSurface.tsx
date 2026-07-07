@@ -1,4 +1,4 @@
-import { CommandBar } from './CommandBar';
+import { CommandBar, type NavCommand } from './CommandBar';
 
 /* Wraps an organizer/projector surface so it escapes the 480px mobile shell
    (see the data-fullscreen rules in globals.css), hides the bottom TabBar,
@@ -14,11 +14,15 @@ export function DesktopSurface({
   className,
   children,
   withCommandBar = false,
+  commands,
 }: {
   variant?: 'default' | 'ink' | 'night' | 'show';
   className?: string;
   children: React.ReactNode;
   withCommandBar?: boolean;
+  /* Serializable, context-aware ⌘K commands for this surface (e.g. this event's
+     cockpit / standings / present). Merged ahead of the global defaults. */
+  commands?: NavCommand[];
 }) {
   return (
     <div data-fullscreen={variant === 'default' ? 'on' : variant} className={className}>
@@ -26,7 +30,7 @@ export function DesktopSurface({
         Skip to content
       </a>
       {children}
-      {withCommandBar ? <CommandBar /> : null}
+      {withCommandBar ? <CommandBar navCommands={commands} /> : null}
     </div>
   );
 }
