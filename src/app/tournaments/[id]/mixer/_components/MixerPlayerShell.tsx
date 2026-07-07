@@ -29,6 +29,8 @@ type Props = {
   playerName: string;
   isManager: boolean;
   initialTab: PlayerTab;
+  tokensLeft: number;
+  tokensTotal: number;
   overlays: ReactNode;
   panes: Record<PlayerTab, ReactNode>;
 };
@@ -49,6 +51,8 @@ export function MixerPlayerShell({
   playerName,
   isManager,
   initialTab,
+  tokensLeft,
+  tokensTotal,
   overlays,
   panes,
 }: Props) {
@@ -127,6 +131,24 @@ export function MixerPlayerShell({
             );
           })}
           <div className="flex-1" />
+          {tokensTotal > 0 && (
+            // Token budget well (handoff player.html .tokenwell) — a persistent
+            // at-a-glance budget with the accent gradient. Display-only; the
+            // ballot itself is where tokens get spent.
+            <div
+              className="mb-2 rounded-[14px] p-3.5"
+              style={{
+                background: 'linear-gradient(150deg, color-mix(in oklch, var(--court) 22%, var(--night-card)), var(--night-card))',
+                border: '1px solid color-mix(in oklch, var(--court) 26%, var(--night-line))',
+              }}
+            >
+              <div className="mono text-[10px] uppercase tracking-[0.1em]" style={{ color: 'var(--night-text3)' }}>Token budget</div>
+              <div className="mono mt-1 text-[30px] font-bold leading-none tracking-[-0.02em]" style={{ color: 'var(--night-text)' }}>
+                {tokensLeft}
+                <span className="text-[15px]" style={{ color: 'var(--night-text3)' }}> / {tokensTotal} left</span>
+              </div>
+            </div>
+          )}
           {isManager && (
             <Link href={`${base}/admin`} prefetch className="rounded-[11px] px-3 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)', color: 'var(--night-nav-link-strong)' }}>
               Organizer mode →

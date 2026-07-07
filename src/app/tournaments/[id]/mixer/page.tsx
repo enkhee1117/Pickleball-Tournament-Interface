@@ -256,6 +256,10 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   // ballot (only I ever see my picks).
   const activeRosterCount = roster.filter((p) => !p.withdrawn_at).length;
   const ballotsIn = ballotsInRaw ?? 0;
+  // Token budget for the sidebar well: wallet remaining + total spent across all
+  // rounds = the night's grant. tokensLeft is the wallet remaining (DB-honest).
+  const tokensLeft = (myState?.tokens_base_remaining ?? cfg.starting_tokens) + (myState?.tokens_bought_remaining ?? 0);
+  const tokensTotal = tokensLeft + voteRows.reduce((sum, v) => sum + (v.up_tokens ?? 0) + (v.down_tokens ?? 0), 0);
   const myRoundVotes = voteRows.filter((v) => v.round_id === currentRound.id);
   const tokensSpent = myRoundVotes.reduce((sum, v) => sum + (v.up_tokens ?? 0) + (v.down_tokens ?? 0), 0);
   const nameFor = (pid: string) => roster.find((p) => p.id === pid)?.display_name ?? 'Player';
@@ -342,6 +346,8 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
       playerName={myPlayer.display_name}
       isManager={isManager}
       initialTab={tab}
+      tokensLeft={tokensLeft}
+      tokensTotal={tokensTotal}
       overlays={overlays}
       panes={panes}
     />

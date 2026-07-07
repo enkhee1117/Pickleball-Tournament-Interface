@@ -3,7 +3,8 @@
 import { setTheme } from '@/app/theme-actions';
 import { THEMES, type Theme } from '@/lib/theme';
 
-/* Cycles Sideline → Night → Arcade via the setTheme server action (cookie).
+/* Cycles Bright (Sideline) ⇄ Dark (Night) via the setTheme server action
+   (cookie). The handoff's third "Arcade" theme is intentionally not shipped.
    Icon button matching the handoff nav's theme toggle. */
 export function ThemeToggleButton({ theme }: { theme: Theme }) {
   const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
