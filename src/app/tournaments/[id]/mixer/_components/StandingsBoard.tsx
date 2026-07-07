@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   computeStandings,
+  orderMovements,
   playerGamesMap,
   tallyGames,
   type CourtResult,
@@ -67,6 +68,28 @@ export function StandingsBoard({
   const gamesMap = useMemo(() => playerGamesMap(results), [results]);
   const gamesLeft = tallyGames(results).left;
   const avatarFor = (id: string, name: string) => mixerAvatarFor({ id, display_name: name }, selfPlayerId ?? undefined);
+
+  // Movement deltas + flash (handoff score-flow.html): when a posted score
+  // re-sorts the board, show ▲/▼ places moved next to the rank and briefly
+  // flash the rows that moved. We diff the new order against the last-seen one;
+  // deltas persist until the next re-sort, the flash clears after ~1.2s.
+  const orderSig = standings.map((r) => r.playerId).join(',');
+  const prevOrderRef = useRef<string[]>([]);
+  const [deltas, setDeltas] = useState<Record<string, number>>({});
+  const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const prev = prevOrderRef.current;
+    const cur = standings.map((r) => r.playerId);
+    prevOrderRef.current = cur;
+    if (prev.length === 0) return; // first paint — nothing to compare against
+    const moved = orderMovements(prev, cur);
+    if (Object.keys(moved).length === 0) return;
+    setDeltas(moved);
+    setFlashIds(new Set(Object.keys(moved)));
+    const t = setTimeout(() => setFlashIds(new Set()), 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderSig]);
 
   const toEntry = (row: StandingRow): PodiumEntry => ({ playerId: row.playerId, name: row.name, points: row.points });
   const women = standings.filter((r) => genders[r.playerId] === 'f');
@@ -156,18 +179,34 @@ export function StandingsBoard({
         {standings.map((row, i) => {
           const medal = i < 3 && finalized ? ['var(--amber)', 'oklch(0.82 0.02 250)', 'oklch(0.66 0.09 55)'][i] : null;
           const isSelf = row.playerId === selfPlayerId;
+          const delta = deltas[row.playerId] ?? 0;
+          const flashing = flashIds.has(row.playerId);
           return (
             <button
               key={row.playerId}
               type="button"
               onClick={() => setSelectedId(row.playerId)}
               aria-label={`${row.name} details`}
-              className="grid w-full grid-cols-[34px_1fr_48px_52px_112px_48px] items-center gap-2 rounded-xl px-4 py-2.5 text-left transition-colors hover:brightness-[.98]"
-              style={{ background: isSelf ? 'color-mix(in oklch, var(--court) 12%, transparent)' : i % 2 ? 'var(--surface-inset)' : undefined }}
+              className="grid w-full grid-cols-[34px_1fr_48px_52px_112px_48px] items-center gap-2 rounded-xl px-4 py-2.5 text-left hover:brightness-[.98]"
+              style={{
+                transition: 'background-color .4s ease',
+                background: flashing
+                  ? 'color-mix(in oklch, var(--court) 22%, transparent)'
+                  : isSelf
+                    ? 'color-mix(in oklch, var(--court) 12%, transparent)'
+                    : i % 2
+                      ? 'var(--surface-inset)'
+                      : undefined,
+              }}
             >
               <span className="mono flex items-center gap-1.5 text-[15px] font-bold" style={{ color: 'var(--ink-3)' }}>
                 {medal ? <span className="h-2.5 w-2.5 rounded-full" style={{ background: medal }} /> : null}
                 {i + 1}
+                {delta !== 0 ? (
+                  <span className="mono text-[11px] font-bold" style={{ color: delta > 0 ? 'var(--court-deep)' : 'var(--berry)' }}>
+                    {delta > 0 ? '▲' : '▼'}{Math.abs(delta)}
+                  </span>
+                ) : null}
               </span>
               <span className="flex min-w-0 items-center gap-2.5">
                 <Avatar player={avatarFor(row.playerId, row.name)} size={32} ring={isSelf} />

@@ -3,12 +3,38 @@ import {
   buildCourtResults,
   computeStandings,
   gameSlotLabel,
+  orderMovements,
   ordinal,
   playerGamesMap,
   sortStandings,
   tallyGames,
   type CourtResult,
 } from './mixer-standings';
+
+describe('orderMovements', () => {
+  it('reports places climbed (+) and dropped (-) between two orderings', () => {
+    // Maya jumps 4th → 2nd (+2); the two she passed each drop one (-1).
+    const prev = ['a', 'b', 'c', 'maya', 'd'];
+    const cur = ['a', 'maya', 'b', 'c', 'd'];
+    const mv = orderMovements(prev, cur);
+    expect(mv.maya).toBe(2);
+    expect(mv.b).toBe(-1);
+    expect(mv.c).toBe(-1);
+    expect(mv.a).toBeUndefined(); // unchanged rank → omitted
+    expect(mv.d).toBeUndefined();
+  });
+
+  it('omits a new entrant itself but still reports whom it displaced', () => {
+    const mv = orderMovements(['a', 'b'], ['new', 'a', 'b']);
+    expect(mv.new).toBeUndefined(); // not in the previous ordering
+    expect(mv.a).toBe(-1);
+    expect(mv.b).toBe(-1);
+  });
+
+  it('returns nothing when the order is identical', () => {
+    expect(orderMovements(['a', 'b', 'c'], ['a', 'b', 'c'])).toEqual({});
+  });
+});
 
 const names = new Map([
   ['me', 'Maya Chen'],
