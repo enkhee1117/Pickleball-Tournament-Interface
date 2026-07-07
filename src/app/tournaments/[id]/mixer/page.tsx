@@ -36,6 +36,7 @@ import { MatchTab } from './_components/MatchTab';
 import { CourtsTab } from './_components/CourtsTab';
 import { MeTab } from './_components/MeTab';
 import { Notice, mixerAvatarFor } from './_components/mixer-night';
+import { MixerPlayerShell, type PlayerTab } from './_components/MixerPlayerShell';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -98,7 +99,7 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   const myPlayer = user ? roster.find((p) => p.profile_id === user.id) ?? null : null;
   const myState = myPlayer ? stateRows.find((s) => s.player_id === myPlayer.id) ?? null : null;
 
-  const [{ data: votes }, { data: pairings }, { data: scores }, { data: sitOuts }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }] = await Promise.all([
+  const [{ data: votes }, { data: pairings }, { data: scores }, { data: sitOuts }, { data: bets }, { data: payments }, { data: snapshot }, { data: checkIn }, { data: ballotConfirmations }, { count: ballotsInRaw }] = await Promise.all([
     roundIds.length > 0 && myPlayer
       ? supabase.from('mixer_votes').select('round_id,target_player_id,up_tokens,down_tokens').in('round_id', roundIds).eq('voter_player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
@@ -126,6 +127,11 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     roundIds.length > 0 && myPlayer
       ? supabase.from('mixer_round_ballots').select('round_id,confirmed_at').in('round_id', roundIds).eq('player_id', myPlayer.id)
       : Promise.resolve({ data: [] }),
+    // Blind-safe total of confirmed ballots for the live round (count only, never
+    // picks). Batched here instead of a sequential await after this block.
+    currentRound && myPlayer
+      ? supabase.from('mixer_round_ballots').select('*', { count: 'exact', head: true }).eq('round_id', currentRound.id).not('confirmed_at', 'is', null)
+      : Promise.resolve({ count: 0 }),
   ]);
 
   const voteRows = (votes ?? []) as VoteRow[];
@@ -249,11 +255,6 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
   // (blind-safe count only — never picks), my own tokens spent, and my sealed
   // ballot (only I ever see my picks).
   const activeRosterCount = roster.filter((p) => !p.withdrawn_at).length;
-  const { count: ballotsInRaw } = await supabase
-    .from('mixer_round_ballots')
-    .select('*', { count: 'exact', head: true })
-    .eq('round_id', currentRound.id)
-    .not('confirmed_at', 'is', null);
   const ballotsIn = ballotsInRaw ?? 0;
   const myRoundVotes = voteRows.filter((v) => v.round_id === currentRound.id);
   const tokensSpent = myRoundVotes.reduce((sum, v) => sum + (v.up_tokens ?? 0) + (v.down_tokens ?? 0), 0);
@@ -268,8 +269,8 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
     }))
     .sort((a, b) => (a.down ? 1 : 0) - (b.down ? 1 : 0) || b.tokens - a.tokens);
 
-  return (
-    <MixerShell tournament={t} currentRound={shellRound ?? currentRound} tab={tab} player={myPlayer} isManager={isManager}>
+  const overlays = (
+    <>
       <PushRegistration />
       {reveal && (
         <RevealTakeover
@@ -295,35 +296,55 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
       {showPresenceCheckIn && <MixerPresenceCheckIn tournamentId={id} />}
       {sp.error && <Notice tone="error">{sp.error}</Notice>}
       {sp.ok && <Notice tone="ok">{sp.ok}</Notice>}
-      {tab === 'vote' && (
-        <MixerVotePanel
-          tournamentId={id}
-          round={voteRound ?? currentRound}
-          rounds={roundRows}
-          eventRoundCount={cfg.rounds}
-          config={cfg}
-          roster={roster}
-          states={stateRows}
-          myPlayer={myPlayer}
-          myState={myState}
-          votes={voteRows}
-          confirmedRoundIds={confirmedRoundIds}
-          genderMode={t.gender_mode ?? 'mixed'}
-        />
-      )}
-      {tab === 'match' && (
-        <MatchTab tournamentId={id} round={currentRound} roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} gameTo={cfg.game_to ?? 11} ballotsIn={ballotsIn} rosterCount={activeRosterCount} tokensSpent={tokensSpent} myBallot={myBallot} />
-      )}
-      {tab === 'courts' && (
-        <CourtsTab roster={roster} pairings={pairingRows} scores={scoreRows} sitOuts={sitOutIds} myPlayer={myPlayer} round={currentRound} />
-      )}
-      {tab === 'betting' && (
-        <MixerBettingPanel tournamentId={id} roster={roster} myPlayer={myPlayer} myState={myState} bets={betRows} config={cfg} />
-      )}
-      {tab === 'me' && (
-        <MeTab tournament={t} config={cfg} player={myPlayer} state={myState} inviteCode={t.invite_code} payments={paymentRows} raffleTickets={raffleTickets} raffleWinner={raffleWinner} standings={standings} />
-      )}
-    </MixerShell>
+    </>
+  );
+
+  // Every pane is rendered once here on the server; MixerPlayerShell toggles
+  // which is visible client-side (no navigation, no refetch on a tab click).
+  const panes: Record<PlayerTab, ReactNode> = {
+    vote: (
+      <MixerVotePanel
+        tournamentId={id}
+        round={voteRound ?? currentRound}
+        rounds={roundRows}
+        eventRoundCount={cfg.rounds}
+        config={cfg}
+        roster={roster}
+        states={stateRows}
+        myPlayer={myPlayer}
+        myState={myState}
+        votes={voteRows}
+        confirmedRoundIds={confirmedRoundIds}
+        genderMode={t.gender_mode ?? 'mixed'}
+      />
+    ),
+    match: (
+      <MatchTab tournamentId={id} round={currentRound} roster={roster} pairings={pairingRows} scores={scoreRows} myPlayer={myPlayer} standings={standings} gameTo={cfg.game_to ?? 11} ballotsIn={ballotsIn} rosterCount={activeRosterCount} tokensSpent={tokensSpent} myBallot={myBallot} />
+    ),
+    courts: (
+      <CourtsTab roster={roster} pairings={pairingRows} scores={scoreRows} sitOuts={sitOutIds} myPlayer={myPlayer} round={currentRound} />
+    ),
+    betting: (
+      <MixerBettingPanel tournamentId={id} roster={roster} myPlayer={myPlayer} myState={myState} bets={betRows} config={cfg} />
+    ),
+    me: (
+      <MeTab tournament={t} config={cfg} player={myPlayer} state={myState} inviteCode={t.invite_code} payments={paymentRows} raffleTickets={raffleTickets} raffleWinner={raffleWinner} standings={standings} />
+    ),
+  };
+
+  return (
+    <MixerPlayerShell
+      tournamentId={id}
+      tournamentName={t.name}
+      inviteCode={t.invite_code}
+      roundNo={currentRound.round_no}
+      roundState={currentRound.state}
+      playerName={myPlayer.display_name}
+      isManager={isManager}
+      initialTab={tab}
+      overlays={overlays}
+      panes={panes}
+    />
   );
 }
 
@@ -343,12 +364,12 @@ function MixerShell({
   children: ReactNode;
 }) {
   const base = `/tournaments/${tournament.id}/mixer`;
-  const tabs: [string, string][] = [
-    ['vote', 'Vote'],
-    ['match', 'Match'],
-    ['courts', 'Courts'],
-    ['betting', 'Pool'],
-    ['me', 'Me'],
+  const tabs: [string, string, ReactNode][] = [
+    ['vote', 'Vote', <><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.7" /><path d="M8 11.5l2.5 2.5 5-5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></>],
+    ['match', 'Match', <><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.7" /><path d="M12 4v16" stroke="currentColor" strokeWidth="1.7" strokeDasharray="1.6 1.8" /></>],
+    ['courts', 'Courts', <><rect x="3.5" y="6" width="7.5" height="12" rx="1.4" stroke="currentColor" strokeWidth="1.6" /><rect x="13" y="6" width="7.5" height="12" rx="1.4" stroke="currentColor" strokeWidth="1.6" /></>],
+    ['betting', 'Pool', <><circle cx="9.5" cy="10" r="5" stroke="currentColor" strokeWidth="1.6" /><path d="M14.2 6.5A5 5 0 1115.5 16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></>],
+    ['me', 'Me', <><circle cx="12" cy="8.5" r="3.3" stroke="currentColor" strokeWidth="1.7" /><path d="M5.5 19.5c.8-3.4 3.4-5.2 6.5-5.2s5.7 1.8 6.5 5.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></>],
   ];
   const href = (id: string) => (id === 'vote' ? base : `${base}?tab=${id}`);
   // Player mode is mobile-primary and widens on desktop (handoff player.html):
@@ -379,16 +400,27 @@ function MixerShell({
               ROUND {currentRound.round_no}{player ? ` · ${player.display_name.toUpperCase()}` : ''}
             </div>
           </div>
-          {tabs.map(([id, label]) => (
-            <Link
-              key={id}
-              href={href(id)}
-              className="rounded-[11px] px-3 py-2.5 text-[14px] font-medium"
-              style={tab === id ? { background: 'var(--court)', color: 'var(--night-court-ink)', fontWeight: 600 } : { color: 'var(--night-nav-link)' }}
-            >
-              {label}
-            </Link>
-          ))}
+          {tabs.map(([id, label, icon]) => {
+            const on = tab === id;
+            return (
+              <Link
+                key={id}
+                href={href(id)}
+                prefetch
+                className="flex items-center gap-3 rounded-[11px] border px-3 py-2.5 text-[14px] font-medium"
+                style={
+                  on
+                    ? { background: 'color-mix(in oklch, var(--court) 16%, transparent)', color: 'var(--night-text)', borderColor: 'color-mix(in oklch, var(--court) 34%, transparent)', fontWeight: 600 }
+                    : { color: 'var(--night-nav-link)', borderColor: 'transparent' }
+                }
+              >
+                <span className="grid w-5 place-items-center" style={{ color: on ? 'var(--court-deep)' : 'var(--night-text3)' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>{icon}</svg>
+                </span>
+                {label}
+              </Link>
+            );
+          })}
           <div className="flex-1" />
           {isManager && (
             <Link href={`${base}/admin`} className="rounded-[11px] px-3 py-2.5 text-[13px] font-semibold" style={{ background: 'var(--night-card)', border: '1px solid var(--night-line)', color: 'var(--night-nav-link-strong)' }}>
@@ -400,8 +432,9 @@ function MixerShell({
           </Link>
         </aside>
 
-        {/* Main column — constrained on tablet, full on desktop */}
-        <div className="mx-auto w-full max-w-[560px] lg:max-w-[1080px] lg:px-6">
+        {/* Main column — centered on mobile, left-aligned against the sidebar on
+            desktop (no dead gap between nav and content). */}
+        <div className="mx-auto w-full max-w-[560px] lg:mx-0 lg:max-w-[1120px] lg:px-8">
           <div className="lg:hidden">
             <TopBar
               dark

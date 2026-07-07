@@ -21,12 +21,17 @@ export function MixerRealtimeSync({ tournamentId }: Props) {
     const supabase = createClient();
     const filter = `tournament_id=eq.${tournamentId}`;
 
+    // Coalesce bursts into a single refresh, and never refresh while the tab is
+    // backgrounded (avoids a jarring reload the moment the organizer switches
+    // back). A longer window keeps a live round from re-rendering on every
+    // single incoming ballot/score.
     const schedule = () => {
       if (pending.current) return;
       pending.current = setTimeout(() => {
         pending.current = null;
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
         router.refresh();
-      }, 250);
+      }, 1000);
     };
 
     const channel = supabase
