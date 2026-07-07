@@ -403,7 +403,7 @@ export function MixerVotePanel({
             </div>
           )}
 
-          <div className="grid gap-2.5 sm:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {targets.map((p) => {
               const cell = ballot[p.id] ?? { up: 0, down: 0 };
               return (
@@ -790,19 +790,21 @@ function RoundSelector({
 }) {
   const byNumber = new Map(rounds.map((round) => [round.round_no, round]));
   const total = Math.max(eventRoundCount, rounds.length, activeRound.round_no);
-  // Per-round status → dot + label (handoff round strip):
-  //   voting-now (serve) · set/played (accent) · not-set (grey)
+  // Per-round status → dot + state-colored meta label (handoff round strip,
+  // player.html .rs states): voting-now (serve) · set/played (court-deep) ·
+  // not-set (grey). The meta label carries its own state colour instead of a
+  // flat grey.
   const statusOf = (round: RoundRow | undefined, spent: number) => {
-    if (!round) return { kind: 'notset' as const, dot: 'var(--night-line-2)', label: 'Pending' };
-    if (round.state === 'open') return { kind: 'voting' as const, dot: 'var(--serve)', label: 'Voting now' };
+    if (!round) return { kind: 'notset' as const, dot: 'var(--night-line-2)', meta: NIGHT_TEXT3, label: 'Pending' };
+    if (round.state === 'open') return { kind: 'voting' as const, dot: 'var(--serve)', meta: 'var(--serve)', label: 'Voting now' };
     const played = ['playing', 'done'].includes(round.state);
     const closed = played || ['locked', 'revealed'].includes(round.state);
     // Green only when THIS player actually set a ballot; a closed round they
     // skipped is amber "No ballot" so an abstained round never masquerades as
     // a submitted one.
-    if (spent > 0) return { kind: 'set' as const, dot: 'var(--court)', label: played ? 'Set · played' : 'Set' };
-    if (closed) return { kind: 'set' as const, dot: 'var(--amber)', label: played ? 'Played · no ballot' : 'No ballot' };
-    return { kind: 'notset' as const, dot: 'var(--night-line-2)', label: 'Not set' };
+    if (spent > 0) return { kind: 'set' as const, dot: 'var(--court)', meta: 'var(--court-deep)', label: played ? 'Set · played' : 'Set' };
+    if (closed) return { kind: 'set' as const, dot: 'var(--amber)', meta: 'var(--amber)', label: played ? 'Played · no ballot' : 'No ballot' };
+    return { kind: 'notset' as const, dot: 'var(--night-line-2)', meta: NIGHT_TEXT3, label: 'Not set' };
   };
   return (
     <div className="mb-3">
@@ -819,26 +821,28 @@ function RoundSelector({
           const status = statusOf(round, spent);
           const inner = (
             <>
-              <span className="text-sm font-bold" style={{ color: active ? 'var(--night-court-ink)' : 'var(--night-text)' }}>Round {roundNo}</span>
+              <span className="text-sm font-bold" style={{ color: 'var(--night-text)' }}>Round {roundNo}</span>
               <span
                 className="mt-1 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.06em]"
-                style={{ color: active ? 'var(--night-court-ink)' : NIGHT_TEXT2 }}
+                style={{ color: status.meta }}
               >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: active ? 'var(--night-court-ink)' : status.dot }} />
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: status.dot }} />
                 {status.label}
               </span>
             </>
           );
+          // Active tab = accent border + soft 12% tint (handoff .rs.on), not a
+          // solid fill — so the state dot/label stay readable on the current tab.
           const style = {
             minWidth: 118,
-            background: active ? 'var(--court)' : NIGHT_CARD,
+            background: active ? 'color-mix(in oklch, var(--court) 12%, transparent)' : NIGHT_CARD,
             border: active
               ? '1.5px solid var(--court)'
               : `1.5px solid ${status.kind === 'voting' ? 'color-mix(in oklch, var(--serve) 40%, var(--night-line))' : NIGHT_LINE}`,
           };
           if (!round) {
             return (
-              <span key={roundNo} className="flex flex-col items-start rounded-xl px-3.5 py-2.5 opacity-50" style={style}>
+              <span key={roundNo} className="flex flex-1 flex-col items-start rounded-xl px-3.5 py-2.5 opacity-50" style={style}>
                 {inner}
               </span>
             );
@@ -847,7 +851,7 @@ function RoundSelector({
             <Link
               key={round.id}
               href={`/tournaments/${tournamentId}/mixer?round=${round.round_no}`}
-              className="flex flex-col items-start rounded-xl px-3.5 py-2.5"
+              className="flex flex-1 flex-col items-start rounded-xl px-3.5 py-2.5"
               style={style}
             >
               {inner}
