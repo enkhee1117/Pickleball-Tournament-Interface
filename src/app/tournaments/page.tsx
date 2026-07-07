@@ -110,16 +110,6 @@ export default async function TournamentsPage({
           })}
         </div>
 
-        {sp.error && (
-          <div className="mb-4 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: 'var(--berry)', color: 'var(--berry)', background: 'oklch(0.96 0.04 12)' }}>
-            {sp.error}
-          </div>
-        )}
-        {sp.ok && (
-          <div className="mb-4 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: 'var(--court-deep)', color: 'var(--court-deep)', background: 'oklch(0.96 0.04 140)' }}>
-            {sp.ok}
-          </div>
-        )}
         {sp.welcome === '1' && (
           <div className="mb-4 rounded-2xl px-4 py-3.5" style={{ background: 'var(--court)', color: 'oklch(0.2 0.04 140)' }}>
             <div className="text-sm font-semibold">🎉 Account created — welcome aboard.</div>

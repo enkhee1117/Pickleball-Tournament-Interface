@@ -324,22 +324,6 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
           recordings={recordings}
         />
 
-        {sp.error && (
-          <div
-            className="mt-4 rounded-xl border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--berry)', color: 'var(--berry)', background: 'oklch(0.96 0.04 12)' }}
-          >
-            {sp.error}
-          </div>
-        )}
-        {sp.ok && (
-          <div
-            className="mt-4 rounded-xl border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--court-deep)', color: 'var(--court-deep)', background: 'oklch(0.96 0.04 140)' }}
-          >
-            {sp.ok}
-          </div>
-        )}
 
         {isMixer ? (
           <>

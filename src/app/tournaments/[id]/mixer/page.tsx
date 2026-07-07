@@ -35,7 +35,7 @@ import type {
 import { MatchTab } from './_components/MatchTab';
 import { CourtsTab } from './_components/CourtsTab';
 import { MeTab } from './_components/MeTab';
-import { Notice, mixerAvatarFor } from './_components/mixer-night';
+import { mixerAvatarFor } from './_components/mixer-night';
 import { MixerPlayerShell, type PlayerTab } from './_components/MixerPlayerShell';
 
 type PageProps = {
@@ -298,8 +298,6 @@ export default async function MixerPlayerPage({ params, searchParams }: PageProp
         />
       )}
       {showPresenceCheckIn && <MixerPresenceCheckIn tournamentId={id} />}
-      {sp.error && <Notice tone="error">{sp.error}</Notice>}
-      {sp.ok && <Notice tone="ok">{sp.ok}</Notice>}
     </>
   );
 

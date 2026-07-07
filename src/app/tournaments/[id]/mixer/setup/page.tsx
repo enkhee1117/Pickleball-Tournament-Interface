@@ -12,12 +12,10 @@ import { ActionForm } from '../_components/ActionForm';
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ ok?: string; error?: string }>;
 };
 
-export default async function MixerSetupPage({ params, searchParams }: PageProps) {
+export default async function MixerSetupPage({ params }: PageProps) {
   const { id } = await params;
-  const sp = await searchParams;
   const supabase = await createClient();
   const user = await getCurrentUser();
   const cookieStore = await cookies();
@@ -69,12 +67,6 @@ export default async function MixerSetupPage({ params, searchParams }: PageProps
           Change how the event runs — anytime, even mid-event. Add-ons flip on and off whenever you like.
         </div>
 
-        {sp.ok && (
-          <div className="mb-4 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: 'var(--court-deep)', color: 'var(--court-deep)', background: 'oklch(0.96 0.04 140)' }}>{sp.ok}</div>
-        )}
-        {sp.error && (
-          <div className="mb-4 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: 'var(--berry)', color: 'var(--berry)', background: 'oklch(0.96 0.04 12)' }}>{sp.error}</div>
-        )}
 
         {!cfg ? (
           <div className="rounded-2xl bg-white p-6 text-center" style={{ border: '1px dashed var(--line)' }}>
