@@ -52,16 +52,6 @@ export default async function ProfilePage({
     <DesktopSurface withCommandBar>
       <DesktopNav theme={theme} active="Me" />
       <main id="main" className="mx-auto w-full max-w-[1120px] px-4 pb-24 pt-7 sm:px-6 lg:px-8">
-        {sp.saved && (
-          <div className="mb-4 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: 'var(--court-deep)', color: 'var(--court-deep)', background: 'oklch(0.96 0.04 140)' }}>
-            Saved.
-          </div>
-        )}
-        {sp.error && (
-          <div className="mb-4 rounded-xl border px-3 py-2 text-sm" style={{ borderColor: 'var(--berry)', color: 'var(--berry)', background: 'oklch(0.96 0.04 12)' }}>
-            {sp.error}
-          </div>
-        )}
 
         {/* hero */}
         <div className="mb-7 flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:text-left">

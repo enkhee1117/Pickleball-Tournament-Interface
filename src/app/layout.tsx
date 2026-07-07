@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from 'next';
+import { Suspense } from 'react';
 import { Instrument_Serif, JetBrains_Mono, Geist, Archivo } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
 import { TabBar } from '@/components/TabBar';
 import { ToastProvider } from '@/components/desktop/ToastProvider';
+import { ToastFromParams } from '@/components/desktop/ToastFromParams';
 import { AccountProvider, type NavAccount } from '@/components/desktop/account-context';
 import { getProfile } from '@/lib/auth';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
@@ -83,6 +85,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <body className="bg-paper text-ink">
         <ToastProvider>
+          <Suspense fallback={null}>
+            <ToastFromParams />
+          </Suspense>
           <AccountProvider account={account}>
             <div className="mx-auto flex min-h-[100dvh] max-w-[480px] flex-col">
               <main className="flex flex-1 flex-col">{children}</main>

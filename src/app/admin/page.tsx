@@ -11,11 +11,7 @@ import { ConfirmForm } from '@/components/ui/ConfirmForm';
 import { SubmitButton } from '@/components/ui/SubmitButton';
 import type { Invite, Profile } from '@/lib/types';
 
-export default async function AdminPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string; ok?: string }>;
-}) {
+export default async function AdminPage() {
   const me = await getProfile();
   if (!me || (me.role !== 'admin' && me.role !== 'organizer')) {
     return (
@@ -47,8 +43,6 @@ export default async function AdminPage({
       </div>
     );
   }
-  const sp = await searchParams;
-
   const admin = createAdminClient();
   const [{ data: invitesRaw }, { data: profilesRaw }] = await Promise.all([
     admin.from('invites').select('*').order('created_at', { ascending: false }).limit(100),
@@ -78,23 +72,6 @@ export default async function AdminPage({
       />
 
       <div className="flex-1 overflow-y-auto px-[18px] pb-24">
-        {sp.error && (
-          <div
-            className="mb-3 rounded-xl border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--berry)', color: 'var(--berry)', background: 'oklch(0.96 0.04 12)' }}
-          >
-            {sp.error}
-          </div>
-        )}
-        {sp.ok && (
-          <div
-            className="mb-3 rounded-xl border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--court-deep)', color: 'var(--court-deep)', background: 'oklch(0.96 0.04 140)' }}
-          >
-            {sp.ok}
-          </div>
-        )}
-
         <SectionHeader title="Invite a player" />
         <form
           action={createInvite}

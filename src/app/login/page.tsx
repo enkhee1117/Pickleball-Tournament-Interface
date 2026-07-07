@@ -92,14 +92,6 @@ export default async function LoginPage({
               Sign in to run and join your events.
             </div>
 
-            {sp.ok && (
-              <div
-                className="mb-4 rounded-xl px-3.5 py-2.5 text-sm"
-                style={{ background: 'oklch(0.82 0.17 140 / .16)', color: 'oklch(0.9 0.16 140)', border: '1px solid oklch(0.82 0.17 140 / .3)' }}
-              >
-                {sp.ok}
-              </div>
-            )}
 
             <LoginForm next={sp.next ?? '/'} />
 

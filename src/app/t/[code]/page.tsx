@@ -218,14 +218,6 @@ export default async function PublicTournamentPage({ params, searchParams }: Pag
       </div>
 
       <div className="flex-1 overflow-y-auto pb-24">
-        {sp.error && (
-          <div
-            className="mx-[18px] mt-3 rounded-xl border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--berry)', color: 'var(--berry)', background: 'oklch(0.96 0.04 12)' }}
-          >
-            {sp.error}
-          </div>
-        )}
         <CtaBar
           tournamentId={t.id}
           inviteCode={t.invite_code}

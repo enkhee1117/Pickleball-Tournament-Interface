@@ -48,7 +48,6 @@ import {
 } from '../_components/admin-helpers';
 import { normalizePaymentMethods } from '../_components/payment-methods';
 import {
-  Notice,
   PrizeBucket,
   RoundRail,
   Section,
@@ -313,8 +312,6 @@ export default async function MixerAdminPage({ params, searchParams }: PageProps
             recapHref={`/tournaments/${id}/recap`}
           />
           <div id="main" className="px-5 pb-24 pt-6 lg:px-7">
-        {sp.error && <Notice tone="error">{sp.error}</Notice>}
-        {sp.ok && <Notice tone="ok">{sp.ok}</Notice>}
 
         {!cfg || !currentRound ? (
           <ActionForm action={initializeMixerEvent} className="rounded-2xl bg-white p-5 text-center" style={{ border: '1px dashed var(--line)' }}>
