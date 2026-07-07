@@ -10,14 +10,17 @@ import { formatInviteCode } from '@/lib/invite-codes';
 import { MixerModeSwitch } from '../MixerModeSwitch';
 import { MixerRealtimeSync } from '../MixerRealtimeSync';
 
-export type PlayerTab = 'vote' | 'match' | 'courts' | 'betting' | 'me';
+export type PlayerTab = 'vote' | 'match' | 'courts' | 'betting' | 'standings' | 'me';
 
-const TABS: [PlayerTab, string, ReactNode][] = [
-  ['vote', 'Vote', <><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.7" /><path d="M8 11.5l2.5 2.5 5-5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></>],
-  ['match', 'Match', <><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.7" /><path d="M12 4v16" stroke="currentColor" strokeWidth="1.7" strokeDasharray="1.6 1.8" /></>],
-  ['courts', 'Courts', <><rect x="3.5" y="6" width="7.5" height="12" rx="1.4" stroke="currentColor" strokeWidth="1.6" /><rect x="13" y="6" width="7.5" height="12" rx="1.4" stroke="currentColor" strokeWidth="1.6" /></>],
-  ['betting', 'Pool', <><circle cx="9.5" cy="10" r="5" stroke="currentColor" strokeWidth="1.6" /><path d="M14.2 6.5A5 5 0 1115.5 16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></>],
-  ['me', 'Me', <><circle cx="12" cy="8.5" r="3.3" stroke="currentColor" strokeWidth="1.7" /><path d="M5.5 19.5c.8-3.4 3.4-5.2 6.5-5.2s5.7 1.8 6.5 5.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></>],
+// [id, desktop label, icon, mobile label] — mobile bottom bar uses the short
+// label so six tabs stay one-line at phone width.
+const TABS: [PlayerTab, string, ReactNode, string][] = [
+  ['vote', 'Vote', <><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.7" /><path d="M8 11.5l2.5 2.5 5-5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></>, 'Vote'],
+  ['match', 'Match', <><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.7" /><path d="M12 4v16" stroke="currentColor" strokeWidth="1.7" strokeDasharray="1.6 1.8" /></>, 'Match'],
+  ['courts', 'Courts', <><rect x="3.5" y="6" width="7.5" height="12" rx="1.4" stroke="currentColor" strokeWidth="1.6" /><rect x="13" y="6" width="7.5" height="12" rx="1.4" stroke="currentColor" strokeWidth="1.6" /></>, 'Courts'],
+  ['betting', 'Pool', <><circle cx="9.5" cy="10" r="5" stroke="currentColor" strokeWidth="1.6" /><path d="M14.2 6.5A5 5 0 1115.5 16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></>, 'Pool'],
+  ['standings', 'Standings', <><rect x="4" y="12" width="4" height="8" rx="1" stroke="currentColor" strokeWidth="1.6" /><rect x="10" y="7" width="4" height="13" rx="1" stroke="currentColor" strokeWidth="1.6" /><rect x="16" y="10" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.6" /></>, 'Board'],
+  ['me', 'Me', <><circle cx="12" cy="8.5" r="3.3" stroke="currentColor" strokeWidth="1.7" /><path d="M5.5 19.5c.8-3.4 3.4-5.2 6.5-5.2s5.7 1.8 6.5 5.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></>, 'Me'],
 ];
 
 type Props = {
@@ -200,19 +203,19 @@ export function MixerPlayerShell({
       </div>
 
       {/* Bottom tab bar — mobile only */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 mx-auto grid max-w-md grid-cols-5 gap-1 p-2 lg:hidden" style={{ background: 'var(--night-bg)', borderTop: '1px solid var(--night-line)' }}>
-        {TABS.map(([id, label]) => (
+      <div className="fixed bottom-0 left-0 right-0 z-30 mx-auto grid max-w-md grid-cols-6 gap-0.5 p-2 lg:hidden" style={{ background: 'var(--night-bg)', borderTop: '1px solid var(--night-line)' }}>
+        {TABS.map(([id, , , shortLabel]) => (
           <button
             key={id}
             type="button"
             onClick={() => go(id)}
-            className="rounded-xl py-3 text-center text-[12px] font-bold"
+            className="rounded-xl py-3 text-center text-[11.5px] font-bold"
             style={{
               background: active === id ? 'var(--court)' : 'transparent',
               color: active === id ? 'var(--night-court-ink)' : 'var(--night-text2)',
             }}
           >
-            {label}
+            {shortLabel}
           </button>
         ))}
       </div>

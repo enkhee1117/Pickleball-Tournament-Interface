@@ -177,6 +177,27 @@ export function MixerBettingPanel({
           );
         })}
       </div>
+
+      {/* How the pool pays (handoff pool.html rail) — the settle rules, adapted
+          to our podium-pool model (not the design's pari-mutuel winner's pool).
+          Each place is its own market; markets settle from the final board. */}
+      <div className="mb-2 mt-3 rounded-2xl p-4" style={{ background: 'var(--night-inset)', border: '1px solid var(--night-line)' }}>
+        <div className="text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--night-text3)' }}>How the pool pays</div>
+        <ul className="mt-2.5 flex flex-col gap-2 text-[12.5px] leading-[1.5]" style={{ color: 'var(--night-text2)' }}>
+          <li className="flex gap-2">
+            <span style={{ color: 'var(--court)' }}>◆</span>
+            <span>Each place is its own market. Stake chips on who you think finishes there.</span>
+          </li>
+          <li className="flex gap-2">
+            <span style={{ color: 'var(--court)' }}>◆</span>
+            <span>Markets settle from the <b style={{ color: 'var(--night-text)' }}>final standings</b> when the night ends — backers of the right pick split that market&apos;s pot.</span>
+          </li>
+          <li className="flex gap-2">
+            <span style={{ color: 'var(--court)' }}>◆</span>
+            <span>A {Math.round(Number(config.betting_rake_pct ?? 0) * 100)}% rake comes off the top; only <b style={{ color: 'var(--night-text)' }}>your</b> slip is ever shown until settle.</span>
+          </li>
+        </ul>
+      </div>
     </div>
   );
 }
