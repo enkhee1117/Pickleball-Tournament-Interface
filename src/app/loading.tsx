@@ -1,33 +1,20 @@
-// Home skeleton — the most-hit route was the only top-level page without
-// one, so signed-in users stared at a blank shell while tournaments and
-// live matches loaded. Mirrors the greeting → hero → live rail structure.
+// Global fallback for routes that render inside the 480px mobile shell and
+// don't ship their own loading.tsx — the auth/join flows (login, signup,
+// forgot/reset-password, join). Home and every desktop surface now provide
+// their own data-fullscreen fallback (see (home)/loading.tsx and the section
+// loading files), so this stays deliberately mobile-shaped and neutral: a
+// desktop fallback here would flash those phone-width pages the other way.
 export default function Loading() {
   return (
-    <div className="flex min-h-full flex-col bg-paper">
-      <div className="flex items-center justify-between px-[18px] pt-3.5 pb-3">
-        <div className="h-5 w-28 animate-pulse rounded-md bg-paper-2" />
-        <div className="h-10 w-10 animate-pulse rounded-xl bg-paper-2" />
-      </div>
-      <div className="px-[18px] pb-24">
-        <div className="mb-4 space-y-2 pt-2">
-          <div className="h-8 w-3/4 animate-pulse rounded-md bg-paper-2" />
-          <div className="h-8 w-1/2 animate-pulse rounded-md bg-paper-2" />
-        </div>
-        <div className="h-48 animate-pulse rounded-[22px] bg-paper-2" />
-        <div className="mt-5 h-4 w-24 animate-pulse rounded bg-paper-2" />
-        <div className="mt-3 space-y-2.5">
+    <div className="flex min-h-full flex-col bg-paper px-5 pt-10">
+      <div className="mx-auto w-full max-w-[420px]">
+        <div className="h-7 w-40 animate-pulse rounded-md bg-paper-2" />
+        <div className="mt-2 h-4 w-56 animate-pulse rounded bg-paper-2" />
+        <div className="mt-7 space-y-3">
           {[1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-24 animate-pulse rounded-[18px] bg-white"
-              style={{ border: '1px solid var(--line)' }}
-            />
+            <div key={i} className="h-12 animate-pulse rounded-xl bg-white" style={{ border: '1px solid var(--line)' }} />
           ))}
-        </div>
-        <div className="mt-5 grid grid-cols-2 gap-2.5">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-20 animate-pulse rounded-[18px] bg-paper-2" />
-          ))}
+          <div className="mt-2 h-12 animate-pulse rounded-xl bg-paper-2" />
         </div>
       </div>
     </div>
