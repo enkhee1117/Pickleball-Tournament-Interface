@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, getProfile } from '@/lib/auth';
 import { THEME_COOKIE, readThemeFromCookie } from '@/lib/theme';
 import type { Tournament } from '@/lib/types';
 import { Chip } from '@/components/ui/Chip';
@@ -120,9 +120,11 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
         .eq('user_id', user.id)
         .maybeSingle()
     : Promise.resolve({ data: null });
-  const viewerProfileQuery = user
-    ? supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
-    : Promise.resolve({ data: null });
+  // Viewer's display name comes from the request-cached getProfile() the root
+  // layout already loaded — reusing it here avoids a second profiles round-trip
+  // on this hot path (React cache() can't dedupe the differently-shaped query
+  // this page used before).
+  const viewerProfileQuery = user ? getProfile() : Promise.resolve(null);
 
   const [
     { data: tournament },
@@ -130,7 +132,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
     { data: players },
     ,
     { data: memberRow },
-    { data: viewerProfile },
+    viewerProfile,
   ] = await Promise.all([
     supabase
       .from('tournaments')
@@ -209,7 +211,7 @@ export default async function TournamentDetailPage({ params, searchParams }: Pag
   const isOwner = !!user && user.id === t.owner_user_id;
   const memberRole: string | null = (memberRow as { role?: string } | null)?.role ?? null;
   const viewerDisplayName: string | null =
-    ((viewerProfile as { display_name?: string } | null)?.display_name ?? '').trim() || null;
+    (viewerProfile?.display_name ?? '').trim() || null;
   const isManager = isOwner || memberRole === 'organizer' || memberRole === 'admin';
   const isMember = isOwner || memberRole !== null;
   const playerCount = (players ?? []).length;

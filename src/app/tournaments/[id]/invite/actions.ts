@@ -373,6 +373,16 @@ export async function setInviteWhatsApp(formData: FormData): Promise<void> {
     .single();
   if (!existing) return;
 
+  // A non-empty but unparseable link normalizes to null, which would silently
+  // erase any saved group link. Surface an error instead of clearing it.
+  if (raw.trim() && !whatsapp) {
+    redirect(
+      `/tournaments/${tournamentId}/invite?error=${encodeURIComponent(
+        'That does not look like a valid WhatsApp group link.',
+      )}`,
+    );
+  }
+
   await supabase.rpc('app_update_tournament', {
     p_tournament_id: tournamentId,
     p_name: existing.name,

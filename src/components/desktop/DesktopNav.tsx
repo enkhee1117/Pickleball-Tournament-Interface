@@ -54,6 +54,7 @@ export function DesktopNav({
   return (
     <nav
       role="navigation"
+      aria-label="Main"
       className={`sticky top-0 z-40 flex h-[66px] items-center gap-3 px-4 sm:gap-[22px] sm:px-8${liberty ? ' liberty-bar' : ''}`}
       style={{
         background: 'color-mix(in oklch, var(--bg) 86%, transparent)',

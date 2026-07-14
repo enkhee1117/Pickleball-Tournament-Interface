@@ -68,8 +68,12 @@ const HIDDEN_EXACT = new Set<string>();
 const HIDDEN_PATTERNS = [
   /^\/tournaments\/new(\/|$)/,
   /^\/tournaments\/[^/]+\/(invite|match|create)(\/|$)/,
-  /^\/tournaments\/[^/]+\/mixer$/,
-  /^\/tournaments\/[^/]+\/mixer\/present$/,
+  // The whole mixer subtree is a set of focused player/organizer surfaces
+  // (player view, cockpit, score, setup, recovery, present) that shouldn't
+  // carry the app's primary tab bar. Below lg these render data-fullscreen, so
+  // this is what keeps the bottom bar off them on phones/tablets now that the
+  // tab bar is no longer suppressed globally by the data-fullscreen CSS.
+  /^\/tournaments\/[^/]+\/mixer(\/|$)/,
 ];
 
 export function TabBar() {
@@ -86,6 +90,7 @@ export function TabBar() {
   return (
     <nav
       data-app-tabbar
+      aria-label="Primary tabs"
       className="fixed bottom-0 left-1/2 z-40 w-full max-w-[480px] -translate-x-1/2 border-t bg-paper px-2 pt-2 pb-[max(env(safe-area-inset-bottom),6px)]"
       style={{ borderColor: 'var(--line)' }}
     >
