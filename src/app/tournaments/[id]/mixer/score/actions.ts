@@ -20,12 +20,25 @@ export async function postCourtScore(input: {
   if (!tournamentId || !roundId) return { ok: false, error: 'Missing identifiers' };
 
   const supabase = await createClient();
+  // Defence in depth: the RPC enforces manager/RLS gating, but re-verify the
+  // session here too so a future RPC regression can't silently leak writes —
+  // matching the sibling mutation actions (saveMatchScore et al.).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Not signed in' };
+
+  // Clamp to a sane 0..999 game score before it reaches the DB, mirroring
+  // scoreMixerCourt / submitMixerScoreAsPlayer — a malformed client payload
+  // (negative / NaN / huge) must not be forwarded raw.
+  const clampScore = (n: number) => Math.max(0, Math.min(999, Math.trunc(Number(n) || 0)));
+
   const { error } = await supabase.rpc('app_mixer_score_court', {
     p_round_id: roundId,
     p_court_no: courtNo,
     p_wave_no: waveNo,
-    p_team_a_score: teamAScore,
-    p_team_b_score: teamBScore,
+    p_team_a_score: clampScore(teamAScore),
+    p_team_b_score: clampScore(teamBScore),
   });
   if (error) return { ok: false, error: formatPgError(error) };
 

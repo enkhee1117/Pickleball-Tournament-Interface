@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 // Client tab machinery for the organizer cockpit. The server renders all six
 // tab panes; these primitives toggle which is visible with local state — no
@@ -81,7 +81,11 @@ export function CockpitTabsProvider({ tournamentId, initialTab, children }: { to
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  return <CockpitTabsContext.Provider value={{ active, select }}>{children}</CockpitTabsContext.Provider>;
+  // Memoize so realtime-driven re-renders (MixerRealtimeSync streams new pane
+  // children on every event) don't hand consumers a fresh context object when
+  // neither `active` nor `select` changed.
+  const value = useMemo(() => ({ active, select }), [active, select]);
+  return <CockpitTabsContext.Provider value={value}>{children}</CockpitTabsContext.Provider>;
 }
 
 // One tab's content — mounted always (single-user page), shown only when active.

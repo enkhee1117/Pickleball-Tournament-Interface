@@ -360,7 +360,14 @@ body:has([data-fullscreen]) > div { max-width: none; }
 body:has([data-fullscreen='ink']) { background: var(--ink); }
 body:has([data-fullscreen='night']) { background: var(--night-bg); }
 body:has([data-fullscreen='show']) { background: var(--show-bg); }
-main:has([data-fullscreen]) + [data-app-tabbar] { display: none; }
+/* Hide the bottom TabBar only at desktop widths, where DesktopNav's link row
+   (hidden below lg) provides navigation. Below lg the DesktopNav has no links,
+   so the TabBar is the ONLY chrome nav — hiding it there stranded phone/tablet
+   users on every main surface (they render data-fullscreen). TabBar's own
+   HIDDEN lists still suppress it on organizer/projector/detail routes. */
+@media (min-width: 1024px) {
+  main:has([data-fullscreen]) + [data-app-tabbar] { display: none; }
+}
 
 /* ─────────────────────────────────────────────────────────────
    ACCESSIBILITY LAYER — court-green focus ring for keyboard users,

@@ -23,12 +23,16 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <div className="flex min-h-full flex-col bg-paper">
+    // data-fullscreen keeps the error state in the desktop shell. Without it a
+    // throwing DesktopSurface page would drop back into the 480px mobile shell
+    // (and flash the bottom TabBar in) mid-error — the same shell-mismatch the
+    // loading fallbacks were fixed for.
+    <div data-fullscreen="on" className="flex min-h-[100dvh] flex-col bg-paper">
       <TopBar title="Something went wrong" />
-      <div className="flex-1 px-[18px] pt-2">
+      <div className="mx-auto w-full max-w-[520px] flex-1 px-[18px] pt-2">
         <div
-          className="rounded-2xl bg-white p-5 text-center"
-          style={{ border: '1px solid var(--line)' }}
+          className="rounded-2xl p-5 text-center"
+          style={{ background: 'var(--card)', border: '1px solid var(--line)' }}
         >
           <div className="text-[28px]">⚠️</div>
           <div className="mt-2 text-[15px] font-semibold text-ink">
@@ -55,7 +59,7 @@ export default function GlobalError({
             <Link
               href="/"
               className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
-              style={{ color: 'var(--ink-2)', border: '1px solid var(--line)', background: '#fff' }}
+              style={{ color: 'var(--ink-2)', border: '1px solid var(--line)', background: 'var(--surface-card)' }}
             >
               Back to home {Icons.arrow}
             </Link>

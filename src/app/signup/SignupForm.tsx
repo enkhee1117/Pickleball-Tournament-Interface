@@ -23,6 +23,7 @@ export function SignupForm({ next }: { next: string }) {
         name="display_name"
         required
         autoFocus
+        aria-label="Display name"
         placeholder="Display name"
         className="rounded-2xl px-5 py-[16px] text-base outline-none"
         style={inputStyle}
@@ -33,6 +34,7 @@ export function SignupForm({ next }: { next: string }) {
         inputMode="email"
         autoComplete="username"
         required
+        aria-label="Email"
         placeholder="Email"
         className="rounded-2xl px-5 py-[16px] text-base outline-none"
         style={inputStyle}
@@ -64,6 +66,7 @@ export function SignupForm({ next }: { next: string }) {
         name="password"
         type="password"
         required
+        aria-label="Password"
         placeholder="password (8+ chars)"
         className="rounded-2xl px-5 py-[16px] text-base outline-none"
         style={inputStyle}

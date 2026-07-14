@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { fieldOptionalNumber, fieldString, formatPgError, type FormState } from '@/lib/forms';
 import { normalizeE164 } from '@/lib/phone';
+import { validatePlayerName } from '@/lib/validation';
 
 export async function saveProfile(_prev: FormState, formData: FormData): Promise<FormState> {
   const supabase = await createClient();
@@ -21,6 +22,8 @@ export async function saveProfile(_prev: FormState, formData: FormData): Promise
   const phone = phoneRaw ? normalizeE164(phoneRaw) : null;
 
   if (!display_name) return { error: 'Display name is required.' };
+  const nameCheck = validatePlayerName(display_name);
+  if (!nameCheck.ok) return { error: nameCheck.error };
   if (phoneRaw && !phone) {
     return { error: 'Phone must be in E.164 format (e.g. +15551234567).' };
   }

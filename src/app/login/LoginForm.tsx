@@ -39,9 +39,10 @@ export function LoginForm({ next }: { next: string }) {
       <input type="hidden" name="next" value={next} />
 
       <div>
-        <label className="mb-1.5 block text-[12.5px] font-semibold" style={{ color: 'rgba(255,255,255,.72)' }}>Email</label>
+        <label htmlFor="login-email" className="mb-1.5 block text-[12.5px] font-semibold" style={{ color: 'rgba(255,255,255,.72)' }}>Email</label>
         <div className={`ttd-field ${INPUT_WRAP}`} style={inputWrapStyle(false)}>
           <input
+            id="login-email"
             name="phone"
             type="email"
             inputMode="email"
@@ -55,9 +56,10 @@ export function LoginForm({ next }: { next: string }) {
       </div>
 
       <div>
-        <label className="mb-1.5 block text-[12.5px] font-semibold" style={{ color: 'rgba(255,255,255,.72)' }}>Password</label>
+        <label htmlFor="login-password" className="mb-1.5 block text-[12.5px] font-semibold" style={{ color: 'rgba(255,255,255,.72)' }}>Password</label>
         <div className={`ttd-field ${INPUT_WRAP}`} style={inputWrapStyle(err)}>
           <input
+            id="login-password"
             name="password"
             type={show ? 'text' : 'password'}
             required
