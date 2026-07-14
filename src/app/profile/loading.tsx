@@ -1,10 +1,11 @@
+import { SurfaceLoading } from '@/components/desktop';
+
+// Profile/Me skeleton. SurfaceLoading keeps the desktop shell during the fetch
+// so switching to this tab doesn't flash the mobile shell + TabBar.
 export default function Loading() {
   return (
-    <div className="flex min-h-full flex-col bg-paper">
-      <div className="flex items-center justify-end px-[18px] pt-[18px]">
-        <div className="h-10 w-10 animate-pulse rounded-xl bg-paper-2" />
-      </div>
-      <div className="flex-1 px-[18px] pb-24 pt-3">
+    <SurfaceLoading maxWidthClass="max-w-[1120px]">
+      <div className="mx-auto w-full max-w-[520px]">
         <div className="flex flex-col items-center pb-4 pt-1">
           <div className="h-[110px] w-[110px] animate-pulse rounded-full bg-paper-2" />
           <div className="mt-3 h-7 w-40 animate-pulse rounded bg-paper-2" />
@@ -17,6 +18,6 @@ export default function Loading() {
           ))}
         </div>
       </div>
-    </div>
+    </SurfaceLoading>
   );
 }

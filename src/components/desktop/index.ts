@@ -5,6 +5,7 @@ export type { Command } from './CommandBar';
 export { DesktopNav } from './DesktopNav';
 export type { DesktopNavProps, NavLink } from './DesktopNav';
 export { DesktopSurface } from './DesktopSurface';
+export { SurfaceLoading } from './SurfaceLoading';
 export { BallMark } from './BallMark';
 export { ThemeToggleButton } from './ThemeToggleButton';
 export { AccountMenu } from './AccountMenu';
