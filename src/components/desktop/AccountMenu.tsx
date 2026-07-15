@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { setTheme } from '@/app/theme-actions';
 import { THEMES, type Theme } from '@/lib/theme';
+import { toggleTheme } from '@/lib/theme-client';
 import { shortFromName } from '@/components/ui/Avatar';
 import { useAccount } from './account-context';
 
@@ -117,7 +118,18 @@ export function AccountMenu({ theme }: { theme: Theme }) {
             </Link>
             <form action={setTheme} onSubmit={close}>
               <input type="hidden" name="theme" value={nextTheme} />
-              <button type="submit" role="menuitem" className={ITEM} style={{ color: 'inherit' }}>
+              <button
+                type="submit"
+                role="menuitem"
+                className={ITEM}
+                style={{ color: 'inherit' }}
+                onClick={(e) => {
+                  // Optimistic flip — no server round-trip / full-tree refetch.
+                  e.preventDefault();
+                  toggleTheme();
+                  close();
+                }}
+              >
                 {ICON_THEME}
                 Switch theme
                 <span
