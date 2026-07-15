@@ -83,12 +83,15 @@ export function CommandBar({ commands, navCommands }: { commands?: Command[]; na
   }, []);
 
   useEffect(() => {
-    if (open) {
-      setQuery('');
-      setSel(0);
-      // focus after paint
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
+    if (!open) return;
+    setQuery('');
+    setSel(0);
+    // Remember what was focused before we opened so we can hand focus back on
+    // close (Escape / backdrop / run) instead of dropping it to <body>.
+    const restoreTo = document.activeElement as HTMLElement | null;
+    // focus after paint
+    requestAnimationFrame(() => inputRef.current?.focus());
+    return () => restoreTo?.focus?.();
   }, [open]);
 
   useEffect(() => {
@@ -122,11 +125,20 @@ export function CommandBar({ commands, navCommands }: { commands?: Command[]; na
   return (
     <div
       role="dialog"
+      aria-modal="true"
       aria-label="Command bar"
       className="fixed inset-0 z-[120] flex items-start justify-center pt-[14vh]"
       style={{ background: 'color-mix(in oklch, #000 46%, transparent)', backdropFilter: 'blur(3px)' }}
       onClick={(e) => {
         if (e.target === e.currentTarget) setOpen(false);
+      }}
+      onKeyDown={(e) => {
+        // Trap Tab: the input is the only tabbable control, so keep focus here
+        // instead of letting it escape to the page behind the modal.
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          inputRef.current?.focus();
+        }
       }}
     >
       <div
@@ -150,6 +162,10 @@ export function CommandBar({ commands, navCommands }: { commands?: Command[]; na
             onKeyDown={onInputKey}
             placeholder="Search events, players, actions…"
             aria-label="Search commands"
+            role="combobox"
+            aria-expanded
+            aria-controls="cmdbar-listbox"
+            aria-activedescendant={filtered.length ? `cmdbar-opt-${sel}` : undefined}
             className="flex-1 border-none bg-transparent text-[17px] outline-none"
             style={{ color: 'var(--text)' }}
           />
@@ -160,7 +176,7 @@ export function CommandBar({ commands, navCommands }: { commands?: Command[]; na
             ESC
           </kbd>
         </div>
-        <div className="max-h-[52vh] overflow-auto p-2" role="listbox">
+        <div className="max-h-[52vh] overflow-auto p-2" role="listbox" id="cmdbar-listbox" aria-label="Commands">
           {filtered.length === 0 ? (
             <div className="py-[34px] text-center text-[14px]" style={{ color: 'var(--text3)' }}>
               No matches for “{query}”
@@ -182,6 +198,7 @@ export function CommandBar({ commands, navCommands }: { commands?: Command[]; na
                   ) : null}
                   <div
                     role="option"
+                    id={`cmdbar-opt-${i}`}
                     aria-selected={selected}
                     className="flex cursor-pointer items-center gap-3 rounded-[11px] p-[11px_12px]"
                     style={selected ? { background: 'color-mix(in oklch, var(--accent) 14%, transparent)' } : undefined}

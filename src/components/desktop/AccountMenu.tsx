@@ -19,6 +19,8 @@ export function AccountMenu({ theme }: { theme: Theme }) {
   const account = useAccount();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const nextTheme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
 
   useEffect(() => {
@@ -31,11 +33,43 @@ export function AccountMenu({ theme }: { theme: Theme }) {
     }
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
+    // Move focus into the menu (first item) so keyboard users land inside it.
+    requestAnimationFrame(() =>
+      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus(),
+    );
     return () => {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
+      // On close, hand focus back to the trigger — but only if focus fell to
+      // <body> (Escape / an activated item removed the menu), never when the
+      // user just clicked another element outside.
+      const active = document.activeElement;
+      if (!active || active === document.body) triggerRef.current?.focus();
     };
   }, [open]);
+
+  // Roving arrow-key navigation between the menu items.
+  function onMenuKey(e: React.KeyboardEvent<HTMLDivElement>) {
+    const items = Array.from(
+      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    );
+    if (!items.length) return;
+    const raw = items.indexOf(document.activeElement as HTMLElement);
+    const cur = raw < 0 ? 0 : raw;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      items[(cur + 1) % items.length]?.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      items[(cur - 1 + items.length) % items.length]?.focus();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      items[0]?.focus();
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      items[items.length - 1]?.focus();
+    }
+  }
 
   if (!account) return null;
 
@@ -44,6 +78,7 @@ export function AccountMenu({ theme }: { theme: Theme }) {
   return (
     <div ref={rootRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -64,8 +99,10 @@ export function AccountMenu({ theme }: { theme: Theme }) {
 
       {open && (
         <div
+          ref={menuRef}
           role="menu"
           aria-label="Account"
+          onKeyDown={onMenuKey}
           className="animate-slide-up overflow-hidden"
           style={{
             position: 'absolute',
