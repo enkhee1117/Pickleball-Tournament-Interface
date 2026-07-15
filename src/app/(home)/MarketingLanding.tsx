@@ -1,8 +1,7 @@
-'use client';
-
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
 import { BallMark } from '@/components/desktop';
+import { StatsStrip } from './StatsStrip';
+import { VoteDemo } from './VoteDemo';
 
 // Public marketing front door (handoff "TourneyPal Landing.html"): a cosmic
 // poster hero, mission-control tour, the crew, the vote→lock→draw→reveal
@@ -127,64 +126,6 @@ function HeroMeta({ big, label }: { big: string; label: string }) {
       <b className="disp text-[24px]">{big}</b>
       <span className="mono mt-0.5 text-[11px] uppercase tracking-[0.08em]" style={{ color: 'rgba(255,255,255,.6)' }}>{label}</span>
     </div>
-  );
-}
-
-function useCountUp(target: number, suffix: string) {
-  const [val, setVal] = useState('0');
-  const ref = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setVal(target + suffix);
-      return;
-    }
-    let raf = 0;
-    let start: number | null = null;
-    const io = new IntersectionObserver((ents) => {
-      ents.forEach((en) => {
-        if (!en.isIntersecting) return;
-        io.disconnect();
-        const step = (t: number) => {
-          if (start === null) start = t;
-          const p = Math.min((t - start) / 900, 1);
-          setVal(Math.round(target * (1 - Math.pow(1 - p, 3))) + suffix);
-          if (p < 1) raf = requestAnimationFrame(step);
-        };
-        raf = requestAnimationFrame(step);
-      });
-    }, { threshold: 0.6 });
-    io.observe(el);
-    return () => {
-      io.disconnect();
-      cancelAnimationFrame(raf);
-    };
-  }, [target, suffix]);
-  return { val, ref };
-}
-
-function StatsStrip() {
-  const a = useCountUp(1200, '+');
-  const b = useCountUp(38, 'K+');
-  const c = useCountUp(240, 'K+');
-  return (
-    <section style={{ background: 'var(--bg2)', borderBottom: '1px solid var(--line)' }}>
-      <div className={`${WRAP} grid grid-cols-1 gap-6 py-7 sm:grid-cols-3`}>
-        {[
-          { s: a, l: 'Events run' },
-          { s: b, l: 'Players mixed' },
-          { s: c, l: 'Partners drawn' },
-        ].map((x, i) => (
-          <div key={i} className="text-center">
-            <div className="disp text-[clamp(26px,3.4vw,42px)] font-extrabold leading-none tracking-[-0.01em]" style={{ color: 'var(--accent)' }}>
-              <span ref={x.s.ref}>{x.s.val}</span>
-            </div>
-            <div className="mono mt-2 text-[11px] uppercase tracking-[0.1em]" style={{ color: 'var(--text3)' }}>{x.l}</div>
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -333,78 +274,6 @@ function Pocket() {
         </div>
       </div>
     </section>
-  );
-}
-
-const DEMO_ROWS = [
-  { avatar: 'p6', name: 'Eli Brooks', start: 2 },
-  { avatar: 'p3', name: 'Theo Kim', start: 0 },
-  { avatar: 'p4', name: 'Alex Park', start: 1 },
-];
-const DEMO_TOTAL = 6;
-
-function VoteDemo() {
-  const [counts, setCounts] = useState<number[]>(DEMO_ROWS.map((r) => r.start));
-  const spent = counts.reduce((a, c) => a + c, 0);
-  const left = DEMO_TOTAL - spent;
-  const bump = (i: number, dir: 1 | -1) => {
-    setCounts((prev) => {
-      const next = [...prev];
-      if (dir === 1) {
-        if (prev.reduce((a, c) => a + c, 0) < DEMO_TOTAL) next[i] = next[i] + 1;
-      } else if (next[i] > 0) {
-        next[i] = next[i] - 1;
-      }
-      return next;
-    });
-  };
-  return (
-    <div
-      className="ttd-float relative w-[300px] overflow-hidden"
-      style={{ border: '8px solid #0a0a0c', borderRadius: 42, background: 'var(--bg)', boxShadow: '0 40px 90px rgba(0,0,0,0.4)', animation: 'ttdFloatY 6.5s 1s ease-in-out infinite' }}
-    >
-      <div className="absolute left-1/2 top-2 z-[5] h-6 w-24 -translate-x-1/2 rounded-2xl" style={{ background: '#0a0a0c' }} />
-      <div className="px-3.5 pb-4 pt-10">
-        <div className="flex items-center justify-between rounded-[14px] px-3 py-3" style={{ background: 'color-mix(in oklch, var(--accent) 13%, var(--bg2))', border: '1px solid color-mix(in oklch, var(--accent) 38%, transparent)' }}>
-          <div>
-            <span className="pill mono inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.07em]" style={{ background: 'var(--accent)', color: 'var(--accent-ink)' }}>
-              <i className="h-[5px] w-[5px] rounded-full" style={{ background: 'var(--accent-ink)' }} /> Ballot open
-            </span>
-            <b className="disp mt-1.5 block text-[14px]" style={{ color: 'var(--text)' }}>Blind ballot · 5 rounds</b>
-          </div>
-        </div>
-        <div className="my-2.5 flex items-center gap-1.5 rounded-[14px] px-3 py-3" style={{ background: 'var(--bg2)', border: '1px solid var(--line)' }}>
-          <div className="flex flex-1 gap-[3px]">
-            {Array.from({ length: DEMO_TOTAL }).map((_, i) => (
-              <span key={i} className="h-[14px] w-[14px] rounded-full" style={i < spent ? { background: 'var(--accent)' } : { border: '1.5px dashed var(--line)' }} />
-            ))}
-          </div>
-          <span className="disp text-[18px] font-extrabold" style={{ color: 'var(--text)' }}>{left}</span>
-        </div>
-        {DEMO_ROWS.map((r, i) => {
-          const c = counts[i];
-          return (
-            <div key={r.name} className="mb-2 flex items-center gap-2.5 rounded-[13px] p-2.5" style={{ background: 'var(--bg2)', border: `1px solid ${c > 0 ? 'color-mix(in oklch, var(--accent) 45%, var(--line))' : 'var(--line)'}` }}>
-              <span className="h-9 w-9 overflow-hidden rounded-full">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/design-handoff/avatars/${r.avatar}.png`} alt="" className="h-full w-full object-cover" style={{ objectPosition: 'center top' }} />
-              </span>
-              <span className="disp flex-1 text-[13px] font-bold" style={{ color: 'var(--text)' }}>{r.name}</span>
-              <button type="button" onClick={() => bump(i, -1)} aria-label={`Downvote ${r.name}`} className="grid h-8 w-8 place-items-center rounded-[9px] text-[13px] font-bold" style={{ border: '1.5px solid var(--line)', color: 'var(--text2)' }}>−</button>
-              <button
-                type="button"
-                onClick={() => bump(i, 1)}
-                aria-label={`Upvote ${r.name}`}
-                className="grid h-8 w-8 place-items-center rounded-[9px] text-[13px] font-bold"
-                style={c > 0 ? { background: 'var(--accent)', color: 'var(--accent-ink)' } : { background: 'color-mix(in oklch, var(--accent) 16%, transparent)', border: '1.5px solid color-mix(in oklch, var(--accent) 55%, transparent)', color: 'var(--accent)' }}
-              >
-                {c > 0 ? `+${c}` : '+'}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
