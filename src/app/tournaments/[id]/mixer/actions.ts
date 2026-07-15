@@ -43,6 +43,10 @@ export async function bindMixerRosterEntry(formData: FormData): Promise<ActionRe
   if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_bind_roster_entry', {
     p_tournament_id: tournamentId,
     p_display_name: displayName || null,
@@ -67,6 +71,10 @@ export async function checkInToMixer(
   if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_check_in', {
     p_tournament_id: tournamentId,
     p_round_id: roundId || null,
@@ -95,6 +103,10 @@ export async function updateMixerConfig(formData: FormData): Promise<ActionResul
   };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_update_mixer_config', {
     p_tournament_id: tournamentId,
     p_starting_tokens: fieldInt(formData, 'starting_tokens', 10, 1, 100),
@@ -163,6 +175,10 @@ export async function retireMixerPlayer(formData: FormData): Promise<ActionResul
   if (!tournamentId || !playerId) return { ok: false, error: 'Missing player.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc(reinstate ? 'app_reinstate_player' : 'app_withdraw_player', { p_player_id: playerId });
   if (error) return { ok: false, error: formatPgError(error) };
 
@@ -179,6 +195,10 @@ export async function swapMixerPlayer(formData: FormData): Promise<ActionResult>
   if (!tournamentId || !roundId || !outPlayer || !inPlayer) return { ok: false, error: 'Pick a player to swap out and a replacement.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_swap_player', { p_round_id: roundId, p_out_player: outPlayer, p_in_player: inPlayer });
   if (error) return { ok: false, error: formatPgError(error) };
 
@@ -195,6 +215,10 @@ export async function updateMixerPlayerPool(formData: FormData): Promise<ActionR
   if (!tournamentId || !playerId || !pool) return { ok: false, error: 'Missing player or pool.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_update_player_pool', {
     p_player_id: playerId,
     p_pairing_pool: pool,
@@ -238,6 +262,10 @@ export async function saveMixerBallot(input: SaveBallotInput): Promise<{ ok: boo
     .filter((v) => v.target_player_id && (v.up_tokens > 0 || v.down_tokens > 0));
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_set_ballot', {
     p_round_id: roundId,
     p_voter_player_id: voterPlayerId,
@@ -256,6 +284,10 @@ export async function updateMixerPlayerGender(formData: FormData): Promise<Actio
   if (!tournamentId || !playerId) return { ok: false, error: 'Missing player.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   // app_update_tournament_player overwrites every column, so read the current
   // row and change ONLY gender — a gender-only edit must not wipe email/phone/dupr.
   const { data: cur } = await supabase
@@ -305,6 +337,10 @@ export async function setMixerRoundState(formData: FormData): Promise<ActionResu
   if (!tournamentId || !roundId || !state) return { ok: false, error: 'Missing round or state.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_set_round_state', {
     p_round_id: roundId,
     p_state: state,
@@ -322,6 +358,10 @@ export async function initializeMixerEvent(formData: FormData): Promise<ActionRe
   if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_ensure_mixer_event', {
     p_tournament_id: tournamentId,
     p_starting_tokens: 10,
@@ -352,6 +392,10 @@ export async function setMixerVotingWindow(formData: FormData): Promise<ActionRe
   if (!tournamentId || !roundId) return { ok: false, error: 'Missing round.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_update_mixer_config', {
     p_tournament_id: tournamentId,
     p_lock_seconds: hours * 3600,
@@ -379,6 +423,10 @@ export async function reopenMixerRound(formData: FormData): Promise<ActionResult
   if (!tournamentId || !roundId) return { ok: false, error: 'Missing round.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_reopen_round', { p_round_id: roundId });
   if (error) return { ok: false, error: formatPgError(error) };
 
@@ -398,6 +446,10 @@ export async function repoolMixerRoster(formData: FormData): Promise<ActionResul
   if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_repool_roster', { p_tournament_id: tournamentId });
   if (error) return { ok: false, error: formatPgError(error) };
 
@@ -412,6 +464,10 @@ export async function resetMixerRoundVotes(formData: FormData): Promise<ActionRe
   if (!tournamentId || !roundId) return { ok: false, error: 'Missing round.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_reset_round_votes', { p_round_id: roundId });
   if (error) return { ok: false, error: formatPgError(error) };
 
@@ -425,6 +481,10 @@ export async function resetMixerEvent(formData: FormData): Promise<ActionResult>
   if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_reset_event', { p_tournament_id: tournamentId });
   if (error) return { ok: false, error: formatPgError(error) };
 
@@ -440,6 +500,10 @@ export async function drawMixerRound(formData: FormData): Promise<ActionResult> 
   if (!tournamentId || !roundId) return { ok: false, error: 'Missing round.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_draw_round', {
     p_round_id: roundId,
   });
@@ -479,6 +543,10 @@ export async function scoreMixerCourt(formData: FormData): Promise<ActionResult>
   if (!tournamentId || !roundId) return { ok: false, error: 'Missing round.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_score_court', {
     p_round_id: roundId,
     p_court_no: courtNo,
@@ -511,6 +579,10 @@ export async function submitMixerScoreAsPlayer(input: {
   const clamp = (n: number) => Math.max(0, Math.min(999, Math.trunc(Number(n) || 0)));
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_player_score_court', {
     p_round_id: roundId,
     p_court_no: Math.max(1, Math.trunc(courtNo)),
@@ -535,6 +607,10 @@ export async function placeMixerBet(formData: FormData): Promise<ActionResult> {
   if (!tournamentId || !bettorPlayerId || !pickPlayerId) return { ok: false, error: 'Missing bet details.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_place_bet', {
     p_tournament_id: tournamentId,
     p_bettor_player_id: bettorPlayerId,
@@ -557,6 +633,10 @@ export async function requestMixerPayment(formData: FormData): Promise<ActionRes
   if (!tournamentId || !playerId || !type) return { ok: false, error: 'Missing payment details.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_request_payment', {
     p_player_id: playerId,
     p_type: type,
@@ -577,6 +657,10 @@ export async function confirmMixerPayment(formData: FormData): Promise<ActionRes
   if (!tournamentId || !paymentId) return { ok: false, error: 'Missing payment.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_confirm_payment', {
     p_payment_id: paymentId,
     p_status: status,
@@ -593,6 +677,10 @@ export async function finalizeMixerEvent(formData: FormData): Promise<ActionResu
   if (!tournamentId) return { ok: false, error: 'Missing tournament.' };
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { error } = await supabase.rpc('app_mixer_finalize_event', {
     p_tournament_id: tournamentId,
   });
@@ -625,6 +713,10 @@ export async function setMixerAddon(formData: FormData): Promise<ActionResult> {
   const enabled = fieldBool(formData, 'enabled');
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Please sign in.' };
   const { data } = await supabase.from('event_config').select('*').eq('tournament_id', tournamentId).maybeSingle();
   if (!data) return { ok: false, error: 'Mixer config is not initialized yet' };
   const c = data as ConfigRow;
