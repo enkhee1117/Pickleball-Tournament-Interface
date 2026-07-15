@@ -2,10 +2,12 @@
 
 import { setTheme } from '@/app/theme-actions';
 import { THEMES, type Theme } from '@/lib/theme';
+import { toggleTheme } from '@/lib/theme-client';
 
-/* Cycles Bright (Sideline) ⇄ Dark (Night) via the setTheme server action
-   (cookie). The handoff's third "Arcade" theme is intentionally not shipped.
-   Icon button matching the handoff nav's theme toggle. */
+/* Cycles Bright (Sideline) ⇄ Dark (Night). With JS the flip is optimistic
+   (instant data-theme swap + cookie write, no server round-trip); the form
+   action is the no-JS fallback. The handoff's third "Arcade" theme is
+   intentionally not shipped. */
 export function ThemeToggleButton({ theme }: { theme: Theme }) {
   const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
   return (
@@ -13,6 +15,10 @@ export function ThemeToggleButton({ theme }: { theme: Theme }) {
       <input type="hidden" name="theme" value={next} />
       <button
         type="submit"
+        onClick={(e) => {
+          e.preventDefault();
+          toggleTheme();
+        }}
         title="Switch theme"
         aria-label="Switch theme"
         className="grid h-10 w-10 place-items-center rounded-[11px] border"
