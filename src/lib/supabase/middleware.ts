@@ -4,7 +4,10 @@ import { getSupabasePublicKey, getSupabaseUrl } from './env';
 
 type CookieInput = { name: string; value: string; options?: CookieOptions };
 
-const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/forgot-password', '/t'];
+// '/api' route handlers do their own auth — the page-level redirect below must
+// not bounce them to /login (it would break the keepalive cron, which is a
+// logged-out GET).
+const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/forgot-password', '/t', '/api'];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
